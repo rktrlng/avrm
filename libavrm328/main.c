@@ -106,7 +106,7 @@ ISR (PCINT0_vect)
 			usart_write_string(" HIGH to LOW\r\n");
 		}
 	}
-/*
+
 	if(changedbits & (1 << PINB2))
 	{
 		// PCINT2 changed
@@ -119,7 +119,6 @@ ISR (PCINT0_vect)
 			usart_write_string(" HIGH to LOW\r\n");
 		}
 	}
-*/
 }
 
 // #####################################################################

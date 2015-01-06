@@ -19,13 +19,13 @@ setup
 Usage
 -----
 
-Run 'setup -a' to install all prerequisites (AVR toolchain, cmake, minicom, autoconf, bison, flex etcetera).
+Run './setup -a' to install all prerequisites (AVR toolchain, cmake, minicom, autoconf, bison, flex etcetera).
 
-Run 'setup -p' to patch the Arduino IDE so it recognizes your board.
+Run './setup -p' to patch the Arduino IDE so it recognizes your board.
 
-Run 'setup -c' to compile and install avrdude from source, or 'setup -b' to install a precompiled avrdude-6.1 with 'linuxgpio' enabled, config file (avrdude.conf) and man file (avrdude.1.gz) to the right places.
+Run './setup -c' to compile and install avrdude from source, or 'setup -b' to install a precompiled avrdude-6.1 with 'linuxgpio' enabled, config file (avrdude.conf) and man file (avrdude.1.gz) to the right places.
 
-Run 'setup -f' to set the fuses for the ATmega328P. Do this once for every new chip.
+Run './setup -f' to set the fuses for the ATmega328P. Do this once for every new chip.
 
 avrdude-6.1-linuxgpio
 ---------------------
@@ -33,9 +33,9 @@ This is plain, vanilla [avrdude-6.1](http://download.savannah.gnu.org/releases/a
 
 This compiles and installs avrdude from source, enabling avrdude to bitbang the Raspberry Pi GPIO pins using the 'linuxgpio' (sysfsgpio) interface that's standard available in avrdude-6.1.
 
-Prerequisite to build avrdude from source:
+Prerequisite to build avrdude from source ('./setup -a' installs this):
 
-	sudo apt-get install flex bison
+	sudo apt-get install autoconf bison flex
 
 connections
 -----------
