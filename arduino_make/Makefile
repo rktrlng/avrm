@@ -109,7 +109,7 @@ $(OUTPUT).hex: $(OUTPUT).elf
 	$(OBJCP) -O ihex -R .eeprom $(OUTPUT).elf $(OUTPUT).hex
 	$(SIZE) $(OUTPUT).hex
   
-.PHONY: upload clean
+.PHONY: flash clean
 
 flash: all
 	$(AVRDUDE) -p $(MCU) -c $(PROGRAMMER) -Uflash:w:$(OUTPUT).hex:i -v
