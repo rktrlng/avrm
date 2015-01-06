@@ -18,7 +18,7 @@ set(ARDUINO_VERSION 103)
 
 # Supported BOARD_TYPE options: 
 # standard, avrm8, avrm12, avrm32u4, gertboard, gertduino, leonardo, custom
-set(BOARD_TYPE avrm32u4)
+set(BOARD_TYPE avrm8)
 
 if (BOARD_TYPE MATCHES standard)
 	set(BOARD_INCLUDE_DIR standard)
