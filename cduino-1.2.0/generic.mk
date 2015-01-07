@@ -130,7 +130,7 @@ UPLOAD_METHOD ?= linuxgpio
 # push the reset button on the arduino immediately after the avrdude
 # programming command goes off to program the device).
 # FIXME: is this crud still required in the rev3 days?  maybe should be true?
-DTR_PULSE_NOT_REQUIRED ?= false
+DTR_PULSE_NOT_REQUIRED ?= true
 
 # Uploader program.
 AVRDUDE ?= avrdude
@@ -479,7 +479,7 @@ else ifeq ($(UPLOAD_METHOD), AVRISPmkII)
             false ) 1>&2
 else ifeq ($(UPLOAD_METHOD), linuxgpio)
   writeflash: binaries_suid_root_stamp
-	$(AVRDUDE) -c linuxgpio \
+	@$(AVRDUDE) -c linuxgpio \
                    -p $(PROGRAMMER_MCU) -P $(AVRISPMKII_PORT) \
                    -U flash:w:$(HEXROMTRG) \
                    $(LOCK_AND_FUSE_AVRDUDE_OPTIONS) || \
@@ -682,12 +682,12 @@ dependency_checks: avrdude_version_check \
 
 .PHONY: avrdude_version_check
 avrdude_version_check: VERSION_CHECKER := \
-  perl -ne ' \
-    m/version (\d+\.\d+(?:\d+))/ and \
-     ($$1 >= 5.10 \
-       or die "avrdude version 5.10 or later required (found version $$1)"); #'
+#  perl -ne ' \
+#    m/version (\d+\.\d+(?:\d+))/ and \
+#     ($$1 >= 5.10 \
+#       or die "avrdude version 5.10 or later required (found version $$1)"); #'
 avrdude_version_check:
-	avrdude -? 2>&1 | $(VERSION_CHECKER)
+#	avrdude -? 2>&1 | $(VERSION_CHECKER)
 
 .PHONY: avrgcc_check
 avrgcc_check:
@@ -708,7 +708,7 @@ avrlibc_check:
 # We are not trying to use avarice or avr-gdb at the moment, but if we were
 # they would probably need this to talk over libusb as well.
 binaries_suid_root_stamp: $(shell which $(AVRDUDE)) $(AVARICE) $(AVRGDB)
-	ls -l $$(which $(AVRDUDE)) | grep --quiet -- '^-rws' || \
+	@ls -l $$(which $(AVRDUDE)) | grep --quiet -- '^-rws' || \
           ( \
             echo -e \\nError: $(AVRDUDE) binary is not suid root\\n 1>&2 && \
             false )
