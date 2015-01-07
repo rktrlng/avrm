@@ -70,7 +70,7 @@ COMPILER_MCU ?= atmega328p
 PROGRAMMER_MCU ?= m328p
 
 # AVR libc uses this.  Some people might prefer to put it in a header though.
-CPU_FREQ_DEFINE ?= -DF_CPU=16000000
+CPU_FREQ_DEFINE ?= -DF_CPU=8000000
 
 # This is used by the replace_bootloader target to determine which
 # bootloader .hex file to use.  Different Arduinos need different values:
@@ -105,10 +105,11 @@ HEADERS ?= $(wildcard *.h)
 # connected via USB (or if there is it should be ignored), so the normal
 # probes for an Arduino on USB are disabled.  This is useful if you're
 # trying to program a bare chip using an AVRISPmkII.
-NO_USB_ARDUINO_CONNECTION ?=
+NO_USB_ARDUINO_CONNECTION ?= noarduino
 
 # This must be one of:
 #
+#    linuxgpio           avrdude's built-in linuxgpio interface (Raspberry Pi)
 #    arduino_bl          Arduino bootloader over USB
 #    AVRISPmkII          AVR ISP mkII programmer, overwriting any bootloader
 #
@@ -119,7 +120,9 @@ NO_USB_ARDUINO_CONNECTION ?=
 # Note that unless NO_USB_ARDUINO_CONNECTION is defined to a non-empty value,
 # this build system still requires an Arduino to be connected over USB,
 # it just doesn't use it for programming.
-UPLOAD_METHOD ?= arduino_bl
+#UPLOAD_METHOD ?= arduino_bl
+#UPLOAD_METHOD ?= AVRISPmkII
+UPLOAD_METHOD ?= linuxgpio
 
 # If this is set to true, then if the perl modules required to pulse the DTR
 # line of the serial port aren't found or the DTR pulse code fails for some
@@ -135,7 +138,8 @@ AVRDUDE ?= avrdude
 # The programmer type being used as understood by avrdude.  This should
 # probably always be "arduino" when the UPLOAD_METHOD is arduino_bl, unless
 # you've for some reason modified you avrdude.conf to include an alternate ID.
-AVRDUDE_ARDUINO_PROGRAMMERID ?= arduino
+#AVRDUDE_ARDUINO_PROGRAMMERID ?= arduino
+AVRDUDE_ARDUINO_PROGRAMMERID ?= linuxgpio
 
 # Location and characteristics of the Arduino on the USB.  Note that this
 # build system usually tries to find an Arduino even if the AVRISPmkII
@@ -148,7 +152,7 @@ AVRDUDE_ARDUINO_PROGRAMMERID ?= arduino
 # 'autoguess' can be used to indicate that the build system should try to
 # guess which values to use based on the device it finds connected (and
 # output diagnostic messages if it can't guess).
-ARDUINO_PORT ?= autoguess
+#ARDUINO_PORT ?= autoguess
 #ARDUINO_PORT ?= /dev/ttyACM0
 #ARDUINO_PORT ?= /dev/ttyUSB0
 ARDUINO_BAUD ?= autoguess
@@ -434,6 +438,11 @@ PRINT_AVRISPMKII_PROGRAMMING_FAILED_MESSAGE := \
   echo for programming. ; \
   echo
 
+PRINT_LINUXGPIO_PROGRAMMING_FAILED_MESSAGE := \
+  echo ; \
+  echo Programming failed.  Is everything concerning linuxgpio hooked up? ; \
+  echo
+
 .PHONY: writeflash
 writeflash: LOCK_AND_FUSE_AVRDUDE_OPTIONS := \
   $(call SHELL_CHECKED,./lock_and_fuse_bits_to_avrdude_options.perl \
@@ -467,6 +476,14 @@ else ifeq ($(UPLOAD_METHOD), AVRISPmkII)
                    -U flash:w:$(HEXROMTRG) \
                    $(LOCK_AND_FUSE_AVRDUDE_OPTIONS) || \
           ( $(PRINT_AVRISPMKII_PROGRAMMING_FAILED_MESSAGE) && \
+            false ) 1>&2
+else ifeq ($(UPLOAD_METHOD), linuxgpio)
+  writeflash: binaries_suid_root_stamp
+	$(AVRDUDE) -c linuxgpio \
+                   -p $(PROGRAMMER_MCU) -P $(AVRISPMKII_PORT) \
+                   -U flash:w:$(HEXROMTRG) \
+                   $(LOCK_AND_FUSE_AVRDUDE_OPTIONS) || \
+          ( $(PRINT_LINUXGPIO_PROGRAMMING_FAILED_MESSAGE) && \
             false ) 1>&2
 else
   $(error invalid UPLOAD_METHOD value '$(UPLOAD_METHOD)')
@@ -553,6 +570,12 @@ else ifeq ($(UPLOAD_METHOD), AVRISPmkII)
                    -p $(PROGRAMMER_MCU) -P $(AVRISPMKII_PORT) \
                    -U eeprom:w:$(RIF)
 	@echo $(IRS)
+else ifeq ($(UPLOAD_METHOD), linuxgpio)
+  write_random_id_to_eeprom: binaries_suid_root_stamp
+	$(AVRDUDE) -c linuxgpio \
+                   -p $(PROGRAMMER_MCU) -P $(AVRISPMKII_PORT) \
+                   -U eeprom:w:$(RIF)
+	@echo $(IRS)
 else
   $(error invalid UPLOAD_METHOD value '$(UPLOAD_METHOD)')
 endif
@@ -569,6 +592,17 @@ ifeq ($(UPLOAD_METHOD), arduino_bl)
 else ifeq ($(UPLOAD_METHOD), AVRISPmkII)
   read_id_from_eeprom: binaries_suid_root_stamp
 	$(AVRDUDE) -c avrispmkII \
+                   -p $(PROGRAMMER_MCU) -P $(AVRISPMKII_PORT) \
+                   -U eeprom:r:$(IDF):r
+	@echo -n "The ID at byte 0 of the EEPROM appears to be 0x"
+	@$(call DUMP_RANDOM_ID, $(RIF))
+	@echo "NOTE: due to endianness you'll need to reverse the bytes of a"
+	@echo "uint64_t literal value to get it to equal this (assuming you"
+	@echo "read the bytes of the ID starting from EEPROM byte 0)."
+	@echo
+else ifeq ($(UPLOAD_METHOD), linuxgpio)
+  read_id_from_eeprom: binaries_suid_root_stamp
+	$(AVRDUDE) -c linuxgpio \
                    -p $(PROGRAMMER_MCU) -P $(AVRISPMKII_PORT) \
                    -U eeprom:r:$(IDF):r
 	@echo -n "The ID at byte 0 of the EEPROM appears to be 0x"
@@ -595,7 +629,7 @@ endif
 # would seem to be stomping a reserved state.  Why not just leave in (1, 0)
 # (meaning slowly rising power)?
 replace_bootloader: $(ACTUAL_ARDUINO_BOOTLOADER)  binaries_suid_root_stamp
-	$(AVRDUDE) -c avrispmkII -p $(PROGRAMMER_MCU) -P $(AVRISPMKII_PORT) \
+	$(AVRDUDE) -c linuxgpio -p $(PROGRAMMER_MCU) -P $(AVRISPMKII_PORT) \
                    -e -u \
                    `./lock_and_fuse_bits_to_avrdude_options.perl -- \
                       $(PROGRAMMER_MCU) \
@@ -605,9 +639,9 @@ replace_bootloader: $(ACTUAL_ARDUINO_BOOTLOADER)  binaries_suid_root_stamp
                       EESAVE=1 BOOTSZ1=0 BOOTSZ0=1 BOOTRST=0 \
                       CKDIV8=1 CKOUT=1 SUT1=1 SUT0=1 \
                       CKSEL3=1 CKSEL2=1 CKSEL1=1 CKSEL0=1` || \
-          ( $(PRINT_AVRISPMKII_PROGRAMMING_FAILED_MESSAGE) && \
+          ( $(PRINT_LINUXGPIO_PROGRAMMING_FAILED_MESSAGE) && \
             false ) 1>&2
-	$(AVRDUDE) -c avrispmkII -p $(PROGRAMMER_MCU) -P $(AVRISPMKII_PORT) \
+	$(AVRDUDE) -c linuxgpio -p $(PROGRAMMER_MCU) -P $(AVRISPMKII_PORT) \
                    -U flash:w:$< \
                    `./lock_and_fuse_bits_to_avrdude_options.perl -- \
                       $(PROGRAMMER_MCU) \
