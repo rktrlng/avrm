@@ -19,7 +19,7 @@ apt_get_everything()
 {
 #	sudo apt-get update
 #	sudo apt-get upgrade
-	sudo apt-get install -y arduino avr-libc binutils-avr gcc-avr avra
+	sudo apt-get install -y arduino arduino-mk avr-libc binutils-avr gcc-avr avra
 #	sudo apt-get install -y gdb-avr simulavr
 	sudo apt-get install -y cmake minicom
 	sudo apt-get install -y autoconf bison flex
