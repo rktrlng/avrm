@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+  <title>Cduino -- Arduino Programming with C and Make</title>
+  <meta name="keywords" content="cduino, arduino, programming, C programming,
+    make, vi, avrdude, atmel, microcontroller" />
+  <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+</head>
+
+<body>
+
+<table style="text-align: left; width: 100%;" border="0" cellpadding="2"
+  cellspacing="10">
+
+  <tbody>
+
+    <tr>
+      <td style="text-align: center; vertical-align: middle; width: 15%;">
+        <br />
+      </td>
+      <td style="text-align: center; vertical-align: middle;">
+        <h1>Cduino: Arduino Programming with C and Make</h1>
+      </td>
+    </tr>
+
+    <tr>
+
+      <td style="vertical-align: top; width: 15%;
+        background-color: rgb(255, 255, 160);">
+
+        <h3><a href="why_cduino.html">Why Cduino?</a></h3>
+
+        <h3><a href="annotated_schematics.html">Annotated Schematics</a></h3>
+
+        <h3><a href="http://www.wayneandlayne.com/blog/2010/12/19/nice-drawings-of-the-arduino-uno-and-mega-2560/">Mechanical Drawing</a></h3>
+
+        <h3><a href="releases/">Download</a></h3>
+
+        <h3><a href="manual.html">Manual</a></h3>
+
+        <h3><a href="apis_and_sources.html">API and Sources</a></h3>
+
+        <h3><a href="lessons.html">Lessons</a></h3>
+
+        <h3><a href="mailing_list.html">Mailing List</a></h3>
+
+        <h3><a href="contributing.html">Contributing</a></h3>
+
+      </td>
+
+      <td style="vertical-align: top;">
+
+        <h2>Quick Start</h2>
+
+        First, <a href="prerequisites.html">set up the prerequisite hardward
+          and software</a>.  Then unpack the distribution and try the following
+        from the top level directory:
+        <p />
+
+        <blockquote>
+          <code>
+            make -rR -C blink writeflash
+          </code>
+        </blockquote>
+        <p />
+
+        If the make command fails, be sure to read the hints just above the
+        failure message...
+        <p />
+
+        Now your arduino's LED should be blinking.
+        <p />
+
+        Talking to the arduino over the serial port takes only two function
+        calls from the <a href="xlinked_source_html/term_io.h.html">
+        term_io module</a>:
+        <p />
+
+        <blockquote>
+          <code>
+            make -rR -C term_io writeflash<br />
+            # Wait a few seconds for the AVR to finish rebooting... <br />
+            make -rR -C term_io run_screen<br />
+            # Maybe hit return a few times
+          </code>
+        </blockquote>
+        <p />
+
+        <h2>News</h2>
+
+        <ul>
+
+          <!-- FIXME: WORK POINT: test out the new html docs -->
+
+          <li> Support for using multiple AVRISPmkII programmers
+          simultaneously.  See the definition of AVRISPMKII_PORT in generic.mk
+          in the top-level project directory.</li>
+
+          <li> New software implementation of Msxim one-wire master protocol:
+          <a
+            href="xlinked_source_html/one_wire_master.h.html">one_wire_master.h
+          </a>.
+          </li>
+
+          <li> New build system support for creating a random 64 bit device ID
+          and loading it into the AVR EEPROM.  See the new_random_id target
+          in generic.mk in the top-level project directory and the <a
+            href="xlinked_source_html/random_id_test.c.html">random_id_test.c
+          </a>.
+          test program.
+          </li>
+
+          <li> Numerous improvements and fixes to <a
+            href="xlinked_source_html/wireless_xbee.h.html"> wireless_xbee.h
+          </a>, including SLEEP_RQ and RESET support.
+          </li>
+
+
+          <li> New module for ST Microelectronics LIS331HH accelerometer (and
+          sibling devices): <a
+            href="xlinked_source_html/accelerometer.h.html">accelerometer.h</a>.
+          </li>
+
+          <li>
+            New module for Maxstream XBee Series 1 wireless modules:
+            <a href="xlinked_source_html/wireless_xbee.h.html">
+              wireless_xbee.h
+            </a>.
+          </li>
+
+          <li>
+            New module for DC motor control use the Arduino Motor Shield:
+            <a href="xlinked_source_html/dc_motor.h.html">dc_motor.h</a>.
+          </li>
+
+          <li>
+            New module for SD card control via SPI:
+            <a href="xlinked_source_html/sd_card.h.html">sd_card.h</a>.
+          </li>
+
+          <li>
+            New module for SPI bus (hardware master-mode only):
+            <a href="xlinked_source_html/spi.h.html">spi.h</a>.
+          </li>
+
+          <li>
+            New tupple macros for cleaner encapsulation of IO pin choices in
+            <a href="xlinked_source_html/dio.h.html">dio.h</a>.
+          </li>
+
+          <li>
+            New module for using Timer/Counter0 hardware as an interrupt-driven
+            stopwatch: <a href="xlinked_source_html/timer0_stopwatch.h.html">
+            timer0_stopwatch.h</a>.
+          </li>
+
+          <li>
+            Fixed port device and baud rate autodetction to work with linux
+            kernel 2.6 behavior.  Unfortunately this means that autodetection
+            doesn't work with earlier kernels anymore.  But it's easy to set
+            the values directly if necessary.
+          </li>
+
+          <li>
+            Works with Aruino Uno now, hopefully.  We try to magically guesses
+            avrdude port and baud rate requirements for Uno vs. Duemilanove
+            Arduinos now (so should work with both).
+          </li>
+
+          <li>
+            New module for the DFRobot DFR0009 LCD and Keypad shield:
+            <code>
+              <a href="xlinked_source_html/lcd_keypad.h.html">lcd_keypad.h</a>
+            </code>.
+          </li>
+
+          <li>Browsable
+            <a href="apis_and_sources.html">API and source documentation</a>.
+          </li>
+
+          <li>
+            New module for HD44780 compatible LCDs:
+            <code>
+              <a href="xlinked_source_html/lcd.h.html">lcd.h</a>
+            </code>.
+          </li>
+
+          <li>
+            New module for simplified digital IO pin initialization and
+            control:
+            <code>
+              <a href="xlinked_source_html/dio.h.html">dio.h</a>
+            </code>.
+          </li>
+
+          <li>
+            Support for building C++ sources.  This project is still all in C,
+            but if anyone wants to use it with C++ it should be easier.  This
+            also make it a lot easier to borrow code from the Arduino libraries
+            :)
+          </li>
+
+        </ul>
+
+        <h2 id="abstract">Abstract</h2>
+
+        <p />
+        This package contains:
+
+          <ul>
+
+            <li> a Makefile setup for programming an arduino (or other
+            Atmel ATMega chip) using unix command line tools
+
+            <li> a library of simple modules to do various interesting things
+            with an ATMega (blink a LED, talk over a serial line, drive simple
+            LCD display, etc.)
+
+          </ul>
+
+        In other words, it's a lots like the excellent <a
+          href="http://www.arduino.cc/">arduino</a> project and uses the same
+        open hardware, but avoids the new wiring language, the C++ intermediate
+        layer, and the Java-based IDE.  Crusy old (and young) Unix/C
+        programmers rejoice!
+
+        <h2>Features</h2>
+
+        <p />
+        <a name="feature_list">
+          <ul>
+
+            <li>Supports programming using the arduino bootloader or in-system
+            programming using AVRISPmkII programmer</li>
+
+            <li>Modules are designed to look as independent as possible: doing
+            <code>cp --recursive --dereference some_module ~/new_project</code>
+            yields a minimal stand-alone project.</li>
+
+            <li>Leverages all the convenient power options (USB or external)
+            and communication circuitry (Serial to USB) of the arduino hardware
+            platform, but provides a convenient migration path to programming
+            for simpler hardware.</li>
+
+            <li>Tries to be pedantic with info and error messages so new
+            arduino users can learn its tricks easily.</li>
+
+          </ul>
+        </a>
+
+        <h2>Bugs and Feature Requests</h2>
+        Please send these to <a
+          href="mailing_list.html">the mailing list</a>.
+        <p />
+
+        Good luck!<br />
+
+        <hr style="width: 100%; height: 2px;">
+
+      </td>
+
+    </tr>
+
+  </tbody>
+
+</table>
+
+</body>
+
+</html>

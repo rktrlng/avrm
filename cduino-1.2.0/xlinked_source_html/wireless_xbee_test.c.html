@@ -1,0 +1,289 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Test/demo for the <a href="wireless_xbee.h.html">wireless_xbee.h</a> interface.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Unlike many other Cduino test programs, this one doesn't blink the on-board</font></i>
+<i><font color="#9A1900">// PB5 LED, but instead requires you to connect a led from Digital 4 (PD4)</font></i>
+<i><font color="#9A1900">// to ground.  For much of the testing an second XBee tranciever and external</font></i>
+<i><font color="#9A1900">// software driver are also required, see the details below.</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;assert.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdlib.h&gt;</font>  <i><font color="#9A1900">// FIXME: probably only needed for broken assert.h</font></i>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;string.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="util.h.html">util.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="wireless_xbee.h.html">wireless_xbee.h</a>"</font>
+
+<i><font color="#9A1900">// The below macro is like the CHKP() macro from <a href="util.h.html">util.h</a>, but it uses pin</font></i>
+<i><font color="#9A1900">// Digital 4 (aka PD4 in ATmega328P-speak).  Why, you ask?  Well, here's</font></i>
+<i><font color="#9A1900">// the story:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   The Sparkfun XBee Shield (Sparkfun part number WRL-10854) uses the</font></i>
+<i><font color="#9A1900">//   hardware serial port to talk to the XBee module (so do all other XBee</font></i>
+<i><font color="#9A1900">//   shield sthat I'm aware of).  Therefore:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   Your host computer cannot use serial-over-USB to program the Arduino</font></i>
+<i><font color="#9A1900">//   unless you flip the tiny switch on the shield to the 'DLINE' position.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   After uploading you have to switch it back and push the tiny reset</font></i>
+<i><font color="#9A1900">//   button.  This gets old fast.  Therefore:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   You might want to use an AVRISPmkII to upload this test driver (assuming</font></i>
+<i><font color="#9A1900">//   you'll be developing off it).  The build system supports this (see the</font></i>
+<i><font color="#9A1900">//   description near UPLOAD_METHOD in generic.mk for warnings and details).</font></i>
+<i><font color="#9A1900">//   However, you'll discover that the plug won't fit in the in-system</font></i>
+<i><font color="#9A1900">//   programming header with the Sparkfun WRL-10854 fully installed (the</font></i>
+<i><font color="#9A1900">//   official Arduino XBee shield might be better in this regard, as they</font></i>
+<i><font color="#9A1900">//   have been leading the charge towards using longer tails on the stacking</font></i>
+<i><font color="#9A1900">//   blocks). DO NOT try to use the shield without it being fully plugged</font></i>
+<i><font color="#9A1900">//   in, I can testify that this can result in flaky connections and much</font></i>
+<i><font color="#9A1900">//   frustration.  Instead, just use a set of stacking blocks to raise the</font></i>
+<i><font color="#9A1900">//   shield up high enough that the ISP cable will fit.  Don't have extra</font></i>
+<i><font color="#9A1900">//   stacking blocks?  Then read on...</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   I found that my Official Arduino Motor Shield R3 has long tails and</font></i>
+<i><font color="#9A1900">//   leaves the ISP header unconnected, so I just plugged that in under the</font></i>
+<i><font color="#9A1900">//   Sparkfun WRL-10854.  But the motor shield uses PB5 for its own purposes</font></i>
+<i><font color="#9A1900">//   and I didn't want to confuse it, hence this macro.  If you remember</font></i>
+<i><font color="#9A1900">//   to add a LED from PD4 to ground (with a current-limiting resistor if</font></i>
+<i><font color="#9A1900">//   you're feeling prim and proper) you'll have a nice working test setup</font></i>
+<i><font color="#9A1900">//   that doesn't require you to twiddle the tiny switch and button every</font></i>
+<i><font color="#9A1900">//   edit-compile-debug :)</font></i>
+<i><font color="#9A1900">//</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="52">CHKP_PD4</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="util.h.html#72">CHKP_USING</a></font></b> <font color="#990000">(</font>DDRD<font color="#990000">,</font> DDD4<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD4<font color="#990000">,</font> <font color="#993399">300.0</font><font color="#990000">,</font> <font color="#993399">3</font><font color="#990000">)</font>
+
+<i><font color="#9A1900">// Single-blink checkpoint (or other thing) version</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="55">CHKP_PD4_SB</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="util.h.html#72">CHKP_USING</a></font></b> <font color="#990000">(</font>DDRD<font color="#990000">,</font> DDD4<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD4<font color="#990000">,</font> <font color="#993399">300.0</font><font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">)</font>
+
+<i><font color="#9A1900">// For the reasons described for CHKP_PD4() above, we need to rewire the</font></i>
+<i><font color="#9A1900">// BTRAP() macro from <a href="util.h.html">util.h</a> to work on a different LED.</font></i>
+<b><font color="#000080">#undef</font></b> <a name="59">BTRAP</a>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="60">BTRAP</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="util.h.html#86">BTRAP_USING</a></font></b> <font color="#990000">(</font>DDRD<font color="#990000">,</font> DDD4<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD4<font color="#990000">,</font> <font color="#993399">100.0</font><font color="#990000">)</font>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="63">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// NOTE: you almost certainly want to use the RESET line on the XBee to</font></i>
+  <i><font color="#9A1900">// reset it at startup.  It's theoretically possible not to do this, and</font></i>
+  <i><font color="#9A1900">// since additional hardware lines are required this test program doesn't</font></i>
+  <i><font color="#9A1900">// do it.  But it's also easy to get the XBee wedged, and resetting the</font></i>
+  <i><font color="#9A1900">// Arduino doesn't reset the XBee, so a power cycle is required, which</font></i>
+  <i><font color="#9A1900">// gets inconvenient fast.  The <a href="wireless_xbee.h.html">wireless_xbee.h</a> header has more details,</font></i>
+  <i><font color="#9A1900">// but the ritual looks something like this:</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">// // These must be defined before <a href="wireless_xbee.h.html">wireless_xbee.h</a> is included for the first</font></i>
+  <i><font color="#9A1900">// // time, so it's actually better to do it from the Makefile -- there is</font></i>
+  <i><font color="#9A1900">// // some commented out code in the Makefile for this module to do it from</font></i>
+  <i><font color="#9A1900">// // there.</font></i>
+  <i><font color="#9A1900">// #define WX_SLEEP_RQ_CONTROL_PIN DIO_PIN_PD7</font></i>
+  <i><font color="#9A1900">// #define WX_RESET_CONTROL_PIN DIO_PIN_PD6</font></i>
+  <i><font color="#9A1900">// #include "<a href="wireless_xbee.h.html">wireless_xbee.h</a>"</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">// WX_SLEEP_RQ_CONTROL_PIN_INIT ();</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">// WX_RESET ();</font></i>
+  <i><font color="#9A1900">// wx_init ();</font></i>
+
+  <b><font color="#000000"><a href="wireless_xbee.c.html#27">wx_init</a></font></b> <font color="#990000">();</font>
+
+  <font color="#008080">uint8_t</font> sentinel<font color="#990000">;</font>    <i><font color="#9A1900">// For sentinel value returned by many functions</font></i>
+
+<i><font color="#9A1900">// Uncomment this to morph this program into a responder that can be</font></i>
+<i><font color="#9A1900">// substituted for the ./usb_xbee_test --query-mode instance as described</font></i>
+<i><font color="#9A1900">// in the comments at the start of usb_xbee_test.</font></i>
+<i><font color="#9A1900">//#define AUTOMATIC_TESTING_WITH_USB_XBEE_TEST</font></i>
+
+<i><font color="#9A1900">// This ifndef is supposed to be true by default (as shipped).</font></i>
+<b><font color="#000080">#ifndef</font></b> AUTOMATIC_TESTING_WITH_USB_XBEE_TEST
+
+  <font color="#009900">char</font> co<font color="#990000">[</font><a href="wireless_xbee.h.html#552">WX_MCOSL</a><font color="#990000">];</font>   <i><font color="#9A1900">// Command Output</font></i>
+
+  <i><font color="#9A1900">// The AT command which queries the current baud setting returns a string</font></i>
+  <i><font color="#9A1900">// containing a particular number followed by a carriage return ('\r')</font></i>
+  <i><font color="#9A1900">// to mean 9600 baud (and wx_com() will strip off the trailing '\r' for us).</font></i>
+<b><font color="#000080">#  define</font></b> <a name="103">STRING_MEANING_9600_BAUD</a> <font color="#FF0000">"3"</font>
+
+  sentinel <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.c.html#109">wx_enter_at_command_mode</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>sentinel<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Check that the current baud setting is 9600.  This is the default setting</font></i>
+  <i><font color="#9A1900">// for the XBee modules, and is the only setting this interface supports,</font></i>
+  <i><font color="#9A1900">// so that's what we should see if we see anything.</font></i>
+  sentinel <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.c.html#188">wx_at_command</a></font></b> <font color="#990000">(</font><font color="#FF0000">"BD"</font><font color="#990000">,</font> co<font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>sentinel<font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(!</font> <b><font color="#000000">strcmp</font></b> <font color="#990000">(</font>co<font color="#990000">,</font> <a href="wireless_xbee_test.c.html#103">STRING_MEANING_9600_BAUD</a><font color="#990000">));</font>
+
+  <i><font color="#9A1900">// The default settings for the XBee module for a couple parameter we</font></i>
+  <i><font color="#9A1900">// can tweak.</font></i>
+<b><font color="#000080">#  define</font></b> <a name="117">DEFAULT_NETWORK_ID</a> <font color="#993399">0x3332</font>
+<b><font color="#000080">#  define</font></b> <a name="118">DEFAULT_CHANNEL</a> <font color="#993399">0x0c</font>
+
+  <i><font color="#9A1900">// Some non-default setting that we're going to try out</font></i>
+<b><font color="#000080">#  define</font></b> <a name="121">NON_DEFAULT_NETWORK_ID</a> <font color="#993399">0x3342</font>
+<b><font color="#000080">#  define</font></b> <a name="122">NON_DEFAULT_CHANNEL</a> <font color="#993399">0x14</font>
+
+  <i><font color="#9A1900">// Equivalent values in the string forms used by the AT command set</font></i>
+<b><font color="#000080">#  define</font></b> <a name="125">DEFAULT_NETWORK_ID_STRING</a> <font color="#FF0000">"3332"</font>
+  <i><font color="#9A1900">// WARNING: it appears that the XBee doesn't print the leading zeros</font></i>
+  <i><font color="#9A1900">// when responding to queries (it still accepts leading zeros when</font></i>
+  <i><font color="#9A1900">// values are being set, and for all I know they may be required in</font></i>
+  <i><font color="#9A1900">// that context).  Therefore we have both DEFAULT_CHANNEL_STRING and</font></i>
+  <i><font color="#9A1900">// OTHER_POSSIBLE_DEFAULT_CHANNEL_STRING for the channel case.  Presumably</font></i>
+  <i><font color="#9A1900">// this is an example of a general behavior that's worth being aware of</font></i>
+  <i><font color="#9A1900">// if you need to query configuration settings.</font></i>
+<b><font color="#000080">#  define</font></b> <a name="133">DEFAULT_CHANNEL_STRING</a> <font color="#FF0000">"0C"</font>
+  <i><font color="#9A1900">// See comment above near the DEFAULT_CHANNEL_STRING define.</font></i>
+<b><font color="#000080">#  define</font></b> <a name="135">OTHER_POSSIBLE_DEFAULT_CHANNEL_STRING</a> <font color="#FF0000">"C"</font>
+<b><font color="#000080">#  define</font></b> <a name="136">NON_DEFAULT_NETWORK_ID_STRING</a> <font color="#FF0000">"3342"</font>
+<b><font color="#000080">#  define</font></b> <a name="137">NON_DEFAULT_CHANNEL_STRING</a> <font color="#FF0000">"14"</font>
+
+  <i><font color="#9A1900">// Test wx_ensure_network_id_set_to()</font></i>
+  sentinel <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.c.html#223">wx_ensure_network_id_set_to</a></font></b> <font color="#990000">(</font><a href="wireless_xbee_test.c.html#121">NON_DEFAULT_NETWORK_ID</a><font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>sentinel<font color="#990000">);</font>
+  sentinel <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.c.html#188">wx_at_command</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ID"</font><font color="#990000">,</font> co<font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>sentinel<font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(!</font> <b><font color="#000000">strcmp</font></b> <font color="#990000">(</font>co<font color="#990000">,</font> <a href="wireless_xbee_test.c.html#136">NON_DEFAULT_NETWORK_ID_STRING</a><font color="#990000">));</font>
+
+  <i><font color="#9A1900">// Test wx_ensure_channel_set_to()</font></i>
+  sentinel <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.c.html#259">wx_ensure_channel_set_to</a></font></b> <font color="#990000">(</font><a href="wireless_xbee_test.c.html#122">NON_DEFAULT_CHANNEL</a><font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>sentinel<font color="#990000">);</font>
+  sentinel <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.c.html#188">wx_at_command</a></font></b> <font color="#990000">(</font><font color="#FF0000">"CH"</font><font color="#990000">,</font> co<font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>sentinel<font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(!</font> <b><font color="#000000">strcmp</font></b> <font color="#990000">(</font>co<font color="#990000">,</font> <a href="wireless_xbee_test.c.html#137">NON_DEFAULT_CHANNEL_STRING</a><font color="#990000">));</font>
+
+  <i><font color="#9A1900">// Test wx_restore_defaults()</font></i>
+  sentinel <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.c.html#299">wx_restore_defaults</a></font></b> <font color="#990000">();</font>
+  sentinel <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.c.html#188">wx_at_command</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ID"</font><font color="#990000">,</font> co<font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>sentinel<font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(!</font> <b><font color="#000000">strcmp</font></b> <font color="#990000">(</font>co<font color="#990000">,</font> <a href="wireless_xbee_test.c.html#125">DEFAULT_NETWORK_ID_STRING</a><font color="#990000">));</font>
+  sentinel <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.c.html#188">wx_at_command</a></font></b> <font color="#990000">(</font><font color="#FF0000">"CH"</font><font color="#990000">,</font> co<font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>sentinel<font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>
+      <font color="#990000">(!</font> <b><font color="#000000">strcmp</font></b> <font color="#990000">(</font>co<font color="#990000">,</font> <a href="wireless_xbee_test.c.html#133">DEFAULT_CHANNEL_STRING</a><font color="#990000">))</font> <font color="#990000">||</font>
+      <font color="#990000">(!</font> <b><font color="#000000">strcmp</font></b> <font color="#990000">(</font>co<font color="#990000">,</font> <a href="wireless_xbee_test.c.html#135">OTHER_POSSIBLE_DEFAULT_CHANNEL_STRING</a><font color="#990000">))</font> <font color="#990000">);</font>
+
+  sentinel <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.c.html#154">wx_exit_at_command_mode</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>sentinel<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// This first batch of blinks mean all the AT command stuff worked :)</font></i>
+  <b><font color="#000000">CHKP_PD4</font></b> <font color="#990000">();</font>
+<a href="wireless_xbee.c.html#22">CHKP_PD4 -> wireless_xbee.c:22</a>
+<a href="wireless_xbee_test.c.html#52">CHKP_PD4 -> wireless_xbee_test.c:52</a>
+
+  <font color="#009900">float</font> tbt_ms <font color="#990000">=</font> <font color="#993399">1000</font><font color="#990000">;</font>   <i><font color="#9A1900">// Time Between Tests (in milliseconds)</font></i>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>tbt_ms<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// The remainder of this test program depends on having a Sparkfun XBee</font></i>
+  <i><font color="#9A1900">// Explorer USB (Sparkfun part number WRL-08687) or equivalent (probably any</font></i>
+  <i><font color="#9A1900">// USB adapter based on the FTDI FT232RL will work) and a copy of usb_xbee</font></i>
+  <i><font color="#9A1900">// running in framed lines mode.  If you're Explorer is associated with</font></i>
+  <i><font color="#9A1900">// device file /dev/ttyUSB0 (see the POD documentation in usb_xbee for a</font></i>
+  <i><font color="#9A1900">// way to check) invocation would look like this:</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">//   ./usb_xbee -d /dev/ttyUSB0 -f</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">// Now we repeatedly send out prompts for the answer, blinking a light</font></i>
+  <i><font color="#9A1900">// whenever we get it (the answer being 42 of course :).  Regardless of the</font></i>
+  <i><font color="#9A1900">// answer given, we echo each received string back out in a return frame.</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">// Note that if this test program is started on the Arduino before usb_xbee</font></i>
+  <i><font color="#9A1900">// is started, usb_xbee may fail at startup complaining about a timeout</font></i>
+  <i><font color="#9A1900">// before receiving a full frame.  This is expected and correct behavior.</font></i>
+  <i><font color="#9A1900">// Just try starting it again.  It might also fail later if there is</font></i>
+  <i><font color="#9A1900">// non-frame radio data floating around on the network/channel in use.</font></i>
+  <i><font color="#9A1900">// It's supposed to do that.</font></i>
+
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">1</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+
+    <font color="#008080">uint8_t</font> sentinel <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.c.html#455">wx_put_string_frame</a></font></b> <font color="#990000">(</font><font color="#FF0000">"What is the answer?</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font>sentinel<font color="#990000">);</font>
+
+    <font color="#008080">uint16_t</font> tpra_ms <font color="#990000">=</font> <font color="#993399">2042</font><font color="#990000">;</font>   <i><font color="#9A1900">// Time Per Read Attempt (in milliseconds)</font></i>
+
+    <i><font color="#9A1900">// Ok, some of the interface macros are long and ugly.  Here's a short</font></i>
+    <i><font color="#9A1900">// ugly alias for our private use: Max Payload Length For Us.</font></i>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a name="202">MPLFU</a></font> <a href="wireless_xbee.h.html#381">WX_FRAME_SAFE_PAYLOAD_LENGTH_WITH_NO_BYTES_REQUIRING_ESCAPE</a>
+    <i><font color="#9A1900">// Testing of frames of maximum length, with many escape characters, etc.</font></i>
+    <i><font color="#9A1900">// is handled largely from usb_xbee_test, but in case you want to try to</font></i>
+    <i><font color="#9A1900">// verify that such frames always work on the C side you can use these</font></i>
+    <i><font color="#9A1900">// line instead of the above.</font></i>
+<i><font color="#9A1900">//#  define MPLFU WX_FRAME_SAFE_UNESCAPED_PAYLOAD_LENGTH</font></i>
+
+    <font color="#009900">char</font> rstr<font color="#990000">[</font><a href="wireless_xbee_test.c.html#202">MPLFU</a> <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">];</font>   <i><font color="#9A1900">// Received string</font></i>
+
+    sentinel <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.c.html#776">wx_get_string_frame</a></font></b> <font color="#990000">(</font><a href="wireless_xbee_test.c.html#202">MPLFU</a> <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">,</font> rstr<font color="#990000">,</font> tpra_ms<font color="#990000">);</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> sentinel <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <i><font color="#9A1900">// In kindness to other callers, we clean up after any UART Rx error.</font></i>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="wireless_xbee.h.html#337">WX_UART_RX_ERROR</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#000000"><a href="wireless_xbee.h.html#341">WX_UART_FLUSH_RX_BUFFER</a></font></b> <font color="#990000">();</font>
+      <font color="#FF0000">}</font>
+      <i><font color="#9A1900">// Timeouts, bad frames, all sorts of errors end up getting eaten</font></i>
+      <i><font color="#9A1900">// here FIXXME: the frame functions should probably do some sort of</font></i>
+      <i><font color="#9A1900">// error propagation.</font></i>
+      <b><font color="#0000FF">continue</font></b><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+
+<b><font color="#000080">#  define</font></b> <a name="223">THE_ANSWER</a> <font color="#FF0000">"42</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font>
+
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> <b><font color="#000000">strcmp</font></b> <font color="#990000">(</font>rstr<font color="#990000">,</font> <a href="wireless_xbee_test.c.html#223">THE_ANSWER</a><font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000">CHKP_PD4</font></b> <font color="#990000">();</font>
+<a href="wireless_xbee.c.html#22">CHKP_PD4 -> wireless_xbee.c:22</a>
+<a href="wireless_xbee_test.c.html#52">CHKP_PD4 -> wireless_xbee_test.c:52</a>
+    <font color="#FF0000">}</font>
+
+    sentinel <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.c.html#455">wx_put_string_frame</a></font></b> <font color="#990000">(</font>rstr<font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font>sentinel<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+<b><font color="#000080">#else</font></b> <i><font color="#9A1900">// AUTOMATIC_TESTING_WITH_USB_XBEE_TEST is defined</font></i>
+
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">1</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+
+    <i><font color="#9A1900">// This value isn't entirely arbitrary: it's less than the $ttwfr (Time To</font></i>
+    <i><font color="#9A1900">// Wait For Response) value in the --query-mode path of usb_xbee_test.</font></i>
+    <i><font color="#9A1900">// This allows the the usb_xbee_test instance to be started in quesry</font></i>
+    <i><font color="#9A1900">// mode at any time after the Arduino is up and running without risking</font></i>
+    <i><font color="#9A1900">// a timeout in that program at startup.  Note that a malformed packet</font></i>
+    <i><font color="#9A1900">// could still sometimes occur at startup, if the wx_get_frame() below</font></i>
+    <i><font color="#9A1900">// has almost timed out when a query packet arrives.</font></i>
+    <font color="#008080">uint16_t</font> tpra_ms <font color="#990000">=</font> <font color="#993399">1042</font><font color="#990000">;</font>   <i><font color="#9A1900">// Time Per Read Attempt (in milliseconds)</font></i>
+
+    <i><font color="#9A1900">// Ok, some of the interface macros are long and ugly.  Here's a short</font></i>
+    <i><font color="#9A1900">// ugly alias for our private use: Max Payload Length For Us.</font></i>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="wireless_xbee_test.c.html#202">MPLFU</a></font> <a href="wireless_xbee.h.html#381">WX_FRAME_SAFE_PAYLOAD_LENGTH_WITH_NO_BYTES_REQUIRING_ESCAPE</a>
+    <i><font color="#9A1900">// Testing of frames of maximum length, with many escape characters, etc.</font></i>
+    <i><font color="#9A1900">// is handled largely from usb_xbee_test, but in case you want to try to</font></i>
+    <i><font color="#9A1900">// verify that such frames always work on the C side you can use this line</font></i>
+    <i><font color="#9A1900">// instead of the above.</font></i>
+<i><font color="#9A1900">//#  define MPLFU WX_FRAME_SAFE_UNESCAPED_PAYLOAD_LENGTH</font></i>
+
+    <font color="#008080">uint8_t</font> rfps<font color="#990000">;</font>
+    <font color="#009900">char</font> rpyld<font color="#990000">[</font><a href="wireless_xbee_test.c.html#202">MPLFU</a><font color="#990000">];</font>   <i><font color="#9A1900">// Received payload</font></i>
+
+    sentinel <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.c.html#519">wx_get_frame</a></font></b> <font color="#990000">(</font><a href="wireless_xbee_test.c.html#202">MPLFU</a><font color="#990000">,</font> <font color="#990000">&amp;</font>rfps<font color="#990000">,</font> rpyld<font color="#990000">,</font> tpra_ms<font color="#990000">);</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> sentinel <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <i><font color="#9A1900">// In kindness to other callers, we clean up after any UART Rx error.</font></i>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="wireless_xbee.h.html#337">WX_UART_RX_ERROR</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#000000"><a href="wireless_xbee.h.html#341">WX_UART_FLUSH_RX_BUFFER</a></font></b> <font color="#990000">();</font>
+      <font color="#FF0000">}</font>
+      <i><font color="#9A1900">// Timeouts, bad frames, all sorts of errors end up getting eaten</font></i>
+      <i><font color="#9A1900">// here FIXXME: the frame functions should probably do some sort of</font></i>
+      <i><font color="#9A1900">// error propagation.</font></i>
+      <b><font color="#0000FF">continue</font></b><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <i><font color="#9A1900">// We can afford a quick blink per packet to show from the Arduino side</font></i>
+    <i><font color="#9A1900">// that a packet has been sent, without causing timeouts elsewhere.</font></i>
+    <b><font color="#000000"><a href="wireless_xbee_test.c.html#55">CHKP_PD4_SB</a></font></b> <font color="#990000">();</font>
+
+    sentinel <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.c.html#379">wx_put_frame</a></font></b> <font color="#990000">(</font>rfps<font color="#990000">,</font> rpyld<font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font>sentinel<font color="#990000">);</font>
+
+  <font color="#FF0000">}</font>
+
+<b><font color="#000080">#endif</font></b>
+
+<font color="#FF0000">}</font>
+</tt></pre>

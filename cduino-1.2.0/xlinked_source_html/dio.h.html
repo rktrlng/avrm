@@ -1,0 +1,681 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Simple digital IO macros to hide some of the ugliness of port bit value</font></i>
+<i><font color="#9A1900">// manipulation.</font></i>
+
+<i><font color="#9A1900">// Test driver: <a href="dio_test.c.html">dio_test.c</a>    Implementation: This file</font></i>
+
+<i><font color="#9A1900">// vim: foldmethod=marker</font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="dio.h.html#9">DIO_H</a>
+<b><font color="#000080">#define</font></b> <a name="9">DIO_H</a>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;inttypes.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="util.h.html">util.h</a>"</font>
+
+<i><font color="#9A1900">///////////////////////////////////////////////////////////////////////////////</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// How This Interface Works</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This interface provides simple pin-at-a-time initialization, reading,</font></i>
+<i><font color="#9A1900">// and writing of the digital IO pins of the ATMega 328p.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// WARNING: this interface provides macros to control pins that are</font></i>
+<i><font color="#9A1900">// normally not available for use as general digital IO on an Arduino.</font></i>
+<i><font color="#9A1900">// See the below section 'Notes About Particular Pins'.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// WARNING: some of the pin configuration abstration provided by the</font></i>
+<i><font color="#9A1900">// initialization macros could cause trouble in some unusual situations.</font></i>
+<i><font color="#9A1900">// See the below section 'Pin Initialization Details'.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Example of use:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   DIO_INIT_PB0 (DIO_OUTPUT, DIO_DONT_CARE, LOW);</font></i>
+<i><font color="#9A1900">//   DIO_INIT_PB1 (DIO_INPUT, DIO_ENABLE_PULLUP, DIO_DONT_CARE);</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   uint8_t pb0_value = some_function_returing_boolean ();</font></i>
+<i><font color="#9A1900">//   DIO_SET_PB0 (pb0_value);</font></i>
+<i><font color="#9A1900">//   uint8_t pb1_value = DIO_READ_PB1 ();</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// When setting a pin to a value known at compile time, it's a tiny bit</font></i>
+<i><font color="#9A1900">// faster (and smaller code) to set the value like this:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   DIO_SET_PB0_HIGH ();</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// I find these macros easier to read and remember than the individual</font></i>
+<i><font color="#9A1900">// bit fiddling instructions and wait-till-set code.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This interface doesn't support configuring/reading/writing multiple pins</font></i>
+<i><font color="#9A1900">// that use the same port in a single instruction, which is possible with</font></i>
+<i><font color="#9A1900">// the raw memory map read/write interface provided by AVR Libc.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// For those who like the alternate numbering system that Aruidnos use</font></i>
+<i><font color="#9A1900">// for their preferred digital IO pins, macros that work like this are</font></i>
+<i><font color="#9A1900">// also provided:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   DIO_INIT_DIGITAL_8 (DIO_INPUT, DIO_ENABLE_PULLUP, DIO_DONT_CARE);</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// All caveats described for the underlying macros apply.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// There are also macros that expand to tuples of the various register</font></i>
+<i><font color="#9A1900">// and bit macros associated with each pin, and variadic macros which can</font></i>
+<i><font color="#9A1900">// accept these tuple macros as arguments.  So it's also possible to write</font></i>
+<i><font color="#9A1900">// things like this:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   DIO_INIT (DIO_PIN_PB0, DIO_OUTPUT, DIO_DONT_CARE, LOW);</font></i>
+<i><font color="#9A1900">//   DIO_SET (DIO_PIN_PB0, HIGH);</font></i>
+<i><font color="#9A1900">//   DIO_SET_LOW (DIO_PIN_PB0);</font></i>
+<i><font color="#9A1900">//   DIO_SET_HIGH (DIO_PIN_PB0);</font></i>
+<i><font color="#9A1900">//   DIO_INIT (DIO_PIN_PB1, DIO_INPUT, DIO_ENABLE_PULLUP, DIO_DONT_CARE);</font></i>
+<i><font color="#9A1900">//   uint8_t pb1_value = DIO_READ (DIO_PIN_PB1);</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// I find these forms harder to read, and the macros are variadic, which</font></i>
+<i><font color="#9A1900">// means you're likely to get strange hard-to-interpret errors if you call</font></i>
+<i><font color="#9A1900">// them wrong.  So I don't reccomend these forms.  However, they may be</font></i>
+<i><font color="#9A1900">// convenient for clients that want to allow compile-time pin configuration.</font></i>
+<i><font color="#9A1900">// See the sd_card module for an example.</font></i>
+
+
+<i><font color="#9A1900">///////////////////////////////////////////////////////////////////////////////</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Notes About Particular Pins</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// All the IO pins on the ATMega chips can be set to perform alternate</font></i>
+<i><font color="#9A1900">// functions other than general digital IO, or controlled in alternate ways</font></i>
+<i><font color="#9A1900">// as described in section 13.3 of the ATMegs328P datasheet Rev. 8271C.</font></i>
+<i><font color="#9A1900">// This interface assumes the normal settings for the Arduino are in effect.</font></i>
+<i><font color="#9A1900">// These are mostly the default setting for the ATMega.  However, the</font></i>
+<i><font color="#9A1900">// Arduino uses some pins for its own pre-set hardware or software purposes:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * PB3, PB4     used for in-system programming (ISP)</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * PB5          Connected to to ground via ~1 kohm resistor and LED,</font></i>
+<i><font color="#9A1900">//                  with a op amp buffer in there as well for the Uno Rev</font></i>
+<i><font color="#9A1900">//                  3 (and probably later models).  Also used for in-system</font></i>
+<i><font color="#9A1900">//                  programming (ISP)</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * PB6, PB7     used for the external oscillator</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * PC6          used as the reset pin, and for in-system programming</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * PD0, PD1     set up for serial communication by Arduino bootloader,</font></i>
+<i><font color="#9A1900">//                  physically connected to the serial-to-USB interface</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// These pins cannot be used for arbitrary general digital IO in the normal</font></i>
+<i><font color="#9A1900">// Arduino configuration.  PB5 can be usefully set for output to control</font></i>
+<i><font color="#9A1900">// the onboard LED.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// For completeness and easy migration to simpler hardware, this interface</font></i>
+<i><font color="#9A1900">// provides macros for these pins.  At least the following considerations</font></i>
+<i><font color="#9A1900">// apply to their use:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * PB3 and PB4 can be used, although tying them firmly low or high will</font></i>
+<i><font color="#9A1900">//     prevent in-system programming (ISP) from working.  I don't fully</font></i>
+<i><font color="#9A1900">//     understand ISP/digital IO interaction.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * PB5 can be used, provided one doesn't mind it being pulled strongly low</font></i>
+<i><font color="#9A1900">//     and/or driving the on-board LED as a side effect (note that activating</font></i>
+<i><font color="#9A1900">//     the internal pull-up resistor will result in a pointless current</font></i>
+<i><font color="#9A1900">//     drain and still fail to pull the input high).  Also, tying it firmly</font></i>
+<i><font color="#9A1900">//     low or high will prevent in-system programming (ISP) from working.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * PD0 and PD1 can be utilized as general digital IO when using</font></i>
+<i><font color="#9A1900">//     an in-system programmer (instead of serial programming via the</font></i>
+<i><font color="#9A1900">//     bootloader).  Note that the bootloader must be fully removed (which</font></i>
+<i><font color="#9A1900">//     ISP does) or the pins reconfigured in software before this can work.</font></i>
+<i><font color="#9A1900">//     The DIO_INIT_PD0/DIO_INIT_PD1 macros are not sufficient.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * PB6, PB7 and PC6 cannot be used for general digital IO without</font></i>
+<i><font color="#9A1900">//     hardware and/or fuse bit changes.</font></i>
+
+
+<i><font color="#9A1900">///////////////////////////////////////////////////////////////////////////////</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Pin Initialization Details</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// In general, it is possible to re-initialize a pin to change it from</font></i>
+<i><font color="#9A1900">// input to output or vice versa, or to enable or disable its internal</font></i>
+<i><font color="#9A1900">// pull-up resistor.  However, there is one issue that results from the</font></i>
+<i><font color="#9A1900">// order in which the initialiazation macros do things.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// When initializing a pin for input, the pin is first set for input, then</font></i>
+<i><font color="#9A1900">// the internal pullup resistor enabled if requested.  Due to the fact that</font></i>
+<i><font color="#9A1900">// the PORTxn bits are recycled and interpreted differently depending on the</font></i>
+<i><font color="#9A1900">// data direction (as set by the DDxn bits), this order of operations means</font></i>
+<i><font color="#9A1900">// that the pin might float for a few microseconds (which might possibly</font></i>
+<i><font color="#9A1900">// result in a spurious pin change interrupt if those are enabled and</font></i>
+<i><font color="#9A1900">// there is no external pull-up or pull-down resister).  We do things in</font></i>
+<i><font color="#9A1900">// this order to ensure that we don't have to risk a spurious change to the</font></i>
+<i><font color="#9A1900">// output value in case the pin is being reconfigured from output to input.</font></i>
+<i><font color="#9A1900">// When initializing a pin for output, the requested initial value is first</font></i>
+<i><font color="#9A1900">// set and then the pin direction set for output.  This might likewise result</font></i>
+<i><font color="#9A1900">// in a momentary deactivation (or activation) of the internal pull-up, and</font></i>
+<i><font color="#9A1900">// a momentarily floating input pin (and potential interrupt).  See Section</font></i>
+<i><font color="#9A1900">// 3.2.3 ATmega328P datasheet, Rev. 8271C, for more details and a possible</font></i>
+<i><font color="#9A1900">// solution if this is an issue.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// It's presumably possible to use a pin as a digital input (via the dio</font></i>
+<i><font color="#9A1900">// module or equivalent) sometimes, and as an ADC input other times (via</font></i>
+<i><font color="#9A1900">// the adc module or equivalent).  Note however that the adc_pin_init()</font></i>
+<i><font color="#9A1900">// function of the adc module sets the appropriate DIDR0 bit, and this</font></i>
+<i><font color="#9A1900">// interface doesn't do anything to clear it.  Note also that pins ADC[3..0]</font></i>
+<i><font color="#9A1900">// generate lots of noise on the ADC if they switch while the ADC is in use</font></i>
+<i><font color="#9A1900">// (ATmega datasheet, Rev. 8271C, section 3.6.2)</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// FIXME: possibly all the loop_until_bit_is_* calls could be replaced with</font></i>
+<i><font color="#9A1900">// single *hardware* no-ops.  Recent versions of AVR libc have added a _NOP</font></i>
+<i><font color="#9A1900">// macro in avr/cpufunc.h that would probably work.</font></i>
+
+<i><font color="#9A1900">// Ensure that HIGH and LOW are defined as expected.  We could probably make</font></i>
+<i><font color="#9A1900">// due with the normal C definition of truth, but I like to be paranoid</font></i>
+<i><font color="#9A1900">// and keep it the same everywhere in case someone likes to write</font></i>
+<i><font color="#9A1900">// 'if ( some_boolean == TRUE )'.</font></i>
+<b><font color="#000080">#if</font></b> <a href="util.h.html#15">HIGH</a> <font color="#990000">!=</font> <font color="#993399">0x01</font>
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> <font color="#008080">uh</font> oh<font color="#990000">,</font> <a href="util.h.html#15">HIGH</a> <font color="#990000">!=</font> <font color="#993399">0x01</font>
+<b><font color="#000080">#endif</font></b>
+<b><font color="#000080">#if</font></b> <a href="util.h.html#16">LOW</a> <font color="#990000">!=</font> <font color="#993399">0x00</font>
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> <font color="#008080">uh</font> oh<font color="#990000">,</font> <a href="util.h.html#16">LOW</a> <font color="#990000">!=</font> <font color="#993399">0x00</font>
+<b><font color="#000080">#endif</font></b>
+
+<i><font color="#9A1900">// Pin Initialization {{{1</font></i>
+
+<i><font color="#9A1900">// These macros can be used to make DIO_INIT_* calls more readable.</font></i>
+<b><font color="#000080">#define</font></b> <a name="183">DIO_INPUT</a> <a href="util.h.html#19">TRUE</a>
+<b><font color="#000080">#define</font></b> <a name="184">DIO_OUTPUT</a> <a href="util.h.html#20">FALSE</a>
+<b><font color="#000080">#define</font></b> <a name="185">DIO_ENABLE_PULLUP</a> <a href="util.h.html#19">TRUE</a>
+<b><font color="#000080">#define</font></b> <a name="186">DIO_DISABLE_PULLUP</a> <a href="util.h.html#20">FALSE</a>
+<b><font color="#000080">#define</font></b> <a name="187">DIO_DONT_CARE</a> <a href="util.h.html#20">FALSE</a>
+
+<i><font color="#9A1900">// Packaged names for the register and bit macros associated with IO pins.</font></i>
+<i><font color="#9A1900">// These can be used by clients that want to let their clients select which</font></i>
+<i><font color="#9A1900">// pin to use at compile-time (see also the DIO_INIT(), DIO_SET_LOW(),</font></i>
+<i><font color="#9A1900">// DIO_SET_HIGH(), DIO_SET(), and DIO_READ() macros).  NOTE: to support</font></i>
+<i><font color="#9A1900">// the use of these tuples, a number of macros have a variadic top layer.</font></i>
+<i><font color="#9A1900">// Obviously these tuples are best interpreted by the variadic macros</font></i>
+<i><font color="#9A1900">// intented to receive them.  They can also be used to initialize dio_pin_t</font></i>
+<i><font color="#9A1900">// structure literals.</font></i>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="197">DIO_PIN_PB0</a></font> DDRB<font color="#990000">,</font> DDB0<font color="#990000">,</font> PORTB<font color="#990000">,</font> PORTB0<font color="#990000">,</font> PINB<font color="#990000">,</font> PINB0
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="198">DIO_PIN_PB1</a></font> DDRB<font color="#990000">,</font> DDB1<font color="#990000">,</font> PORTB<font color="#990000">,</font> PORTB1<font color="#990000">,</font> PINB<font color="#990000">,</font> PINB1
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="199">DIO_PIN_PB2</a></font> DDRB<font color="#990000">,</font> DDB2<font color="#990000">,</font> PORTB<font color="#990000">,</font> PORTB2<font color="#990000">,</font> PINB<font color="#990000">,</font> PINB2
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="200">DIO_PIN_PB3</a></font> DDRB<font color="#990000">,</font> DDB3<font color="#990000">,</font> PORTB<font color="#990000">,</font> PORTB3<font color="#990000">,</font> PINB<font color="#990000">,</font> PINB3
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="201">DIO_PIN_PB4</a></font> DDRB<font color="#990000">,</font> DDB4<font color="#990000">,</font> PORTB<font color="#990000">,</font> PORTB4<font color="#990000">,</font> PINB<font color="#990000">,</font> PINB4
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="202">DIO_PIN_PB5</a></font> DDRB<font color="#990000">,</font> DDB5<font color="#990000">,</font> PORTB<font color="#990000">,</font> PORTB5<font color="#990000">,</font> PINB<font color="#990000">,</font> PINB5
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="203">DIO_PIN_PB6</a></font> DDRB<font color="#990000">,</font> DDB6<font color="#990000">,</font> PORTB<font color="#990000">,</font> PORTB6<font color="#990000">,</font> PINB<font color="#990000">,</font> PINB6
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="204">DIO_PIN_PB7</a></font> DDRB<font color="#990000">,</font> DDB7<font color="#990000">,</font> PORTB<font color="#990000">,</font> PORTB7<font color="#990000">,</font> PINB<font color="#990000">,</font> PINB7
+
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="206">DIO_PIN_PC0</a></font> DDRC<font color="#990000">,</font> DDC0<font color="#990000">,</font> PORTC<font color="#990000">,</font> PORTC0<font color="#990000">,</font> PINC<font color="#990000">,</font> PINC0
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="207">DIO_PIN_PC1</a></font> DDRC<font color="#990000">,</font> DDC1<font color="#990000">,</font> PORTC<font color="#990000">,</font> PORTC1<font color="#990000">,</font> PINC<font color="#990000">,</font> PINC1
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="208">DIO_PIN_PC2</a></font> DDRC<font color="#990000">,</font> DDC2<font color="#990000">,</font> PORTC<font color="#990000">,</font> PORTC2<font color="#990000">,</font> PINC<font color="#990000">,</font> PINC2
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="209">DIO_PIN_PC3</a></font> DDRC<font color="#990000">,</font> DDC3<font color="#990000">,</font> PORTC<font color="#990000">,</font> PORTC3<font color="#990000">,</font> PINC<font color="#990000">,</font> PINC3
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="210">DIO_PIN_PC4</a></font> DDRC<font color="#990000">,</font> DDC4<font color="#990000">,</font> PORTC<font color="#990000">,</font> PORTC4<font color="#990000">,</font> PINC<font color="#990000">,</font> PINC4
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="211">DIO_PIN_PC5</a></font> DDRC<font color="#990000">,</font> DDC5<font color="#990000">,</font> PORTC<font color="#990000">,</font> PORTC5<font color="#990000">,</font> PINC<font color="#990000">,</font> PINC5
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="212">DIO_PIN_PC6</a></font> DDRC<font color="#990000">,</font> DDC6<font color="#990000">,</font> PORTC<font color="#990000">,</font> PORTC6<font color="#990000">,</font> PINC<font color="#990000">,</font> PINC6
+
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="214">DIO_PIN_PD0</a></font> DDRD<font color="#990000">,</font> DDD0<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD0<font color="#990000">,</font> PIND<font color="#990000">,</font> PIND0
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="215">DIO_PIN_PD1</a></font> DDRD<font color="#990000">,</font> DDD1<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD1<font color="#990000">,</font> PIND<font color="#990000">,</font> PIND1
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="216">DIO_PIN_PD2</a></font> DDRD<font color="#990000">,</font> DDD2<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD2<font color="#990000">,</font> PIND<font color="#990000">,</font> PIND2
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="217">DIO_PIN_PD3</a></font> DDRD<font color="#990000">,</font> DDD3<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD3<font color="#990000">,</font> PIND<font color="#990000">,</font> PIND3
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="218">DIO_PIN_PD4</a></font> DDRD<font color="#990000">,</font> DDD4<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD4<font color="#990000">,</font> PIND<font color="#990000">,</font> PIND4
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="219">DIO_PIN_PD5</a></font> DDRD<font color="#990000">,</font> DDD5<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD5<font color="#990000">,</font> PIND<font color="#990000">,</font> PIND5
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="220">DIO_PIN_PD6</a></font> DDRD<font color="#990000">,</font> DDD6<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD6<font color="#990000">,</font> PIND<font color="#990000">,</font> PIND6
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="221">DIO_PIN_PD7</a></font> DDRD<font color="#990000">,</font> DDD7<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD7<font color="#990000">,</font> PIND<font color="#990000">,</font> PIND7
+
+<i><font color="#9A1900">// Set a pin (which must have been initialized for output) low.  The argument</font></i>
+<i><font color="#9A1900">// is intended to be one of the DIO_PIN_P* tuples.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="225">DIO_SET_LOW</a></font></b><font color="#990000">(...)</font> <b><font color="#000000"><a href="dio.h.html#228">DIO_SET_LOW_NA</a></font></b> <font color="#990000">(</font>__VA_ARGS__<font color="#990000">)</font>
+
+<i><font color="#9A1900">// Underlying named-argument macro implementing the DIO_SET_LOW() macro.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="228">DIO_SET_LOW_NA</a></font></b><font color="#990000">(</font>dir_reg<font color="#990000">,</font> dir_bit<font color="#990000">,</font> port_reg<font color="#990000">,</font> port_bit<font color="#990000">,</font> pin_reg<font color="#990000">,</font> pin_bit<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+    port_reg <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>port_bit<font color="#990000">));</font> <font color="#990000">\</font>
+    <b><font color="#000000">loop_until_bit_is_clear</font></b> <font color="#990000">(</font>port_reg<font color="#990000">,</font> port_bit<font color="#990000">);</font> <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+
+<i><font color="#9A1900">// Set a pin (which must have been initialized for output) high.  This macro</font></i>
+<i><font color="#9A1900">// is intended to take one of the DIO_PIN_P* tuples as its argument.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="236">DIO_SET_HIGH</a></font></b><font color="#990000">(...)</font> <b><font color="#000000"><a href="dio.h.html#239">DIO_SET_HIGH_NA</a></font></b> <font color="#990000">(</font>__VA_ARGS__<font color="#990000">)</font>
+
+<i><font color="#9A1900">// Underlying named-argument macro implementing the DIO_SET_HIGH() macro.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="239">DIO_SET_HIGH_NA</a></font></b><font color="#990000">(</font> <font color="#990000">\</font>
+    dir_reg<font color="#990000">,</font> dir_bit<font color="#990000">,</font> port_reg<font color="#990000">,</font> port_bit<font color="#990000">,</font> pin_reg<font color="#990000">,</font> pin_bit<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+    port_reg <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>port_bit<font color="#990000">);</font> <font color="#990000">\</font>
+    <b><font color="#000000">loop_until_bit_is_set</font></b> <font color="#990000">(</font>port_reg<font color="#990000">,</font> port_bit<font color="#990000">);</font> <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+
+<i><font color="#9A1900">// Set a pin (which must already be initialized for output) to the value</font></i>
+<i><font color="#9A1900">// given as the last argument.  The first argument is intended to be one</font></i>
+<i><font color="#9A1900">// of the DIO_PIN_P* tuples.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="249">DIO_SET</a></font></b><font color="#990000">(...)</font> <b><font color="#000000"><a href="dio.h.html#252">DIO_SET_NA</a></font></b> <font color="#990000">(</font>__VA_ARGS__<font color="#990000">)</font>
+
+<i><font color="#9A1900">// Underlying named-argument macro implementing the DIO_SET() macro.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="252">DIO_SET_NA</a></font></b><font color="#990000">(</font> <font color="#990000">\</font>
+    dir_reg<font color="#990000">,</font> dir_bit<font color="#990000">,</font> port_reg<font color="#990000">,</font> port_bit<font color="#990000">,</font> pin_reg<font color="#990000">,</font> pin_bit<font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> value <font color="#990000">)</font> <font color="#FF0000">{</font> <font color="#990000">\</font>
+      <b><font color="#000000"><a href="dio.h.html#239">DIO_SET_HIGH_NA</a></font></b> <font color="#990000">(</font> <font color="#990000">\</font>
+          dir_reg<font color="#990000">,</font> dir_bit<font color="#990000">,</font> port_reg<font color="#990000">,</font> port_bit<font color="#990000">,</font> pin_reg<font color="#990000">,</font> pin_bit<font color="#990000">);</font> <font color="#990000">\</font>
+    <font color="#FF0000">}</font> <font color="#990000">\</font>
+    <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+      <b><font color="#000000"><a href="dio.h.html#228">DIO_SET_LOW_NA</a></font></b> <font color="#990000">(</font> <font color="#990000">\</font>
+          dir_reg<font color="#990000">,</font> dir_bit<font color="#990000">,</font> port_reg<font color="#990000">,</font> port_bit<font color="#990000">,</font> pin_reg<font color="#990000">,</font> pin_bit<font color="#990000">);</font> <font color="#990000">\</font>
+    <font color="#FF0000">}</font> <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+
+<i><font color="#9A1900">// Initialize the pin given as the first argument (which should be one of</font></i>
+<i><font color="#9A1900">// the DIO_PIN_P_* tuples) according to the next three arguments</font></i>
+<i><font color="#9A1900">// (see DIO_INIT_NA() for details on these).</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="268">DIO_INIT</a></font></b><font color="#990000">(...)</font> <b><font color="#000000"><a href="dio.h.html#273">DIO_INIT_NA</a></font></b> <font color="#990000">(</font>__VA_ARGS__<font color="#990000">)</font>
+
+<i><font color="#9A1900">// Underlying named-argument macro implementing the DIO_INIT() macro.</font></i>
+<i><font color="#9A1900">// FIXME: "for_input" doesn't do a good job of suggesting that DIO_INPUT</font></i>
+<i><font color="#9A1900">// or DIO_OUTPUT should be used.  likewise for enable_pullup sort of.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="273">DIO_INIT_NA</a></font></b><font color="#990000">(</font> <font color="#990000">\</font>
+    dir_reg<font color="#990000">,</font> dir_bit<font color="#990000">,</font> port_reg<font color="#990000">,</font> port_bit<font color="#990000">,</font> pin_reg<font color="#990000">,</font> pin_bit<font color="#990000">,</font> <font color="#990000">\</font>
+    for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value <font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> for_input <font color="#990000">)</font> <font color="#FF0000">{</font> <font color="#990000">\</font>
+        dir_reg <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>dir_bit<font color="#990000">));</font> <font color="#990000">\</font>
+        <b><font color="#000000">loop_until_bit_is_clear</font></b> <font color="#990000">(</font>dir_reg<font color="#990000">,</font> dir_bit<font color="#990000">);</font> <font color="#990000">\</font>
+        <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> enable_pullup <font color="#990000">)</font> <font color="#FF0000">{</font> <font color="#990000">\</font>
+          port_reg <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>port_bit<font color="#990000">);</font> <font color="#990000">\</font>
+          <b><font color="#000000">loop_until_bit_is_set</font></b> <font color="#990000">(</font>port_reg<font color="#990000">,</font> port_bit<font color="#990000">);</font> <font color="#990000">\</font>
+        <font color="#FF0000">}</font> <font color="#990000">\</font>
+        <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+          port_reg <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>port_bit<font color="#990000">));</font> <font color="#990000">\</font>
+          <b><font color="#000000">loop_until_bit_is_clear</font></b> <font color="#990000">(</font>port_reg<font color="#990000">,</font> port_bit<font color="#990000">);</font> <font color="#990000">\</font>
+        <font color="#FF0000">}</font> <font color="#990000">\</font>
+      <font color="#FF0000">}</font> <font color="#990000">\</font>
+      <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+        <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font> <font color="#990000">\</font>
+            dir_reg<font color="#990000">,</font> dir_bit<font color="#990000">,</font> port_reg<font color="#990000">,</font> port_bit<font color="#990000">,</font> pin_reg<font color="#990000">,</font> pin_bit<font color="#990000">,</font> <font color="#990000">\</font>
+            initial_value <font color="#990000">);</font> <font color="#990000">\</font>
+        dir_reg <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>dir_bit<font color="#990000">);</font> <font color="#990000">\</font>
+        <b><font color="#000000">loop_until_bit_is_set</font></b> <font color="#990000">(</font>dir_reg<font color="#990000">,</font> dir_bit<font color="#990000">);</font> <font color="#990000">\</font>
+      <font color="#FF0000">}</font> <font color="#990000">\</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font> <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+
+<i><font color="#9A1900">// Pin PB* Initialization {{{2</font></i>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="301">DIO_INIT_PB0</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#197">DIO_PIN_PB0</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="304">DIO_INIT_PB1</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#198">DIO_PIN_PB1</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="307">DIO_INIT_PB2</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#199">DIO_PIN_PB2</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="311">DIO_INIT_PB3</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#200">DIO_PIN_PB3</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="315">DIO_INIT_PB4</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#201">DIO_PIN_PB4</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="319">DIO_INIT_PB5</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#202">DIO_PIN_PB5</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="323">DIO_INIT_PB6</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#203">DIO_PIN_PB6</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="327">DIO_INIT_PB7</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#204">DIO_PIN_PB7</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<i><font color="#9A1900">/// }}}2</font></i>
+
+<i><font color="#9A1900">// Pin PC* Initialization {{{2</font></i>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="334">DIO_INIT_PC0</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#206">DIO_PIN_PC0</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="337">DIO_INIT_PC1</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#207">DIO_PIN_PC1</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="340">DIO_INIT_PC2</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#208">DIO_PIN_PC2</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="343">DIO_INIT_PC3</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#209">DIO_PIN_PC3</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="346">DIO_INIT_PC4</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#210">DIO_PIN_PC4</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="349">DIO_INIT_PC5</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#211">DIO_PIN_PC5</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="353">DIO_INIT_PC6</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#212">DIO_PIN_PC6</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<i><font color="#9A1900">// }}}2</font></i>
+
+<i><font color="#9A1900">// Pin PD* Initialization {{{2</font></i>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="361">DIO_INIT_PD0</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#214">DIO_PIN_PD0</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="365">DIO_INIT_PD1</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#215">DIO_PIN_PD1</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="368">DIO_INIT_PD2</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#216">DIO_PIN_PD2</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="371">DIO_INIT_PD3</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#217">DIO_PIN_PD3</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="374">DIO_INIT_PD4</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#218">DIO_PIN_PD4</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="377">DIO_INIT_PD5</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#219">DIO_PIN_PD5</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="380">DIO_INIT_PD6</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#220">DIO_PIN_PD6</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="383">DIO_INIT_PD7</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#221">DIO_PIN_PD7</a><font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font>
+
+<i><font color="#9A1900">// }}}2</font></i>
+
+<i><font color="#9A1900">// }}}1</font></i>
+
+<i><font color="#9A1900">// Pin Setting {{{1</font></i>
+
+<i><font color="#9A1900">// Pins PB* Without Argument {{{2</font></i>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="394">DIO_SET_PB0_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#197">DIO_PIN_PB0</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="395">DIO_SET_PB0_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#197">DIO_PIN_PB0</a><font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="397">DIO_SET_PB1_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#198">DIO_PIN_PB1</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="398">DIO_SET_PB1_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#198">DIO_PIN_PB1</a><font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="400">DIO_SET_PB2_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#199">DIO_PIN_PB2</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="401">DIO_SET_PB2_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#199">DIO_PIN_PB2</a><font color="#990000">)</font>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="404">DIO_SET_PB3_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#200">DIO_PIN_PB3</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="405">DIO_SET_PB3_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#200">DIO_PIN_PB3</a><font color="#990000">)</font>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="408">DIO_SET_PB4_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#201">DIO_PIN_PB4</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="409">DIO_SET_PB4_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#201">DIO_PIN_PB4</a><font color="#990000">)</font>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="412">DIO_SET_PB5_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#202">DIO_PIN_PB5</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="413">DIO_SET_PB5_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#202">DIO_PIN_PB5</a><font color="#990000">)</font>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="416">DIO_SET_PB6_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#203">DIO_PIN_PB6</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="417">DIO_SET_PB6_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#203">DIO_PIN_PB6</a><font color="#990000">)</font>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="420">DIO_SET_PB7_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#204">DIO_PIN_PB7</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="421">DIO_SET_PB7_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#204">DIO_PIN_PB7</a><font color="#990000">)</font>
+
+<i><font color="#9A1900">// }}}2</font></i>
+
+<i><font color="#9A1900">// Pins PC* Without Argument {{{2</font></i>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="427">DIO_SET_PC0_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#206">DIO_PIN_PC0</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="428">DIO_SET_PC0_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#206">DIO_PIN_PC0</a><font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="430">DIO_SET_PC1_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#207">DIO_PIN_PC1</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="431">DIO_SET_PC1_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#207">DIO_PIN_PC1</a><font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="433">DIO_SET_PC2_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#208">DIO_PIN_PC2</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="434">DIO_SET_PC2_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#208">DIO_PIN_PC2</a><font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="436">DIO_SET_PC3_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#209">DIO_PIN_PC3</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="437">DIO_SET_PC3_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#209">DIO_PIN_PC3</a><font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="439">DIO_SET_PC4_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#210">DIO_PIN_PC4</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="440">DIO_SET_PC4_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#210">DIO_PIN_PC4</a><font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="442">DIO_SET_PC5_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#211">DIO_PIN_PC5</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="443">DIO_SET_PC5_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#211">DIO_PIN_PC5</a><font color="#990000">)</font>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="446">DIO_SET_PC6_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#212">DIO_PIN_PC6</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="447">DIO_SET_PC6_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#212">DIO_PIN_PC6</a><font color="#990000">)</font>
+
+<i><font color="#9A1900">// }}}2</font></i>
+
+<i><font color="#9A1900">// Pins PD* Without Argument {{{2</font></i>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="454">DIO_SET_PD0_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#214">DIO_PIN_PD0</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="455">DIO_SET_PD0_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#214">DIO_PIN_PD0</a><font color="#990000">)</font>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="458">DIO_SET_PD1_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#215">DIO_PIN_PD1</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="459">DIO_SET_PD1_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#215">DIO_PIN_PD1</a><font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="461">DIO_SET_PD2_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#216">DIO_PIN_PD2</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="462">DIO_SET_PD2_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#216">DIO_PIN_PD2</a><font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="464">DIO_SET_PD3_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#217">DIO_PIN_PD3</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="465">DIO_SET_PD3_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#217">DIO_PIN_PD3</a><font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="467">DIO_SET_PD4_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#218">DIO_PIN_PD4</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="468">DIO_SET_PD4_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#218">DIO_PIN_PD4</a><font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="470">DIO_SET_PD5_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#219">DIO_PIN_PD5</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="471">DIO_SET_PD5_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#219">DIO_PIN_PD5</a><font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="473">DIO_SET_PD6_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#220">DIO_PIN_PD6</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="474">DIO_SET_PD6_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#220">DIO_PIN_PD6</a><font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="476">DIO_SET_PD7_LOW</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font><a href="dio.h.html#221">DIO_PIN_PD7</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="477">DIO_SET_PD7_HIGH</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font><a href="dio.h.html#221">DIO_PIN_PD7</a><font color="#990000">)</font>
+
+<i><font color="#9A1900">// }}}2</font></i>
+
+<i><font color="#9A1900">// Pins PB* With Argument {{{2</font></i>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="483">DIO_SET_PB0</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#197">DIO_PIN_PB0</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="484">DIO_SET_PB1</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#198">DIO_PIN_PB1</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="485">DIO_SET_PB2</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#199">DIO_PIN_PB2</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="487">DIO_SET_PB3</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#200">DIO_PIN_PB3</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="489">DIO_SET_PB4</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#201">DIO_PIN_PB4</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="491">DIO_SET_PB5</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#202">DIO_PIN_PB5</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="493">DIO_SET_PB6</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#203">DIO_PIN_PB6</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="495">DIO_SET_PB7</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#204">DIO_PIN_PB7</a><font color="#990000">,</font> value<font color="#990000">)</font>
+
+<i><font color="#9A1900">// }}}2</font></i>
+
+<i><font color="#9A1900">// Pins PC* With Argument {{{2</font></i>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="501">DIO_SET_PC0</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#206">DIO_PIN_PC0</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="502">DIO_SET_PC1</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#207">DIO_PIN_PC1</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="503">DIO_SET_PC2</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#208">DIO_PIN_PC2</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="504">DIO_SET_PC3</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#209">DIO_PIN_PC3</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="505">DIO_SET_PC4</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#210">DIO_PIN_PC4</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="506">DIO_SET_PC5</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#211">DIO_PIN_PC5</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="508">DIO_SET_PC6</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#212">DIO_PIN_PC6</a><font color="#990000">,</font> value<font color="#990000">)</font>
+
+<i><font color="#9A1900">// }}}2</font></i>
+
+<i><font color="#9A1900">// Pins PD* With Argument {{{2</font></i>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="515">DIO_SET_PD0</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#214">DIO_PIN_PD0</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="517">DIO_SET_PD1</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#215">DIO_PIN_PD1</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="518">DIO_SET_PD2</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#216">DIO_PIN_PD2</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="519">DIO_SET_PD3</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#217">DIO_PIN_PD3</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="520">DIO_SET_PD4</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#218">DIO_PIN_PD4</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="521">DIO_SET_PD5</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#219">DIO_PIN_PD5</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="522">DIO_SET_PD6</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#220">DIO_PIN_PD6</a><font color="#990000">,</font> value<font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="523">DIO_SET_PD7</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font> <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dio.h.html#221">DIO_PIN_PD7</a><font color="#990000">,</font> value<font color="#990000">)</font>
+
+<i><font color="#9A1900">// }}}2</font></i>
+
+<i><font color="#9A1900">// }}}1</font></i>
+
+<i><font color="#9A1900">// Pin Reading {{{1</font></i>
+
+<i><font color="#9A1900">// Read a pin (which must have been initialized for input).  This macro is</font></i>
+<i><font color="#9A1900">// intended to take one of the DIO_PIN_P* tuples as its argument.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="533">DIO_READ</a></font></b><font color="#990000">(...)</font> <b><font color="#000000"><a href="dio.h.html#541">DIO_READ_NA</a></font></b><font color="#990000">(</font>__VA_ARGS__<font color="#990000">)</font>
+
+<i><font color="#9A1900">// Underlying named-argument macro implementing the DIO_READ() macro.  NOTE:</font></i>
+<i><font color="#9A1900">// The bit shifts are only included so that the results will work in case</font></i>
+<i><font color="#9A1900">// the user actually compares the result to the value of the 'HIGH' macro.</font></i>
+<i><font color="#9A1900">// We probably waste an instruction doing this, but the Arduino libraries</font></i>
+<i><font color="#9A1900">// define HIGH this way and it's kind of nice to keep everything symbolic,</font></i>
+<i><font color="#9A1900">// so we do the same.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="541">DIO_READ_NA</a></font></b><font color="#990000">(</font>dir_reg<font color="#990000">,</font> dir_bit<font color="#990000">,</font> port_reg<font color="#990000">,</font> port_bit<font color="#990000">,</font> pin_reg<font color="#990000">,</font> pin_bit<font color="#990000">)</font> <font color="#990000">\</font>
+  <font color="#990000">((</font>pin_reg <font color="#990000">&amp;</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>pin_bit<font color="#990000">))</font> <font color="#990000">&gt;&gt;</font> pin_bit<font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="544">DIO_READ_PB0</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#197">DIO_PIN_PB0</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="545">DIO_READ_PB1</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#198">DIO_PIN_PB1</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="546">DIO_READ_PB2</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#199">DIO_PIN_PB2</a><font color="#990000">)</font>
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="548">DIO_READ_PB3</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#200">DIO_PIN_PB3</a><font color="#990000">)</font>
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="550">DIO_READ_PB4</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#201">DIO_PIN_PB4</a><font color="#990000">)</font>
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="552">DIO_READ_PB5</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#202">DIO_PIN_PB5</a><font color="#990000">)</font>
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="554">DIO_READ_PB6</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#203">DIO_PIN_PB6</a><font color="#990000">)</font>
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="556">DIO_READ_PB7</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#204">DIO_PIN_PB7</a><font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="558">DIO_READ_PC0</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#206">DIO_PIN_PC0</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="559">DIO_READ_PC1</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#207">DIO_PIN_PC1</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="560">DIO_READ_PC2</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#208">DIO_PIN_PC2</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="561">DIO_READ_PC3</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#209">DIO_PIN_PC3</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="562">DIO_READ_PC4</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#210">DIO_PIN_PC4</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="563">DIO_READ_PC5</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#211">DIO_PIN_PC5</a><font color="#990000">)</font>
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="565">DIO_READ_PC6</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#212">DIO_PIN_PC6</a><font color="#990000">)</font>
+
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="568">DIO_READ_PD0</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#214">DIO_PIN_PD0</a><font color="#990000">)</font>
+<i><font color="#9A1900">// WARNING: See comments in 'Notes About Particular Pins' above.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="570">DIO_READ_PD1</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#215">DIO_PIN_PD1</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="571">DIO_READ_PD2</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#216">DIO_PIN_PD2</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="572">DIO_READ_PD3</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#217">DIO_PIN_PD3</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="573">DIO_READ_PD4</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#218">DIO_PIN_PD4</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="574">DIO_READ_PD5</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#219">DIO_PIN_PD5</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="575">DIO_READ_PD6</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#220">DIO_PIN_PD6</a><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="576">DIO_READ_PD7</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font><a href="dio.h.html#221">DIO_PIN_PD7</a><font color="#990000">)</font>
+
+<i><font color="#9A1900">// }}}1</font></i>
+
+<i><font color="#9A1900">// Arduino Compatible Pin Number Macros {{{1</font></i>
+
+<i><font color="#9A1900">// WARNING: all caveats described for the underlying macros apply.</font></i>
+
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="584">DIO_PIN_DIGITAL_0</a></font> <a href="dio.h.html#214">DIO_PIN_PD0</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="585">DIO_PIN_DIGITAL_1</a></font> <a href="dio.h.html#215">DIO_PIN_PD1</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="586">DIO_PIN_DIGITAL_2</a></font> <a href="dio.h.html#216">DIO_PIN_PD2</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="587">DIO_PIN_DIGITAL_3</a></font> <a href="dio.h.html#217">DIO_PIN_PD3</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="588">DIO_PIN_DIGITAL_4</a></font> <a href="dio.h.html#218">DIO_PIN_PD4</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="589">DIO_PIN_DIGITAL_5</a></font> <a href="dio.h.html#219">DIO_PIN_PD5</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="590">DIO_PIN_DIGITAL_6</a></font> <a href="dio.h.html#220">DIO_PIN_PD6</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="591">DIO_PIN_DIGITAL_7</a></font> <a href="dio.h.html#221">DIO_PIN_PD7</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="592">DIO_PIN_DIGITAL_8</a></font> <a href="dio.h.html#197">DIO_PIN_PB0</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="593">DIO_PIN_DIGITAL_9</a></font> <a href="dio.h.html#198">DIO_PIN_PB1</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="594">DIO_PIN_DIGITAL_10</a></font> <a href="dio.h.html#199">DIO_PIN_PB2</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="595">DIO_PIN_DIGITAL_11</a></font> <a href="dio.h.html#200">DIO_PIN_PB3</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="596">DIO_PIN_DIGITAL_12</a></font> <a href="dio.h.html#201">DIO_PIN_PB4</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="597">DIO_PIN_DIGITAL_13</a></font> <a href="dio.h.html#202">DIO_PIN_PB5</a>
+
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="599">DIO_INIT_DIGITAL_0</a></font> <a href="dio.h.html#361">DIO_INIT_PD0</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="600">DIO_INIT_DIGITAL_1</a></font> <a href="dio.h.html#365">DIO_INIT_PD1</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="601">DIO_INIT_DIGITAL_2</a></font> <a href="dio.h.html#368">DIO_INIT_PD2</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="602">DIO_INIT_DIGITAL_3</a></font> <a href="dio.h.html#371">DIO_INIT_PD3</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="603">DIO_INIT_DIGITAL_4</a></font> <a href="dio.h.html#374">DIO_INIT_PD4</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="604">DIO_INIT_DIGITAL_5</a></font> <a href="dio.h.html#377">DIO_INIT_PD5</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="605">DIO_INIT_DIGITAL_6</a></font> <a href="dio.h.html#380">DIO_INIT_PD6</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="606">DIO_INIT_DIGITAL_7</a></font> <a href="dio.h.html#383">DIO_INIT_PD7</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="607">DIO_INIT_DIGITAL_8</a></font> <a href="dio.h.html#301">DIO_INIT_PB0</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="608">DIO_INIT_DIGITAL_9</a></font> <a href="dio.h.html#304">DIO_INIT_PB1</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="609">DIO_INIT_DIGITAL_10</a></font> <a href="dio.h.html#307">DIO_INIT_PB2</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="610">DIO_INIT_DIGITAL_11</a></font> <a href="dio.h.html#311">DIO_INIT_PB3</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="611">DIO_INIT_DIGITAL_12</a></font> <a href="dio.h.html#315">DIO_INIT_PB4</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="612">DIO_INIT_DIGITAL_13</a></font> <a href="dio.h.html#319">DIO_INIT_PB5</a>
+
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="614">DIO_SET_DIGITAL_0_LOW</a></font> <a href="dio.h.html#454">DIO_SET_PD0_LOW</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="615">DIO_SET_DIGITAL_1_LOW</a></font> <a href="dio.h.html#458">DIO_SET_PD1_LOW</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="616">DIO_SET_DIGITAL_2_LOW</a></font> <a href="dio.h.html#461">DIO_SET_PD2_LOW</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="617">DIO_SET_DIGITAL_3_LOW</a></font> <a href="dio.h.html#464">DIO_SET_PD3_LOW</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="618">DIO_SET_DIGITAL_4_LOW</a></font> <a href="dio.h.html#467">DIO_SET_PD4_LOW</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="619">DIO_SET_DIGITAL_5_LOW</a></font> <a href="dio.h.html#470">DIO_SET_PD5_LOW</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="620">DIO_SET_DIGITAL_6_LOW</a></font> <a href="dio.h.html#473">DIO_SET_PD6_LOW</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="621">DIO_SET_DIGITAL_7_LOW</a></font> <a href="dio.h.html#476">DIO_SET_PD7_LOW</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="622">DIO_SET_DIGITAL_8_LOW</a></font> <a href="dio.h.html#394">DIO_SET_PB0_LOW</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="623">DIO_SET_DIGITAL_9_LOW</a></font> <a href="dio.h.html#397">DIO_SET_PB1_LOW</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="624">DIO_SET_DIGITAL_10_LOW</a></font> <a href="dio.h.html#400">DIO_SET_PB2_LOW</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="625">DIO_SET_DIGITAL_11_LOW</a></font> <a href="dio.h.html#404">DIO_SET_PB3_LOW</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="626">DIO_SET_DIGITAL_12_LOW</a></font> <a href="dio.h.html#408">DIO_SET_PB4_LOW</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="627">DIO_SET_DIGITAL_13_LOW</a></font> <a href="dio.h.html#412">DIO_SET_PB5_LOW</a>
+
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="629">DIO_SET_DIGITAL_0_HIGH</a></font> <a href="dio.h.html#455">DIO_SET_PD0_HIGH</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="630">DIO_SET_DIGITAL_1_HIGH</a></font> <a href="dio.h.html#459">DIO_SET_PD1_HIGH</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="631">DIO_SET_DIGITAL_2_HIGH</a></font> <a href="dio.h.html#462">DIO_SET_PD2_HIGH</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="632">DIO_SET_DIGITAL_3_HIGH</a></font> <a href="dio.h.html#465">DIO_SET_PD3_HIGH</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="633">DIO_SET_DIGITAL_4_HIGH</a></font> <a href="dio.h.html#468">DIO_SET_PD4_HIGH</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="634">DIO_SET_DIGITAL_5_HIGH</a></font> <a href="dio.h.html#471">DIO_SET_PD5_HIGH</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="635">DIO_SET_DIGITAL_6_HIGH</a></font> <a href="dio.h.html#474">DIO_SET_PD6_HIGH</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="636">DIO_SET_DIGITAL_7_HIGH</a></font> <a href="dio.h.html#477">DIO_SET_PD7_HIGH</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="637">DIO_SET_DIGITAL_8_HIGH</a></font> <a href="dio.h.html#395">DIO_SET_PB0_HIGH</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="638">DIO_SET_DIGITAL_9_HIGH</a></font> <a href="dio.h.html#398">DIO_SET_PB1_HIGH</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="639">DIO_SET_DIGITAL_10_HIGH</a></font> <a href="dio.h.html#401">DIO_SET_PB2_HIGH</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="640">DIO_SET_DIGITAL_11_HIGH</a></font> <a href="dio.h.html#405">DIO_SET_PB3_HIGH</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="641">DIO_SET_DIGITAL_12_HIGH</a></font> <a href="dio.h.html#409">DIO_SET_PB4_HIGH</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="642">DIO_SET_DIGITAL_13_HIGH</a></font> <a href="dio.h.html#413">DIO_SET_PB5_HIGH</a>
+
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="644">DIO_SET_DIGITAL_0</a></font> <a href="dio.h.html#515">DIO_SET_PD0</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="645">DIO_SET_DIGITAL_1</a></font> <a href="dio.h.html#517">DIO_SET_PD1</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="646">DIO_SET_DIGITAL_2</a></font> <a href="dio.h.html#518">DIO_SET_PD2</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="647">DIO_SET_DIGITAL_3</a></font> <a href="dio.h.html#519">DIO_SET_PD3</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="648">DIO_SET_DIGITAL_4</a></font> <a href="dio.h.html#520">DIO_SET_PD4</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="649">DIO_SET_DIGITAL_5</a></font> <a href="dio.h.html#521">DIO_SET_PD5</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="650">DIO_SET_DIGITAL_6</a></font> <a href="dio.h.html#522">DIO_SET_PD6</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="651">DIO_SET_DIGITAL_7</a></font> <a href="dio.h.html#523">DIO_SET_PD7</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="652">DIO_SET_DIGITAL_8</a></font> <a href="dio.h.html#483">DIO_SET_PB0</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="653">DIO_SET_DIGITAL_9</a></font> <a href="dio.h.html#484">DIO_SET_PB1</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="654">DIO_SET_DIGITAL_10</a></font> <a href="dio.h.html#485">DIO_SET_PB2</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="655">DIO_SET_DIGITAL_11</a></font> <a href="dio.h.html#487">DIO_SET_PB3</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="656">DIO_SET_DIGITAL_12</a></font> <a href="dio.h.html#489">DIO_SET_PB4</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="657">DIO_SET_DIGITAL_13</a></font> <a href="dio.h.html#491">DIO_SET_PB5</a>
+
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="659">DIO_READ_DIGITAL_0</a></font> <a href="dio.h.html#568">DIO_READ_PD0</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="660">DIO_READ_DIGITAL_1</a></font> <a href="dio.h.html#570">DIO_READ_PD1</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="661">DIO_READ_DIGITAL_2</a></font> <a href="dio.h.html#571">DIO_READ_PD2</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="662">DIO_READ_DIGITAL_3</a></font> <a href="dio.h.html#572">DIO_READ_PD3</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="663">DIO_READ_DIGITAL_4</a></font> <a href="dio.h.html#573">DIO_READ_PD4</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="664">DIO_READ_DIGITAL_5</a></font> <a href="dio.h.html#574">DIO_READ_PD5</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="665">DIO_READ_DIGITAL_6</a></font> <a href="dio.h.html#575">DIO_READ_PD6</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="666">DIO_READ_DIGITAL_7</a></font> <a href="dio.h.html#576">DIO_READ_PD7</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="667">DIO_READ_DIGITAL_8</a></font> <a href="dio.h.html#544">DIO_READ_PB0</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="668">DIO_READ_DIGITAL_9</a></font> <a href="dio.h.html#545">DIO_READ_PB1</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="669">DIO_READ_DIGITAL_10</a></font> <a href="dio.h.html#546">DIO_READ_PB2</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="670">DIO_READ_DIGITAL_11</a></font> <a href="dio.h.html#548">DIO_READ_PB3</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="671">DIO_READ_DIGITAL_12</a></font> <a href="dio.h.html#550">DIO_READ_PB4</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="672">DIO_READ_DIGITAL_13</a></font> <a href="dio.h.html#552">DIO_READ_PB5</a>
+
+<i><font color="#9A1900">// }}}1</font></i>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// DIO_H</font></i>
+</tt></pre>

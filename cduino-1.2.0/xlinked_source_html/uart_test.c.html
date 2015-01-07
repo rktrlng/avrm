@@ -1,0 +1,104 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Test/demo for the <a href="uart.h.html">uart.h</a> interface.</font></i>
+
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900"> * ----------------------------------------------------------------------------</font></i>
+<i><font color="#9A1900"> * "THE BEER-WARE LICENSE" (Revision 42):</font></i>
+<i><font color="#9A1900"> * </font></i><u><font color="#0000FF">&lt;joerg@FreeBSD.ORG&gt;</font></u><i><font color="#9A1900"> wrote this file.  As long as you retain this notice you</font></i>
+<i><font color="#9A1900"> * can do whatever you want with this stuff. If we meet some day, and you think</font></i>
+<i><font color="#9A1900"> * this stuff is worth it, you can buy me a beer in return.        Joerg Wunsch</font></i>
+<i><font color="#9A1900"> * ----------------------------------------------------------------------------</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * Stdio demo</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * $Id: stdiodemo.c 1008 2005-12-28 21:38:59Z joerg_wunsch $</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<i><font color="#9A1900">// This program puts a prompt out to the serial port, reads some character</font></i>
+<i><font color="#9A1900">// from the serial port, then sends the read characters back out on the</font></i>
+<i><font color="#9A1900">// serial port.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// There are no external hardware requirements other than an arduino and a USB</font></i>
+<i><font color="#9A1900">// cable to connect it to the computer.  It should be possible to run</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   make -rR run_screen</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// or so from the module directory to see it do its thing.</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;assert.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdint.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdlib.h&gt;</font>   <i><font color="#9A1900">// FIXXME: PROBABLY only need do to bad assert.h header</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="uart.h.html">uart.h</a>"</font>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="36">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="uart.c.html#21">uart_init</a></font></b> <font color="#990000">();</font>
+
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font><b><font color="#0000FF">sizeof</font></b> <font color="#990000">(</font><font color="#009900">char</font><font color="#990000">)</font> <font color="#990000">==</font> <font color="#993399">1</font><font color="#990000">);</font>   <i><font color="#9A1900">// Hey, I like probably correct programs :)</font></i>
+
+<b><font color="#000080">#define</font></b> <a name="42">CHARS_TO_READ</a> <font color="#993399">5</font>
+
+  <i><font color="#9A1900">// FIXXME: we could probably change things around to use program space</font></i>
+  <i><font color="#9A1900">// strings here</font></i>
+
+  <font color="#009900">char</font> ptec<font color="#990000">[]</font> <font color="#990000">=</font> <font color="#FF0000">"</font><font color="#CC33CC">\n\r</font><font color="#FF0000">Type some characters now</font><font color="#CC33CC">\n\r</font><font color="#FF0000">"</font><font color="#990000">;</font>   <i><font color="#9A1900">// Prompt To Enter Chars</font></i>
+  <font color="#009900">char</font> ce<font color="#990000">[</font><a href="uart_test.c.html#42">CHARS_TO_READ</a><font color="#990000">];</font>   <i><font color="#9A1900">// Characters Entered</font></i>
+
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#990000">;</font> <font color="#990000">;</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+
+    <i><font color="#9A1900">// Put a prompt on the wire</font></i>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <b><font color="#0000FF">sizeof</font></b> <font color="#990000">(</font>ptec<font color="#990000">)</font> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="uart.h.html#32">UART_PUT_BYTE</a></font></b> <font color="#990000">(</font>ptec<font color="#990000">[</font>ii<font color="#990000">]);</font>
+    <font color="#FF0000">}</font>
+
+    <i><font color="#9A1900">// Read the characters entered</font></i>
+    <i><font color="#9A1900">//</font></i>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="uart_test.c.html#42">CHARS_TO_READ</a> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+
+      <i><font color="#9A1900">// NOTE: this could block forever</font></i>
+      <b><font color="#000000"><a href="uart.h.html#45">UART_WAIT_FOR_BYTE</a></font></b> <font color="#990000">();</font>
+
+      <i><font color="#9A1900">// If you don't want to risk blocking forever, you could do this:</font></i>
+      <i><font color="#9A1900">//while ( ! UART_BYTE_AVAILABLE () ) {</font></i>
+        <i><font color="#9A1900">// Count iteration, perhaps call _delay_us(), eventually timeout</font></i>
+      <i><font color="#9A1900">//} </font></i>
+
+      <i><font color="#9A1900">// Handle receiver errors</font></i>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="uart.h.html#58">UART_RX_ERROR</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="uart.h.html#62">UART_RX_FRAME_ERROR</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+          <b><font color="#000000"><a href="uart.h.html#78">UART_FLUSH_RX_BUFFER</a></font></b> <font color="#990000">();</font>
+          <i><font color="#9A1900">// Do something?  Propagate error?</font></i>
+        <font color="#FF0000">}</font> 
+        <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="uart.h.html#67">UART_RX_DATA_OVERRUN_ERROR</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+          <b><font color="#000000"><a href="uart.h.html#78">UART_FLUSH_RX_BUFFER</a></font></b> <font color="#990000">();</font>
+          <i><font color="#9A1900">// Do something?  Propagate error?</font></i>
+        <font color="#FF0000">}</font>
+        <i><font color="#9A1900">// Hope we aren't here.  We could try to print an error...</font></i>
+        <b><font color="#000000">assert</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>
+      <font color="#FF0000">}</font>
+
+      <i><font color="#9A1900">// Actually retrieve the byte</font></i>
+      ce<font color="#990000">[</font>ii<font color="#990000">]</font> <font color="#990000">=</font> <b><font color="#000000"><a href="uart.h.html#74">UART_GET_BYTE</a></font></b> <font color="#990000">();</font>
+    <font color="#FF0000">}</font>
+
+    <font color="#009900">char</font> ebp<font color="#990000">[]</font> <font color="#990000">=</font> <font color="#FF0000">"You entered these characters: "</font><font color="#990000">;</font>   <i><font color="#9A1900">// Echo Back Prefix</font></i>
+
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <b><font color="#0000FF">sizeof</font></b> <font color="#990000">(</font>ebp<font color="#990000">)</font> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="uart.h.html#32">UART_PUT_BYTE</a></font></b> <font color="#990000">(</font>ebp<font color="#990000">[</font>ii<font color="#990000">]);</font>
+    <font color="#FF0000">}</font>
+
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="uart_test.c.html#42">CHARS_TO_READ</a> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="uart.h.html#32">UART_PUT_BYTE</a></font></b> <font color="#990000">(</font>ce<font color="#990000">[</font>ii<font color="#990000">]);</font>
+    <font color="#FF0000">}</font>
+
+    <b><font color="#000000"><a href="uart.h.html#32">UART_PUT_BYTE</a></font></b> <font color="#990000">(</font><font color="#FF0000">'</font><font color="#CC33CC">\n</font><font color="#FF0000">'</font><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+</tt></pre>

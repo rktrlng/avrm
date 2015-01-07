@@ -1,0 +1,98 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Implementation of the interface described in <a href="adc.h.html">adc.h</a>.</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;assert.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdlib.h&gt;</font>   <i><font color="#9A1900">// FIXME: remove when have latest avr libc</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="adc.h.html">adc.h</a>"</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="10">adc_init</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="adc.h.html#22">adc_reference_source_t</a></font> reference_source<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  PRR <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PRADC<font color="#990000">));</font>
+
+  <i><font color="#9A1900">// Restore the default settings for ADMUX.</font></i>
+  ADMUX <font color="#990000">=</font> <font color="#993399">0x00</font><font color="#990000">;</font>
+
+  <b><font color="#0000FF">switch</font></b> <font color="#990000">(</font> reference_source <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">case</font></b> <a href="adc.h.html#19">ADC_REFERENCE_AREF</a><font color="#990000">:</font>
+      <i><font color="#9A1900">// Nothing to set since ADMUX bits default to 0.</font></i>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="adc.h.html#20">ADC_REFERENCE_AVCC</a><font color="#990000">:</font>
+      ADMUX <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>REFS0<font color="#990000">);</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="adc.h.html#21">ADC_REFERENCE_INTERNAL</a><font color="#990000">:</font>
+      ADMUX <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>REFS0<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>REFS1<font color="#990000">);</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+<b><font color="#008080">    default:</font></b>
+      <i><font color="#9A1900">// Shouldn't be here.</font></i>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Sample the ground for now (we'll change this before taking real samples).</font></i>
+  ADMUX <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>MUX3<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>MUX2<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>MUX1<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>MUX0<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Restore the default settings for ADC status register A.</font></i>
+  ADCSRA <font color="#990000">=</font> <font color="#993399">0x00</font><font color="#990000">;</font>
+
+  <i><font color="#9A1900">// Restore the default settings for ADC status register B.</font></i>
+  ADCSRB <font color="#990000">=</font> <font color="#993399">0x00</font><font color="#990000">;</font>
+
+  <i><font color="#9A1900">// Enable the ADC system, use 128 as the clock divider on a 16MHz arduino</font></i>
+  <i><font color="#9A1900">// (ADC needs a 50 - 200kHz clock) and start a sample.  The ATmega328P</font></i>
+  <i><font color="#9A1900">// datasheet specifies that the first sample taken after the voltage</font></i>
+  <i><font color="#9A1900">// reference is changed should be discarded.</font></i>
+  ADCSRA <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>ADEN<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>ADPS2<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>ADPS1<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>ADPS0<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>ADSC<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Wait for the ADC to return a sample (and discard it).</font></i>
+  <b><font color="#000000">loop_until_bit_is_clear</font></b> <font color="#990000">(</font>ADCSRA<font color="#990000">,</font> ADSC<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="52">adc_pin_init</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> pin<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Conceptual assertion (unsigned datatype prevents it actually happening :)</font></i>
+  <i><font color="#9A1900">// assert (pin &gt;= ADC_LOWEST_PIN);</font></i>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>pin <font color="#990000">&lt;=</font> ADC_HIGHEST_PIN<font color="#990000">);</font>
+<a href="adc.h.html#39">ADC_HIGHEST_PIN -> adc.h:39</a>
+<a href="lesson9.c.html#68">ADC_HIGHEST_PIN -> lesson9.c:68</a>
+
+  PORTC <font color="#990000">&amp;=</font> <font color="#990000">~(</font><font color="#993399">0x01</font> <font color="#990000">&lt;&lt;</font> pin<font color="#990000">);</font>   <i><font color="#9A1900">// Disable pull-up on pin</font></i>
+  DDRC <font color="#990000">&amp;=</font> <font color="#990000">~(</font><font color="#993399">0x01</font> <font color="#990000">&lt;&lt;</font> pin<font color="#990000">);</font>    <i><font color="#9A1900">// Ensure pin is set as an input</font></i>
+
+  <i><font color="#9A1900">// Save power: See the ATmega328P datasheet section 9.10.6.</font></i>
+  DIDR0 <font color="#990000">|=</font> <font color="#993399">0x01</font> <font color="#990000">&lt;&lt;</font> pin<font color="#990000">;</font>      <i><font color="#9A1900">// Disable digital input buffer on pin</font></i>
+<font color="#FF0000">}</font>
+
+uint16_t
+<b><font color="#000000"><a name="66">adc_read_raw</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> pin<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Select the input channel.  Table 23-4 of the ATmega328P datasheet</font></i>
+  <i><font color="#9A1900">// effectively specifies that the pin selection bits in the lower nibble</font></i>
+  <i><font color="#9A1900">// of ADMUX are interpreted as an integer specifying the channel.</font></i>
+  <font color="#008080">uint8_t</font> admux_byte <font color="#990000">=</font> <font color="#990000">(</font>ADMUX <font color="#990000">&amp;</font> <font color="#993399">0xf0</font><font color="#990000">)</font> <font color="#990000">|</font> <font color="#990000">(</font>pin <font color="#990000">&amp;</font> <font color="#993399">0x0f</font><font color="#990000">);</font>
+  ADMUX <font color="#990000">=</font> admux_byte<font color="#990000">;</font>
+
+  <i><font color="#9A1900">// Start a sample and wait until it's done.</font></i>
+  ADCSRA <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>ADSC<font color="#990000">);</font>
+  <b><font color="#000000">loop_until_bit_is_clear</font></b> <font color="#990000">(</font>ADCSRA<font color="#990000">,</font> ADSC<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// It is required to read the low ADC byte before the high byte.</font></i>
+  <font color="#008080">uint8_t</font> low_byte <font color="#990000">=</font> ADCL<font color="#990000">;</font>
+  <font color="#008080">uint8_t</font> high_byte <font color="#990000">=</font> ADCH<font color="#990000">;</font>
+
+  <b><font color="#0000FF">return</font></b> <font color="#990000">(((</font>uint16_t<font color="#990000">)</font> high_byte<font color="#990000">)</font> <font color="#990000">&lt;&lt;</font> <font color="#993399">8</font><font color="#990000">)</font> <font color="#990000">|</font> low_byte<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">float</font>
+<b><font color="#000000"><a name="86">adc_read_voltage</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> pin<font color="#990000">,</font> <font color="#009900">float</font> reference_voltage<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+    <font color="#008080">uint16_t</font> raw <font color="#990000">=</font> <b><font color="#000000"><a href="adc.c.html#66">adc_read_raw</a></font></b> <font color="#990000">(</font>pin<font color="#990000">);</font>
+
+    <b><font color="#0000FF">return</font></b> <font color="#990000">((</font><font color="#009900">float</font><font color="#990000">)</font> raw <font color="#990000">/</font> <font color="#990000">(</font><a href="adc.h.html#53">ADC_RAW_READING_STEPS</a> <font color="#990000">-</font> <font color="#993399">1</font><font color="#990000">))</font> <font color="#990000">*</font> reference_voltage<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+</tt></pre>

@@ -1,0 +1,275 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Test/demo for the <a href="sd_card.h.html">sd_card.h</a> interface.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This test driver requires an Arduino SD Card/Ethernet shield</font></i>
+<i><font color="#9A1900">// (http://arduino.cc/en/Main/ArduinoEthernetShield) with an SD card that</font></i>
+<i><font color="#9A1900">// supports all the tested features to be connected.  The author has tested</font></i>
+<i><font color="#9A1900">// things only with the Rev. 3 version of the above shield and an SDHC type</font></i>
+<i><font color="#9A1900">// SD card (as opposed to SD1 or SD2 type).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Diagnostic output is produced on an attached terminal using the <a href="term_io.h.html">term_io.h</a></font></i>
+<i><font color="#9A1900">// interface.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// WARNING: despite being ubiquitous, many SD cards are utter junk.</font></i>
+<i><font color="#9A1900">// They lack any underlying wear leveling for the flash memory and are</font></i>
+<i><font color="#9A1900">// horribly intolerant of asynchronous shutdown (power cuts).  If you're</font></i>
+<i><font color="#9A1900">// doing anything remotely serious you must invest in an "industrial"</font></i>
+<i><font color="#9A1900">// SD card.  I've used the Apacer AP-MSD04GCS4P-1TM with good results.</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;assert.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/pgmspace.h&gt;</font>
+<i><font color="#9A1900">// FIXME: do we need stdlib here once we have the new avr libc which has</font></i>
+<i><font color="#9A1900">// the fixed assert.h?  I doubt it but it needs checked..</font></i>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdlib.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="sd_card.h.html">sd_card.h</a>"</font>
+<b><font color="#000080">#define</font></b> <a name="25">TERM_IO_POLLUTE_NAMESPACE_WITH_DEBUGGING_GOOP</a>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="term_io.h.html">term_io.h</a>"</font>
+
+<i><font color="#9A1900">// An option exists to not build the function that generates the string</font></i>
+<i><font color="#9A1900">// descriptions of error values, since it's kind of large.  But this test</font></i>
+<i><font color="#9A1900">// program requires this function, hence this test.</font></i>
+<b><font color="#000080">#ifndef</font></b> SD_CARD_BUILD_ERROR_DESCRIPTION_FUNCTION
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> This test program <font color="#008080">requires</font> SD_CARD_BUILD_ERROR_DESCRIPTION_FUNCTION
+<b><font color="#000080">#endif</font></b>
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">void</font>
+<b><font color="#000000"><a name="36">check_maybe_print_possible_failure_message</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> code<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Check that code is 0, if it isn't, print a message describing the error</font></i>
+  <i><font color="#9A1900">// returned by sd_card_last_error(), followed by a newline.</font></i>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> code <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <font color="#008080"><a href="sd_card.h.html#149">sd_card_error_t</a></font> last_error <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#344">sd_card_last_error</a></font></b> <font color="#990000">();</font>
+    <font color="#009900">char</font> err_buf<font color="#990000">[</font><a href="sd_card.h.html#175">SD_CARD_ERROR_DESCRIPTION_MAX_LENGTH</a> <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">];</font>
+    <b><font color="#000000"><a href="sd_card.c.html#358">sd_card_error_description</a></font></b> <font color="#990000">(</font>last_error<font color="#990000">,</font> err_buf<font color="#990000">);</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"failed: %s</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font> err_buf<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">void</font>
+<b><font color="#000000"><a name="50">test_write_read</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Fill block 42 with 42s, then read them back out.</font></i>
+
+  <font color="#008080">uint32_t</font> bn <font color="#990000">=</font> <font color="#993399">42</font><font color="#990000">;</font>
+  <font color="#008080">uint8_t</font> data_block<font color="#990000">[</font><a href="sd_card.h.html#98">SD_CARD_BLOCK_SIZE</a><font color="#990000">];</font>
+  <font color="#008080">uint16_t</font> ii<font color="#990000">;</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="sd_card.h.html#98">SD_CARD_BLOCK_SIZE</a> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    data_block<font color="#990000">[</font>ii<font color="#990000">]</font> <font color="#990000">=</font> <font color="#993399">42</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying sd_card_write_block()... "</font><font color="#990000">);</font>
+  <font color="#008080">uint8_t</font> return_code <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#786">sd_card_write_block</a></font></b> <font color="#990000">(</font>bn<font color="#990000">,</font> data_block<font color="#990000">);</font>
+  <b><font color="#000000"><a href="sd_card_test.c.html#36">check_maybe_print_possible_failure_message</a></font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <font color="#008080">uint8_t</font> reread_data<font color="#990000">[</font><a href="sd_card.h.html#98">SD_CARD_BLOCK_SIZE</a><font color="#990000">];</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying sd_card_read_block()... "</font><font color="#990000">);</font>
+  return_code <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#780">sd_card_read_block</a></font></b> <font color="#990000">(</font>bn<font color="#990000">,</font> reread_data<font color="#990000">);</font>
+  <b><font color="#000000"><a href="sd_card_test.c.html#36">check_maybe_print_possible_failure_message</a></font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="sd_card.h.html#98">SD_CARD_BLOCK_SIZE</a> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> reread_data<font color="#990000">[</font>ii<font color="#990000">]</font> <font color="#990000">!=</font> <font color="#993399">42</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"failed: didn't read expected value"</font><font color="#990000">);</font>
+      <b><font color="#000000">assert</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Re-zero the reread data buffer to give the next tests a better chance</font></i>
+  <i><font color="#9A1900">// of catching problems.</font></i>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="sd_card.h.html#98">SD_CARD_BLOCK_SIZE</a> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    reread_data<font color="#990000">[</font>ii<font color="#990000">]</font> <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying sd_card_write_partial_block()... "</font><font color="#990000">);</font>
+  uint16_t <font color="#008080">const</font> pbbc <font color="#990000">=</font> <font color="#993399">42</font><font color="#990000">;</font>   <i><font color="#9A1900">// Partial block byte count</font></i>
+  return_code <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#798">sd_card_write_partial_block</a></font></b> <font color="#990000">(</font>bn<font color="#990000">,</font> pbbc<font color="#990000">,</font> data_block<font color="#990000">);</font>
+  <b><font color="#000000"><a href="sd_card_test.c.html#36">check_maybe_print_possible_failure_message</a></font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying sd_card_read_partial_block()... "</font><font color="#990000">);</font>
+  return_code <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#792">sd_card_read_partial_block</a></font></b> <font color="#990000">(</font>bn<font color="#990000">,</font> pbbc<font color="#990000">,</font> reread_data<font color="#990000">);</font>
+  <b><font color="#000000"><a href="sd_card_test.c.html#36">check_maybe_print_possible_failure_message</a></font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> pbbc <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> reread_data<font color="#990000">[</font>ii<font color="#990000">]</font> <font color="#990000">!=</font> <font color="#993399">42</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"failed: didn't read expected value"</font><font color="#990000">);</font>
+      <b><font color="#000000">assert</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">void</font>
+<b><font color="#000000"><a name="107">speed_test_1000_blocks</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Write and then read back in 1000 blocks, to give an idea of speed.</font></i>
+
+  <font color="#008080">uint8_t</font> data_block<font color="#990000">[</font><a href="sd_card.h.html#98">SD_CARD_BLOCK_SIZE</a><font color="#990000">];</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#009900">int</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="sd_card.h.html#98">SD_CARD_BLOCK_SIZE</a> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    data_block<font color="#990000">[</font>ii<font color="#990000">]</font> <font color="#990000">=</font> <font color="#993399">42</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Speed test: writing 1000 blocks... "</font><font color="#990000">);</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint32_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <font color="#993399">1000</font> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <font color="#008080">uint8_t</font> return_code <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#786">sd_card_write_block</a></font></b> <font color="#990000">(</font>ii <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">,</font> data_block<font color="#990000">);</font>
+    <b><font color="#000000"><a href="sd_card_test.c.html#36">check_maybe_print_possible_failure_message</a></font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"done.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Speed test: reading 1000 blocks... "</font><font color="#990000">);</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint32_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <font color="#993399">1000</font> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <font color="#008080">uint8_t</font> return_code <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#780">sd_card_read_block</a></font></b> <font color="#990000">(</font>ii <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">,</font> data_block<font color="#990000">);</font>
+    <b><font color="#000000"><a href="sd_card_test.c.html#36">check_maybe_print_possible_failure_message</a></font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+    <i><font color="#9A1900">// Here we double check that we're getting back the correct values,</font></i>
+    <i><font color="#9A1900">// which makes the speed test take slightly longer, but it's not going</font></i>
+    <i><font color="#9A1900">// to be much compared to the read itself at hight F_CPU at least.</font></i>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#009900">int</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="sd_card.h.html#98">SD_CARD_BLOCK_SIZE</a> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> data_block<font color="#990000">[</font>ii<font color="#990000">]</font> <font color="#990000">!=</font> <font color="#993399">42</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"failed: didn't read expected value"</font><font color="#990000">);</font>
+        <b><font color="#000000">assert</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>
+      <font color="#FF0000">}</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"done.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">void</font>
+<b><font color="#000000"><a name="143">per_speed_tests</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="sd_card.h.html#192">sd_card_spi_speed_t</a></font> <a href="sd_card.c.html#95">speed</a><font color="#990000">,</font> <font color="#009900">char</font> <b><font color="#0000FF">const</font></b> <font color="#990000">*</font>speed_string<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Perform the various tests that we try for each speed setting.</font></i>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying </font><font color="#FF0000"><a href="sd_card.c.html#539">sd_card_init</a></font><font color="#FF0000"> (%s)... "</font><font color="#990000">,</font> speed_string<font color="#990000">);</font>
+  <font color="#008080">uint8_t</font> return_code <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#539">sd_card_init</a></font></b> <font color="#990000">(</font><a href="sd_card.c.html#95">speed</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="sd_card_test.c.html#36">check_maybe_print_possible_failure_message</a></font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying </font><font color="#FF0000"><a href="sd_card.c.html#447">sd_card_size</a></font><font color="#FF0000"> ()... "</font><font color="#990000">);</font>
+  <font color="#008080">uint32_t</font> card_size <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#447">sd_card_size</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> card_size <font color="#990000">==</font> <font color="#993399">0</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="sd_card_test.c.html#36">check_maybe_print_possible_failure_message</a></font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok, card_size: %lu</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font> card_size<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying sd_card_type()... "</font><font color="#990000">);</font>
+  <font color="#008080"><a href="sd_card.h.html#224">sd_card_type_t</a></font> <a href="sd_card.c.html#93">card_type</a> <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#441">sd_card_type</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"got card type "</font><font color="#990000">);</font>
+  <b><font color="#0000FF">switch</font></b> <font color="#990000">(</font> <a href="sd_card.c.html#93">card_type</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#220">SD_CARD_TYPE_INDETERMINATE</a><font color="#990000">:</font>
+      <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"indeterminate.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#221">SD_CARD_TYPE_SD1</a><font color="#990000">:</font>
+      <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"SD1.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+      <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font>
+          <font color="#FF0000">"SD1 type cards haven't been tested (only SDHC cards have).</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font>
+          <font color="#FF0000">"Disable this trap and try it :)  Other tests that don't work</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font>
+          <font color="#FF0000">"for this card type might also need to be disabled.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font> <font color="#990000">);</font>
+      <b><font color="#000000">assert</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>   <i><font color="#9A1900">// SD1 type cards haven't been tested</font></i>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#222">SD_CARD_TYPE_SD2</a><font color="#990000">:</font>
+      <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"SD2.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+      <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font>
+          <font color="#FF0000">"SD2 type cards haven't been tested (only SDHC cards have).</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font>
+          <font color="#FF0000">"Disable this trap and try it :)  Other tests that don't work</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font>
+          <font color="#FF0000">"for this card type might also need to be disabled.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font> <font color="#990000">);</font>
+      <b><font color="#000000">assert</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>   <i><font color="#9A1900">// SD2 type cards haven't been tested</font></i>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#223">SD_CARD_TYPE_SDHC</a><font color="#990000">:</font>
+      <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"SDHC.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+<b><font color="#008080">    default:</font></b>
+      <b><font color="#000000">assert</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>   <i><font color="#9A1900">// Shouldn't be here</font></i>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying sd_card_read_cid()... "</font><font color="#990000">);</font>
+  <font color="#008080"><a href="sd_card_private.h.html#204">sd_card_cid_t</a></font> ccid<font color="#990000">;</font>   <i><font color="#9A1900">// Card CID</font></i>
+  return_code <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#848">sd_card_read_cid</a></font></b> <font color="#990000">(&amp;</font>ccid<font color="#990000">);</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> return_code <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"returned TRUE, so presumably it worked.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="sd_card_test.c.html#36">check_maybe_print_possible_failure_message</a></font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying sd_card_read_csd()... "</font><font color="#990000">);</font>
+  <font color="#008080"><a href="sd_card_private.h.html#334">sd_card_csd_t</a></font> ccsd<font color="#990000">;</font>   <i><font color="#9A1900">// Card CSD</font></i>
+  return_code <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#857">sd_card_read_csd</a></font></b> <font color="#990000">(&amp;</font>ccsd<font color="#990000">);</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> return_code <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"returned TRUE, so presumably it worked.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="sd_card_test.c.html#36">check_maybe_print_possible_failure_message</a></font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000"><a href="sd_card_test.c.html#50">test_write_read</a></font></b> <font color="#990000">();</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying sd_card_single_block_erase_supported()... "</font><font color="#990000">);</font>
+  <font color="#008080">uint8_t</font> result <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#485">sd_card_single_block_erase_supported</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> result <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok, it's supported.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying </font><font color="#FF0000"><a href="sd_card.c.html#492">sd_card_erase_blocks</a></font><font color="#FF0000"> (42, 43)... "</font><font color="#990000">);</font>
+    return_code <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#492">sd_card_erase_blocks</a></font></b> <font color="#990000">(</font><font color="#993399">42</font><font color="#990000">,</font> <font color="#993399">43</font><font color="#990000">);</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> return_code <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="sd_card_test.c.html#36">check_maybe_print_possible_failure_message</a></font></b> <font color="#990000">(</font>return_code<font color="#990000">);</font>
+      <b><font color="#000000">assert</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"it's not supported.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000"><a href="sd_card_test.c.html#107">speed_test_1000_blocks</a></font></b> <font color="#990000">();</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Everything worked with %s</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font> speed_string<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="243">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// This isn't what we're testing exactly, but we need to know if its</font></i>
+  <i><font color="#9A1900">// working or not to interpret other results.</font></i>
+  <b><font color="#000000"><a href="term_io.c.html#166">term_io_init</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"term_io_init() worked.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font>
+      <font color="#FF0000">"NOTE: some tests don't bother to call sd_card_last_error() when</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font>
+      <font color="#FF0000">"things go wrong.  You might be able to get information about the</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font>
+      <font color="#FF0000">"nature of a failure by doing that.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font> <font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="sd_card_test.c.html#143">per_speed_tests</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#189">SD_CARD_SPI_SPEED_FULL</a><font color="#990000">,</font> <font color="#FF0000">"SD_CARD_SPI_SPEED_FULL"</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="sd_card_test.c.html#143">per_speed_tests</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#190">SD_CARD_SPI_SPEED_HALF</a><font color="#990000">,</font> <font color="#FF0000">"SD_CARD_SPI_SPEED_HALF"</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="sd_card_test.c.html#143">per_speed_tests</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#191">SD_CARD_SPI_SPEED_QUARTER</a><font color="#990000">,</font> <font color="#FF0000">"SD_CARD_SPI_SPEED_QUARTER"</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Everything worked!</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+<font color="#FF0000">}</font>
+</tt></pre>

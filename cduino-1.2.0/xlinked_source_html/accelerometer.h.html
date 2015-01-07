@@ -1,0 +1,81 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Interface to ST Microelectronics LIS331(HH/DLH) solid state accelerometers.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Test driver: <a href="accelerometer_test.c.html">accelerometer_test.c</a>    Implementation: <a href="accelerometer.h.html">accelerometer.h</a></font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Only a few features of the underlying <a href="lis331dlh_driver_private.h.html">lis331dlh_driver_private.h</a> are</font></i>
+<i><font color="#9A1900">// brought out directly in this interface.  See that file for interrupt</font></i>
+<i><font color="#9A1900">// generation, high-pass filtering etc.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Some of the underlying code we grabbed from the ST Microelectronics</font></i>
+<i><font color="#9A1900">// site was written for the LIS331DLH, so everything should work fine</font></i>
+<i><font color="#9A1900">// with that device.  We have an LIS331HH, which is almost identical</font></i>
+<i><font color="#9A1900">// register-wise (see the start of <a href="lis331dlh_driver_private.c.html">lis331dlh_driver_private.c</a> for a</font></i>
+<i><font color="#9A1900">// description of the difference).  This interface will probably work</font></i>
+<i><font color="#9A1900">// almost unchanged for a number of ST Microelectronics accelerometers;</font></i>
+<i><font color="#9A1900">// the major task when considering a different one would be to look through</font></i>
+<i><font color="#9A1900">// <a href="lis331dlh_driver_private.h.html">lis331dlh_driver_private.h</a> and compare it to the datasheet for the device</font></i>
+<i><font color="#9A1900">// you're considering and ensure that the registers used are the same.</font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="accelerometer.h.html#20">ACCELEROMETER_H</a>
+<b><font color="#000080">#define</font></b> <a name="20">ACCELEROMETER_H</a>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;inttypes.h&gt;</font>
+
+<i><font color="#9A1900">// WARNING: this header pollutes the namespace with a variety of types with</font></i>
+<i><font color="#9A1900">// fairly short names.  I don't want to go through and make a zillion tiny</font></i>
+<i><font color="#9A1900">// changes to the file, since that would make it hard to track the upstream</font></i>
+<i><font color="#9A1900">// source from which it came.</font></i>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="lis331dlh_driver_private.h.html">lis331dlh_driver_private.h</a>"</font>
+
+<i><font color="#9A1900">// Initialize the accelerometer and put it in normal (not power-down mode).</font></i>
+<i><font color="#9A1900">// Other than selecting normal mode instead of power-down mode, all the</font></i>
+<i><font color="#9A1900">// device defaults are used.  This function must be called first, but once</font></i>
+<i><font color="#9A1900">// its done all the functions from <a href="lis331dlh_driver_private.h.html">lis331dlh_driver_private.h</a> can be used.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="accelerometer.c.html#22">accelerometer_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Power down the accelerometer.  This puts the device fully to sleep.</font></i>
+<i><font color="#9A1900">// For other low-power modes with periodic sampling and interrupts see the</font></i>
+<i><font color="#9A1900">// datasheet and/or underlying <a href="lis331dlh_driver_private.h.html">lis331dlh_driver_private.h</a> interface.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="accelerometer.c.html#32">accelerometer_power_down</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Put the accelerometer in fully operational normal mode.  See</font></i>
+<i><font color="#9A1900">// accelerometer_power_down().</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="accelerometer.c.html#38">accelerometer_power_up</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="49">ACCELEROMETER_FULLSCALE_TYPE_6G</a>  <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#132">LIS331HH_FULLSCALE_6</a><font color="#990000">,</font>
+  <a name="50">ACCELEROMETER_FULLSCALE_TYPE_12G</a> <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#133">LIS331HH_FULLSCALE_12</a><font color="#990000">,</font>
+  <a name="51">ACCELEROMETER_FULLSCALE_TYPE_24G</a> <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#134">LIS331HH_FULLSCALE_24</a><font color="#990000">,</font>
+<font color="#FF0000">}</font> <a name="52">accelerometer_fullscale_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// Set the full-scale (and corresponding sensitivity) setting.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="accelerometer.c.html#44">accelerometer_set_fullscale</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="accelerometer.h.html#52">accelerometer_fullscale_t</a></font> fs<font color="#990000">);</font>
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="59">ACCELEROMETER_DATA_RATE_50HZ</a>   <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#74">LIS331DLH_ODR_50Hz</a><font color="#990000">,</font>
+  <a name="60">ACCELEROMETER_DATA_RATE_100HZ</a>  <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#75">LIS331DLH_ODR_100Hz</a><font color="#990000">,</font>
+  <a name="61">ACCELEROMETER_DATA_RATE_400HZ</a>  <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#76">LIS331DLH_ODR_400Hz</a><font color="#990000">,</font>
+  <a name="62">ACCELEROMETER_DATA_RATE_1000HZ</a> <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#77">LIS331DLH_ODR_1000Hz</a>
+<font color="#FF0000">}</font> <a name="63">accelerometer_data_rate_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// Set the output data rate.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="accelerometer.c.html#50">accelerometer_set_data_rate</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="accelerometer.h.html#63">accelerometer_data_rate_t</a></font> dr<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Block until new acceleration data is ready, then return it in *ax, *ay,</font></i>
+<i><font color="#9A1900">// *az.  FIXME: The exact choice of units is not clear to me, and seems to</font></i>
+<i><font color="#9A1900">// depend on the selected full-scale setting.  You're always supposed to</font></i>
+<i><font color="#9A1900">// get 1g pointing down :).</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="accelerometer.c.html#56">accelerometer_get_accel</a></font></b> <font color="#990000">(</font><font color="#008080">int16_t</font> <font color="#990000">*</font><a href="accelerometer_test.c.html#42">ax</a><font color="#990000">,</font> <font color="#008080">int16_t</font> <font color="#990000">*</font><a href="accelerometer_test.c.html#42">ay</a><font color="#990000">,</font> <font color="#008080">int16_t</font> <font color="#990000">*</font><a href="accelerometer_test.c.html#42">az</a><font color="#990000">);</font>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// ACCELEROMETER_H</font></i>
+</tt></pre>

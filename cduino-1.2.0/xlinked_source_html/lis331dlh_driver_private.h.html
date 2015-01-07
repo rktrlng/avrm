@@ -1,0 +1,398 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Turns out ST Microelectronics already provides an almost-finished interface</font></i>
+<i><font color="#9A1900">// for us.  See the comments at the start of <a href="lis331dlh_driver_private.c.html">lis331dlh_driver_private.c</a>.</font></i>
+
+<i><font color="#9A1900">/******************** (C) COPYRIGHT 2012 STMicroelectronics ********************</font></i>
+<i><font color="#9A1900">* File Name          : lis331dlh_driver.h</font></i>
+<i><font color="#9A1900">* Author             : MSH Application Team</font></i>
+<i><font color="#9A1900">* Author             : Abhishek Anand</font></i>
+<i><font color="#9A1900">* Version            : $Revision:$</font></i>
+<i><font color="#9A1900">* Date               : $Date:$</font></i>
+<i><font color="#9A1900">* Description        : Descriptor Header for lis331dlh_driver.c driver file</font></i>
+<i><font color="#9A1900">*</font></i>
+<i><font color="#9A1900">* HISTORY:</font></i>
+<i><font color="#9A1900">* Date        | Modification                                | Author</font></i>
+<i><font color="#9A1900">* 16/05/2012  | Initial Revision                            | Abhishek Anand</font></i>
+<i><font color="#9A1900">* 17/05/2012  |  Modified to support multiple drivers in the same program                |	Abhishek Anand</font></i>
+
+<i><font color="#9A1900">********************************************************************************</font></i>
+<i><font color="#9A1900">* THE PRESENT FIRMWARE WHICH IS FOR GUIDANCE ONLY AIMS AT PROVIDING CUSTOMERS</font></i>
+<i><font color="#9A1900">* WITH CODING INFORMATION REGARDING THEIR PRODUCTS IN ORDER FOR THEM TO SAVE TIME.</font></i>
+<i><font color="#9A1900">* AS A RESULT, STMICROELECTRONICS SHALL NOT BE HELD LIABLE FOR ANY DIRECT,</font></i>
+<i><font color="#9A1900">* INDIRECT OR CONSEQUENTIAL DAMAGES WITH RESPECT TO ANY CLAIMS ARISING FROM THE</font></i>
+<i><font color="#9A1900">* CONTENT OF SUCH FIRMWARE AND/OR THE USE MADE BY CUSTOMERS OF THE CODING</font></i>
+<i><font color="#9A1900">* INFORMATION CONTAINED HEREIN IN CONNECTION WITH THEIR PRODUCTS.</font></i>
+<i><font color="#9A1900">*</font></i>
+<i><font color="#9A1900">* THIS SOFTWARE IS SPECIFICALLY DESIGNED FOR EXCLUSIVE USE WITH ST PARTS.</font></i>
+<i><font color="#9A1900">*</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+
+<i><font color="#9A1900">/* Define to prevent recursive inclusion -------------------------------------*/</font></i>
+<b><font color="#000080">#ifndef</font></b> <a href="lis331dlh_driver_private.h.html#31">__LIS331DLH_DRIVER__H</a>
+<b><font color="#000080">#define</font></b> <a name="31">__LIS331DLH_DRIVER__H</a>
+
+<i><font color="#9A1900">/* Includes ------------------------------------------------------------------*/</font></i>
+
+<i><font color="#9A1900">/* Exported types ------------------------------------------------------------*/</font></i>
+
+<i><font color="#9A1900">//these could change accordingly with the architecture</font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="lis331dlh_driver_private.h.html#40">__ARCHDEP__TYPES</a>
+<b><font color="#000080">#define</font></b> <a name="40">__ARCHDEP__TYPES</a>
+<b><font color="#0000FF">typedef</font></b> <font color="#009900">unsigned</font> <font color="#009900">char</font> <a name="41">u8_t</a><font color="#990000">;</font>
+<b><font color="#0000FF">typedef</font></b> <font color="#009900">unsigned</font> <font color="#009900">short</font> <font color="#009900">int</font> <a name="42">u16_t</a><font color="#990000">;</font>
+<b><font color="#0000FF">typedef</font></b> <font color="#009900">short</font> <font color="#009900">int</font> <a name="43">i16_t</a><font color="#990000">;</font>
+<b><font color="#0000FF">typedef</font></b> <font color="#009900">short</font> <font color="#009900">int</font> <a name="44">i8_t</a><font color="#990000">;</font>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">/*__ARCHDEP__TYPES*/</font></i>
+
+<b><font color="#0000FF">typedef</font></b> <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> <a name="48">LIS331DLH_Axis_t</a><font color="#990000">;</font>
+<b><font color="#0000FF">typedef</font></b> <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> <a name="49">LIS331DLH_IntConf_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">//define structure</font></i>
+<b><font color="#000080">#ifndef</font></b> <a href="lis331dlh_driver_private.h.html#53">__SHARED__TYPES</a>
+<b><font color="#000080">#define</font></b> <a name="53">__SHARED__TYPES</a>
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="56">MEMS_SUCCESS</a>                            <font color="#990000">=</font>		<font color="#993399">0x01</font><font color="#990000">,</font>
+  <a name="57">MEMS_ERROR</a>			          <font color="#990000">=</font>		<font color="#993399">0x00</font>
+<font color="#FF0000">}</font> <a name="58">status_t</a><font color="#990000">;</font>
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="61">MEMS_ENABLE</a>			          <font color="#990000">=</font>		<font color="#993399">0x01</font><font color="#990000">,</font>
+  <a name="62">MEMS_DISABLE</a>			          <font color="#990000">=</font>		<font color="#993399">0x00</font>
+<font color="#FF0000">}</font> <a name="63">State_t</a><font color="#990000">;</font>
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">struct</font></b> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#43">i16_t</a></font> <a name="66">AXIS_X</a><font color="#990000">;</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#43">i16_t</a></font> <a name="67">AXIS_Y</a><font color="#990000">;</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#43">i16_t</a></font> <a name="68">AXIS_Z</a><font color="#990000">;</font>
+<font color="#FF0000">}</font> <a name="69">AxesRaw_t</a><font color="#990000">;</font>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">/*__SHARED__TYPES*/</font></i>
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="74">LIS331DLH_ODR_50Hz</a>                       <font color="#990000">=</font>		<font color="#993399">0x00</font><font color="#990000">,</font>
+  <a name="75">LIS331DLH_ODR_100Hz</a>		          <font color="#990000">=</font>		<font color="#993399">0x01</font><font color="#990000">,</font>
+  <a name="76">LIS331DLH_ODR_400Hz</a>		          <font color="#990000">=</font>		<font color="#993399">0x02</font><font color="#990000">,</font>
+  <a name="77">LIS331DLH_ODR_1000Hz</a>		          <font color="#990000">=</font>		<font color="#993399">0x03</font>
+<font color="#FF0000">}</font> <a name="78">LIS331DLH_ODR_t</a><font color="#990000">;</font>
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="81">LIS331DLH_CONTINUOUS_MODE</a>                <font color="#990000">=</font>		<font color="#993399">0x00</font><font color="#990000">,</font>
+  <a name="82">LIS331DLH_SINGLE_MODE</a> 		          <font color="#990000">=</font>		<font color="#993399">0x01</font><font color="#990000">,</font>
+  <a name="83">LIS331DLH_SLEEP_MODE</a>			  <font color="#990000">=</font>		<font color="#993399">0x02</font>
+<font color="#FF0000">}</font> <a name="84">LIS331DLH_Mode_M_t</a><font color="#990000">;</font>
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="87">LIS331DLH_POWER_DOWN</a>                     <font color="#990000">=</font>		<font color="#993399">0x00</font><font color="#990000">,</font>
+  <a name="88">LIS331DLH_NORMAL</a> 			  <font color="#990000">=</font>		<font color="#993399">0x01</font><font color="#990000">,</font>
+  <a name="89">LIS331DLH_LOW_POWER_05</a>		          <font color="#990000">=</font>		<font color="#993399">0x02</font><font color="#990000">,</font>
+  <a name="90">LIS331DLH_LOW_POWER_1</a> 		          <font color="#990000">=</font>		<font color="#993399">0x03</font><font color="#990000">,</font>
+  <a name="91">LIS331DLH_LOW_POWER_2</a>			  <font color="#990000">=</font>		<font color="#993399">0x04</font><font color="#990000">,</font>
+  <a name="92">LIS331DLH_LOW_POWER_5</a>			  <font color="#990000">=</font>		<font color="#993399">0x05</font><font color="#990000">,</font>
+  <a name="93">LIS331DLH_LOW_POWER_10</a>		          <font color="#990000">=</font>		<font color="#993399">0x06</font><font color="#990000">,</font>
+<font color="#FF0000">}</font> <a name="94">LIS331DLH_Mode_t</a><font color="#990000">;</font>
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="97">LIS331DLH_HPM_NORMAL_MODE_RES</a>            <font color="#990000">=</font>             <font color="#993399">0x00</font><font color="#990000">,</font>
+  <a name="98">LIS331DLH_HPM_REF_SIGNAL</a>                 <font color="#990000">=</font>             <font color="#993399">0x01</font><font color="#990000">,</font>
+  <a name="99">LIS331DLH_HPM_NORMAL_MODE</a>                <font color="#990000">=</font>             <font color="#993399">0x02</font><font color="#990000">,</font>
+<font color="#FF0000">}</font> <a name="100">LIS331DLH_HPFMode_t</a><font color="#990000">;</font>
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="103">LIS331DLH_HPFCF_0</a>                        <font color="#990000">=</font>             <font color="#993399">0x00</font><font color="#990000">,</font>
+  <a name="104">LIS331DLH_HPFCF_1</a>                        <font color="#990000">=</font>             <font color="#993399">0x01</font><font color="#990000">,</font>
+  <a name="105">LIS331DLH_HPFCF_2</a>                        <font color="#990000">=</font>             <font color="#993399">0x02</font><font color="#990000">,</font>
+  <a name="106">LIS331DLH_HPFCF_3</a>                        <font color="#990000">=</font>             <font color="#993399">0x03</font>
+<font color="#FF0000">}</font> <a name="107">LIS331DLH_HPFCutOffFreq_t</a><font color="#990000">;</font>
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="110">LIS331DLH_INT_SOURCE</a>                     <font color="#990000">=</font>             <font color="#993399">0x00</font><font color="#990000">,</font>
+  <a name="111">LIS331DLH_INT_1OR2_SOURCE</a>                <font color="#990000">=</font>             <font color="#993399">0x01</font><font color="#990000">,</font>
+  <a name="112">LIS331DLH_DATA_READY</a>                     <font color="#990000">=</font>             <font color="#993399">0x02</font><font color="#990000">,</font>
+  <a name="113">LIS331DLH_BOOT_RUNNING</a>                   <font color="#990000">=</font>             <font color="#993399">0x03</font>
+<font color="#FF0000">}</font> <a name="114">LIS331DLH_INT_Conf_t</a><font color="#990000">;</font>
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="117">LIS331DLH_SLEEP_TO_WAKE_DIS</a>              <font color="#990000">=</font>             <font color="#993399">0x00</font><font color="#990000">,</font>
+  <a name="118">LIS331DLH_SLEEP_TO_WAKE_ENA</a>              <font color="#990000">=</font>             <font color="#993399">0x03</font><font color="#990000">,</font>
+<font color="#FF0000">}</font> <a name="119">LIS331DLH_Sleep_To_Wake_Conf_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// WARNING: The LIS331HH differs fromt the LIS331DLH in the full-scale values</font></i>
+<i><font color="#9A1900">// of its supported acceleration ranges.</font></i>
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="124">LIS331DLH_FULLSCALE_2</a>                    <font color="#990000">=</font>             <font color="#993399">0x00</font><font color="#990000">,</font>
+  <a name="125">LIS331DLH_FULLSCALE_4</a>                    <font color="#990000">=</font>             <font color="#993399">0x01</font><font color="#990000">,</font>
+  <a name="126">LIS331DLH_FULLSCALE_8</a>                    <font color="#990000">=</font>             <font color="#993399">0x03</font><font color="#990000">,</font>
+<font color="#FF0000">}</font> <a name="127">LIS331DLH_Fullscale_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// Full scale values for the LIS331HH.  Values of this type can be used where</font></i>
+<i><font color="#9A1900">// a value of type LIS331DLK_Fullscale_t is called for in this interface.</font></i>
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="132">LIS331HH_FULLSCALE_6</a>                    <font color="#990000">=</font>             <font color="#993399">0x00</font><font color="#990000">,</font>
+  <a name="133">LIS331HH_FULLSCALE_12</a>                   <font color="#990000">=</font>             <font color="#993399">0x01</font><font color="#990000">,</font>
+  <a name="134">LIS331HH_FULLSCALE_24</a>                   <font color="#990000">=</font>             <font color="#993399">0x03</font><font color="#990000">,</font>
+<font color="#FF0000">}</font> <a name="135">LIS331HH_Fullscale_t</a><font color="#990000">;</font>
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="138">LIS331DLH_BLE_LSB</a>                        <font color="#990000">=</font>		<font color="#993399">0x00</font><font color="#990000">,</font>
+  <a name="139">LIS331DLH_BLE_MSB</a>                        <font color="#990000">=</font>		<font color="#993399">0x01</font>
+<font color="#FF0000">}</font> <a name="140">LIS331DLH_Endianess_t</a><font color="#990000">;</font>
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="143">LIS331DLH_SPI_4_WIRE</a>                     <font color="#990000">=</font>             <font color="#993399">0x00</font><font color="#990000">,</font>
+  <a name="144">LIS331DLH_SPI_3_WIRE</a>                     <font color="#990000">=</font>             <font color="#993399">0x01</font>
+<font color="#FF0000">}</font> <a name="145">LIS331DLH_SPIMode_t</a><font color="#990000">;</font>
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="148">LIS331DLH_X_ENABLE</a>                       <font color="#990000">=</font>             <font color="#993399">0x01</font><font color="#990000">,</font>
+  <a name="149">LIS331DLH_X_DISABLE</a>                      <font color="#990000">=</font>             <font color="#993399">0x00</font><font color="#990000">,</font>
+  <a name="150">LIS331DLH_Y_ENABLE</a>                       <font color="#990000">=</font>             <font color="#993399">0x02</font><font color="#990000">,</font>
+  <a name="151">LIS331DLH_Y_DISABLE</a>                      <font color="#990000">=</font>             <font color="#993399">0x00</font><font color="#990000">,</font>
+  <a name="152">LIS331DLH_Z_ENABLE</a>                       <font color="#990000">=</font>             <font color="#993399">0x04</font><font color="#990000">,</font>
+  <a name="153">LIS331DLH_Z_DISABLE</a>                      <font color="#990000">=</font>             <font color="#993399">0x00</font>
+<font color="#FF0000">}</font> <a name="154">LIS331DLH_AXISenable_t</a><font color="#990000">;</font>
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="157">LIS331DLH_UP_SX</a>                          <font color="#990000">=</font>             <font color="#993399">0x44</font><font color="#990000">,</font>
+  <a name="158">LIS331DLH_UP_DX</a>                          <font color="#990000">=</font>             <font color="#993399">0x42</font><font color="#990000">,</font>
+  <a name="159">LIS331DLH_DW_SX</a>                          <font color="#990000">=</font>             <font color="#993399">0x41</font><font color="#990000">,</font>
+  <a name="160">LIS331DLH_DW_DX</a>                          <font color="#990000">=</font>             <font color="#993399">0x48</font><font color="#990000">,</font>
+  <a name="161">LIS331DLH_TOP</a>                            <font color="#990000">=</font>             <font color="#993399">0x60</font><font color="#990000">,</font>
+  <a name="162">LIS331DLH_BOTTOM</a>                         <font color="#990000">=</font>             <font color="#993399">0x50</font>
+<font color="#FF0000">}</font> <a name="163">LIS331DLH_POSITION_6D_t</a><font color="#990000">;</font>
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="166">LIS331DLH_INT_MODE_OR</a>                    <font color="#990000">=</font>             <font color="#993399">0x00</font><font color="#990000">,</font>
+  <a name="167">LIS331DLH_INT_MODE_6D_MOVEMENT</a>           <font color="#990000">=</font>             <font color="#993399">0x01</font><font color="#990000">,</font>
+  <a name="168">LIS331DLH_INT_MODE_AND</a>                   <font color="#990000">=</font>             <font color="#993399">0x02</font><font color="#990000">,</font>
+  <a name="169">LIS331DLH_INT_MODE_6D_POSITION</a>           <font color="#990000">=</font>             <font color="#993399">0x03</font>
+<font color="#FF0000">}</font> <a name="170">LIS331DLH_IntMode_t</a><font color="#990000">;</font>
+
+
+<i><font color="#9A1900">/* Exported constants --------------------------------------------------------*/</font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="lis331dlh_driver_private.h.html#176">__SHARED__CONSTANTS</a>
+<b><font color="#000080">#define</font></b> <a name="176">__SHARED__CONSTANTS</a>
+
+<b><font color="#000080">#define</font></b> <a name="178">MEMS_SET</a>                                        <font color="#993399">0x01</font>
+<b><font color="#000080">#define</font></b> <a name="179">MEMS_RESET</a>                                      <font color="#993399">0x00</font>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">/*__SHARED__CONSTANTS*/</font></i>
+
+<b><font color="#000080">#define</font></b> <a name="183">LIS331DLH_MEMS_I2C_ADDRESS</a>                       <font color="#993399">0x32</font>
+
+<i><font color="#9A1900">//Register and define</font></i>
+
+<i><font color="#9A1900">// The LIS331HH doesn't say anything about this register, so I guess</font></i>
+<i><font color="#9A1900">// we have to assume it's not supported on it.  Too bad, it'd be a good</font></i>
+<i><font color="#9A1900">// starting point.  So far as I can tell from the LIS331HH datasheet all</font></i>
+<i><font color="#9A1900">// the other registers/bits are identical to those on the LIS331DLH.</font></i>
+<i><font color="#9A1900">//#define LIS331DLH_WHO_AM_I				0x0F  // device identification register</font></i>
+
+<i><font color="#9A1900">// CONTROL REGISTER 1</font></i>
+<b><font color="#000080">#define</font></b> <a name="194">LIS331DLH_CTRL_REG1</a>       			<font color="#993399">0x20</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="195">LIS331DLH_PM</a></font>				        <b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">5</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="196">LIS331DLH_DR</a></font>				        <b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">3</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="197">LIS331DLH_ZEN</a></font>					<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">2</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="198">LIS331DLH_YEN</a></font>					<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">1</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="199">LIS331DLH_XEN</a></font>					<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">0</font><font color="#990000">)</font>
+
+<i><font color="#9A1900">//CONTROL REGISTER 2</font></i>
+<b><font color="#000080">#define</font></b> <a name="202">LIS331DLH_CTRL_REG2</a>				<font color="#993399">0x21</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="203">LIS331DLH_BOOT</a></font>                                   <b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">7</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="204">LIS331DLH_HPM</a></font>     				<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">5</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="205">LIS331DLH_FDS</a></font>     				<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">4</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="206">LIS331DLH_HPEN2</a></font>					<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">3</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="207">LIS331DLH_HPEN1</a></font>					<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">2</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="208">LIS331DLH_HPCF</a></font>					<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">0</font><font color="#990000">)</font>
+
+<i><font color="#9A1900">//CONTROL REGISTER 3</font></i>
+<b><font color="#000080">#define</font></b> <a name="211">LIS331DLH_CTRL_REG3</a>				<font color="#993399">0x22</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="212">LIS331DLH_IHL</a></font>                                    <b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">7</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="213">LIS331DLH_PP_OD</a></font>					<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">6</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="214">LIS331DLH_LIR2</a></font>				        <b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">5</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="215">LIS331DLH_I2_CFG</a></font>  				<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">3</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="216">LIS331DLH_LIR1</a></font>    				<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">2</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="217">LIS331DLH_I1_CFG</a></font>  				<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">0</font><font color="#990000">)</font>
+
+<i><font color="#9A1900">//CONTROL REGISTER 4</font></i>
+<b><font color="#000080">#define</font></b> <a name="220">LIS331DLH_CTRL_REG4</a>				<font color="#993399">0x23</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="221">LIS331DLH_BDU</a></font>					<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">7</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="222">LIS331DLH_BLE</a></font>					<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">6</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="223">LIS331DLH_FS</a></font>					<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">4</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="224">LIS331DLH_ST_SIGN</a></font>				<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">3</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="225">LIS331DLH_ST</a></font>       				<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">1</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="226">LIS331DLH_SIM</a></font>					<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">0</font><font color="#990000">)</font>
+
+<i><font color="#9A1900">//CONTROL REGISTER 5</font></i>
+<b><font color="#000080">#define</font></b> <a name="229">LIS331DLH_CTRL_REG5</a>       			<font color="#993399">0x24</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="230">LIS331DLH_TURN_ON</a></font>                                <b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">0</font><font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <a name="232">LIS331DLH_HP_FILTER_RESET</a>			<font color="#993399">0x25</font>
+
+<i><font color="#9A1900">//REFERENCE/DATA_CAPTURE</font></i>
+<b><font color="#000080">#define</font></b> <a name="235">LIS331DLH_REFERENCE_REG</a>		                <font color="#993399">0x26</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="236">LIS331DLH_REF</a></font>		                	<b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">0</font><font color="#990000">)</font>
+
+<i><font color="#9A1900">//STATUS_REG_AXIES</font></i>
+<b><font color="#000080">#define</font></b> <a name="239">LIS331DLH_STATUS_REG</a>				<font color="#993399">0x27</font>
+
+<i><font color="#9A1900">//INTERRUPT 1 CONFIGURATION</font></i>
+<b><font color="#000080">#define</font></b> <a name="242">LIS331DLH_INT1_CFG</a>				<font color="#993399">0x30</font>
+
+<i><font color="#9A1900">//INTERRUPT 2 CONFIGURATION</font></i>
+<b><font color="#000080">#define</font></b> <a name="245">LIS331DLH_INT2_CFG</a>				<font color="#993399">0x34</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="246">LIS331DLH_ANDOR</a></font>                                  <b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">7</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="247">LIS331DLH_INT_6D</a></font>                                 <b><font color="#000000"><a href="lis331dlh_driver_private.h.html#319">BIT</a></font></b><font color="#990000">(</font><font color="#993399">6</font><font color="#990000">)</font>
+
+<i><font color="#9A1900">//INT REGISTERS</font></i>
+<b><font color="#000080">#define</font></b> <a name="250">LIS331DLH_INT1_THS</a>                               <font color="#993399">0x32</font>
+<b><font color="#000080">#define</font></b> <a name="251">LIS331DLH_INT1_DURATION</a>                          <font color="#993399">0x33</font>
+<b><font color="#000080">#define</font></b> <a name="252">LIS331DLH_INT2_THS</a>                               <font color="#993399">0x36</font>
+<b><font color="#000080">#define</font></b> <a name="253">LIS331DLH_INT2_DURATION</a>                          <font color="#993399">0x37</font>
+
+<i><font color="#9A1900">//INTERRUPT 1 SOURCE REGISTER</font></i>
+<b><font color="#000080">#define</font></b> <a name="256">LIS331DLH_INT1_SRC</a>                               <font color="#993399">0x31</font>
+<b><font color="#000080">#define</font></b> <a name="257">LIS331DLH_INT2_SRC</a>			        <font color="#993399">0x35</font>
+
+<i><font color="#9A1900">//INT_CFG  bit mask</font></i>
+<b><font color="#000080">#define</font></b> <a name="260">LIS331DLH_INT_AND</a>                                <font color="#993399">0x80</font>
+<b><font color="#000080">#define</font></b> <a name="261">LIS331DLH_INT_OR</a>                                 <font color="#993399">0x00</font>
+<b><font color="#000080">#define</font></b> <a name="262">LIS331DLH_INT_ZHIE_ENABLE</a>                        <font color="#993399">0x20</font>
+<b><font color="#000080">#define</font></b> <a name="263">LIS331DLH_INT_ZHIE_DISABLE</a>                       <font color="#993399">0x00</font>
+<b><font color="#000080">#define</font></b> <a name="264">LIS331DLH_INT_ZLIE_ENABLE</a>                        <font color="#993399">0x10</font>
+<b><font color="#000080">#define</font></b> <a name="265">LIS331DLH_INT_ZLIE_DISABLE</a>                       <font color="#993399">0x00</font>
+<b><font color="#000080">#define</font></b> <a name="266">LIS331DLH_INT_YHIE_ENABLE</a>                        <font color="#993399">0x08</font>
+<b><font color="#000080">#define</font></b> <a name="267">LIS331DLH_INT_YHIE_DISABLE</a>                       <font color="#993399">0x00</font>
+<b><font color="#000080">#define</font></b> <a name="268">LIS331DLH_INT_YLIE_ENABLE</a>                        <font color="#993399">0x04</font>
+<b><font color="#000080">#define</font></b> <a name="269">LIS331DLH_INT_YLIE_DISABLE</a>                       <font color="#993399">0x00</font>
+<b><font color="#000080">#define</font></b> <a name="270">LIS331DLH_INT_XHIE_ENABLE</a>                        <font color="#993399">0x02</font>
+<b><font color="#000080">#define</font></b> <a name="271">LIS331DLH_INT_XHIE_DISABLE</a>                       <font color="#993399">0x00</font>
+<b><font color="#000080">#define</font></b> <a name="272">LIS331DLH_INT_XLIE_ENABLE</a>                        <font color="#993399">0x01</font>
+<b><font color="#000080">#define</font></b> <a name="273">LIS331DLH_INT_XLIE_DISABLE</a>                       <font color="#993399">0x00</font>
+
+<i><font color="#9A1900">//INT_SRC  bit mask</font></i>
+<b><font color="#000080">#define</font></b> <a name="276">LIS331DLH_INT_SRC_IA</a>                             <font color="#993399">0x40</font>
+<b><font color="#000080">#define</font></b> <a name="277">LIS331DLH_INT_SRC_ZH</a>                             <font color="#993399">0x20</font>
+<b><font color="#000080">#define</font></b> <a name="278">LIS331DLH_INT_SRC_ZL</a>                             <font color="#993399">0x10</font>
+<b><font color="#000080">#define</font></b> <a name="279">LIS331DLH_INT_SRC_YH</a>                             <font color="#993399">0x08</font>
+<b><font color="#000080">#define</font></b> <a name="280">LIS331DLH_INT_SRC_YL</a>                             <font color="#993399">0x04</font>
+<b><font color="#000080">#define</font></b> <a name="281">LIS331DLH_INT_SRC_XH</a>                             <font color="#993399">0x02</font>
+<b><font color="#000080">#define</font></b> <a name="282">LIS331DLH_INT_SRC_XL</a>                             <font color="#993399">0x01</font>
+
+<i><font color="#9A1900">//OUTPUT REGISTER</font></i>
+<b><font color="#000080">#define</font></b> <a name="285">LIS331DLH_OUT_X_L</a>                                <font color="#993399">0x28</font>
+<b><font color="#000080">#define</font></b> <a name="286">LIS331DLH_OUT_X_H</a>                                <font color="#993399">0x29</font>
+<b><font color="#000080">#define</font></b> <a name="287">LIS331DLH_OUT_Y_L</a>			        <font color="#993399">0x2A</font>
+<b><font color="#000080">#define</font></b> <a name="288">LIS331DLH_OUT_Y_H</a>		                <font color="#993399">0x2B</font>
+<b><font color="#000080">#define</font></b> <a name="289">LIS331DLH_OUT_Z_L</a>			        <font color="#993399">0x2C</font>
+<b><font color="#000080">#define</font></b> <a name="290">LIS331DLH_OUT_Z_H</a>		                <font color="#993399">0x2D</font>
+
+<i><font color="#9A1900">//STATUS REGISTER bit mask</font></i>
+<b><font color="#000080">#define</font></b> <a name="293">LIS331DLH_STATUS_REG_ZYXOR</a>                       <font color="#993399">0x80</font>    <i><font color="#9A1900">// 1	:	new data set has over written the previous one</font></i>
+						                <i><font color="#9A1900">// 0	:	no overrun has occurred (default)</font></i>
+<b><font color="#000080">#define</font></b> <a name="295">LIS331DLH_STATUS_REG_ZOR</a>                         <font color="#993399">0x40</font>    <i><font color="#9A1900">// 0	:	no overrun has occurred (default)</font></i>
+							        <i><font color="#9A1900">// 1	:	new Z-axis data has over written the previous one</font></i>
+<b><font color="#000080">#define</font></b> <a name="297">LIS331DLH_STATUS_REG_YOR</a>                         <font color="#993399">0x20</font>    <i><font color="#9A1900">// 0	:	no overrun has occurred (default)</font></i>
+						        	<i><font color="#9A1900">// 1	:	new Y-axis data has over written the previous one</font></i>
+<b><font color="#000080">#define</font></b> <a name="299">LIS331DLH_STATUS_REG_XOR</a>                         <font color="#993399">0x10</font>    <i><font color="#9A1900">// 0	:	no overrun has occurred (default)</font></i>
+							        <i><font color="#9A1900">// 1	:	new X-axis data has over written the previous one</font></i>
+<b><font color="#000080">#define</font></b> <a name="301">LIS331DLH_STATUS_REG_ZYXDA</a>                       <font color="#993399">0x08</font>    <i><font color="#9A1900">// 0	:	a new set of data is not yet avvious one</font></i>
+                                                                <i><font color="#9A1900">// 1	:	a new set of data is available</font></i>
+<b><font color="#000080">#define</font></b> <a name="303">LIS331DLH_STATUS_REG_ZDA</a>                         <font color="#993399">0x04</font>    <i><font color="#9A1900">// 0	:	a new data for the Z-Axis is not availvious one</font></i>
+                                                                <i><font color="#9A1900">// 1	:	a new data for the Z-Axis is available</font></i>
+<b><font color="#000080">#define</font></b> <a name="305">LIS331DLH_STATUS_REG_YDA</a>                         <font color="#993399">0x02</font>    <i><font color="#9A1900">// 0	:	a new data for the Y-Axis is not available</font></i>
+                                                                <i><font color="#9A1900">// 1	:	a new data for the Y-Axis is available</font></i>
+<b><font color="#000080">#define</font></b> <a name="307">LIS331DLH_STATUS_REG_XDA</a>                         <font color="#993399">0x01</font>    <i><font color="#9A1900">// 0	:	a new data for the X-Axis is not available</font></i>
+                                                                <i><font color="#9A1900">// 1	:	a new data for the X-Axis is available</font></i>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="309">LIS331DLH_DATAREADY_BIT</a></font>                          <a href="lis331dlh_driver_private.h.html#301">LIS331DLH_STATUS_REG_ZYXDA</a>
+
+
+
+<i><font color="#9A1900">/* Exported macro ------------------------------------------------------------*/</font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="lis331dlh_driver_private.h.html#317">__SHARED__MACROS</a>
+
+<b><font color="#000080">#define</font></b> <a name="317">__SHARED__MACROS</a>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="318">ValBit</a></font></b><font color="#990000">(</font>VAR<font color="#990000">,</font>Place<font color="#990000">)</font>         <font color="#990000">(</font>VAR <font color="#990000">&amp;</font> <font color="#990000">(</font><font color="#993399">1</font><font color="#990000">&lt;&lt;</font>Place<font color="#990000">))</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="319">BIT</a></font></b><font color="#990000">(</font>x<font color="#990000">)</font> <font color="#990000">(</font> <font color="#990000">(</font>x<font color="#990000">)</font> <font color="#990000">)</font>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">/*__SHARED__MACROS*/</font></i>
+
+<i><font color="#9A1900">/* Exported functions --------------------------------------------------------*/</font></i>
+
+<i><font color="#9A1900">//Sensor Configuration Functions</font></i>
+<i><font color="#9A1900">// This GetWHOA_M_I function probably doesn't work on the LIS331HH, though it</font></i>
+<i><font color="#9A1900">// would be nice and should work fine on the LIS331DHL.  But since LIS331HH</font></i>
+<i><font color="#9A1900">// is the part I have to play with I'm disabling it.</font></i>
+<i><font color="#9A1900">//status_t LIS331DLH_GetWHO_AM_I(u8_t* val);</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#185">LIS331DLH_SetODR</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#78">LIS331DLH_ODR_t</a></font> dr<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#208">LIS331DLH_SetMode</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#94">LIS331DLH_Mode_t</a></font> pm<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#232">LIS331DLH_SetAxis</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#48">LIS331DLH_Axis_t</a></font> axis<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#255">LIS331DLH_SetFullScale</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#127">LIS331DLH_Fullscale_t</a></font> fs<font color="#990000">);</font>
+<i><font color="#9A1900">// The LIS331HH supports different full-scale values than the LIS331DLH.</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#271">LIS331HH_SetFullScale</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#135">LIS331HH_Fullscale_t</a></font> fs<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#285">LIS331DLH_SetBDU</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> bdu<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#308">LIS331DLH_SetBLE</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#140">LIS331DLH_Endianess_t</a></font> ble<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#377">LIS331DLH_SetSelfTest</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> st<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#400">LIS331DLH_SetSelfTestSign</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> st_sign<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#540">LIS331DLH_TurnONEnable</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#119">LIS331DLH_Sleep_To_Wake_Conf_t</a></font> stw<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#354">LIS331DLH_SetBOOT</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> boot<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#331">LIS331DLH_SetFDS</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> fds<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#517">LIS331DLH_SetSPI34Wire</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#145">LIS331DLH_SPIMode_t</a></font> sim<font color="#990000">);</font>
+
+<i><font color="#9A1900">//Filtering Functions</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#605">LIS331DLH_SetHPFMode</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#100">LIS331DLH_HPFMode_t</a></font> hpm<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#628">LIS331DLH_SetHPFCutOFF</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#107">LIS331DLH_HPFCutOffFreq_t</a></font> hpf<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000">LIS331DLH_SetFilterDataSel</font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> state<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#589">LIS331DLH_SetReference</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#44">i8_t</a></font> ref<font color="#990000">);</font>
+
+<i><font color="#9A1900">//Interrupt Functions</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#423">LIS331DLH_SetIntHighLow</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> hil<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#446">LIS331DLH_SetIntPPOD</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> pp_od<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#470">LIS331DLH_SetInt1DataSign</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#114">LIS331DLH_INT_Conf_t</a></font> i_cfg<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#494">LIS331DLH_SetInt2DataSign</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#114">LIS331DLH_INT_Conf_t</a></font> i_cfg<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#677">LIS331DLH_SetInt1HPEnable</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> stat<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#653">LIS331DLH_SetInt2HPEnable</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> stat<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#700">LIS331DLH_Int1LatchEnable</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> latch<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#723">LIS331DLH_Int2LatchEnable</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> latch<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#746">LIS331DLH_ResetInt1Latch</a></font></b><font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#763">LIS331DLH_ResetInt2Latch</a></font></b><font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#781">LIS331DLH_SetInt1Configuration</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#49">LIS331DLH_IntConf_t</a></font> ic<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#805">LIS331DLH_SetInt2Configuration</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#49">LIS331DLH_IntConf_t</a></font> ic<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#954">LIS331DLH_SetInt1Threshold</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> ths<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#990">LIS331DLH_SetInt2Threshold</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> ths<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#972">LIS331DLH_SetInt1Duration</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> id<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#1008">LIS331DLH_SetInt2Duration</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> id<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#828">LIS331DLH_SetInt1Mode</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#170">LIS331DLH_IntMode_t</a></font> int_mode<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#851">LIS331DLH_SetInt2Mode</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#170">LIS331DLH_IntMode_t</a></font> int_mode<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#1175">LIS331DLH_GetInt1Src</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#41">u8_t</a><font color="#990000">*</font> val<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#1190">LIS331DLH_GetInt2Src</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#41">u8_t</a><font color="#990000">*</font> val<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#1205">LIS331DLH_GetInt1SrcBit</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> statusBIT<font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#41">u8_t</a><font color="#990000">*</font> val<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#1298">LIS331DLH_GetInt2SrcBit</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> statusBIT<font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#41">u8_t</a><font color="#990000">*</font> val<font color="#990000">);</font>
+
+<i><font color="#9A1900">//Other Reading Functions</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#1026">LIS331DLH_GetStatusReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#41">u8_t</a><font color="#990000">*</font> val<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#1043">LIS331DLH_GetStatusBit</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> statusBIT<font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#41">u8_t</a><font color="#990000">*</font> val<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#1135">LIS331DLH_GetAccAxesRaw</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#69">AxesRaw_t</a><font color="#990000">*</font> buff<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#874">LIS331DLH_Get6DPositionInt1</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#41">u8_t</a><font color="#990000">*</font> val<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#914">LIS331DLH_Get6DPositionInt2</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#41">u8_t</a><font color="#990000">*</font> val<font color="#990000">);</font>
+
+<i><font color="#9A1900">//Generic</font></i>
+<i><font color="#9A1900">// i.e. u8_t LIS331DLH_ReadReg(u8_t deviceAddr, u8_t Reg, u8_t* Data);</font></i>
+<i><font color="#9A1900">// i.e. u8_t LIS331DLH_WriteReg(u8_t deviceAddress, u8_t WriteAddr, u8_t Data);</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> deviceAddr<font color="#990000">,</font> <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> Reg<font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#41">u8_t</a><font color="#990000">*</font> Data<font color="#990000">);</font>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> deviceAddress<font color="#990000">,</font> <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> WriteAddr<font color="#990000">,</font> <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> Data<font color="#990000">);</font>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">/*__LIS331DLH_H */</font></i>
+
+<i><font color="#9A1900">/******************* (C) COPYRIGHT 2012 STMicroelectronics *****END OF FILE****/</font></i>
+
+
+
+</tt></pre>

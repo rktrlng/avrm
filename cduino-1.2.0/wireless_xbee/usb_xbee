@@ -1,0 +1,1428 @@
+#!/usr/bin/perl -w
+
+# This program lets you easily talk to an XBee module using a serial-over-USB
+# adapter.  See the POD documentation for more hardware details:
+#
+#   pod2text usb_xbee
+
+# vim:foldmethod=marker
+
+# Pragmas and Modules {{{1
+
+use strict;
+use warnings FATAL => 'all';
+
+use Carp;
+use Fcntl;
+use Getopt::Long qw( GetOptions );
+use IO::Handle;
+use Pod::Usage qw( pod2usage );
+use Scalar::Util qw(looks_like_number);
+use Time::HiRes qw( time usleep ualarm );
+
+# }}}1
+
+# POD (Plain Old Documentation) {{{1
+
+=head1 NAME
+
+usb_xbee - configure and transmit/receive data via a USB XBee device
+
+=head1 SYNOPSIS
+
+B<usb_xbee> --device=I<DEVICE> --command-mode
+
+B<usb_xbee> --device=I<DEVICE> --raw-mode
+
+B<usb_xbee> --device=I<DEVICE> --packetized-lines-mode [--xbee-ro=I<TIMEOUT>]
+
+B<usb_xbee> --device=I<DEVICE> --framed-lines-mode [--xbee-ro=I<TIMEOUT>]
+
+=head1 DESCRIPTION
+
+This program first sets the stty settings for the I<DEVICE> file used to
+communicate with the XBee.  It makes no attempt to restore the pre-existing
+settings on exit, since it's not possible to gaurantee that this happens
+correctly for all different kinds of program termination (uncatchable signals
+in particular).  The settings can be saved: see the stty man page.  The stty
+settings seem to persist accross unplug/plug events, despite the fact that the
+device file itself vanishes on unplug.  You have been warned.
+
+Usage is simple: start the program and start typing commands without their "AT"
+prefixes (if --command-mode), or data (if --raw-mode), or lines of input (if
+--packetized-lines-mode of --framed-lines-mode).  Of course you can also use
+pipes or shell redirects to supply data and store output.
+
+It's possible to plug in multiple devices (which will get different dev file
+names, e.g. /dev/ttyUSB0 and /dev/ttyUSB1) and make them talk to each other,
+but when the second device is plugged in, an copy of this program which is
+communicating with the first device will probably experience an error, since
+the stty settings for the second device won't be correct yet.  Simply run this
+program on the second device to give it correct stty settings, then re-run it
+on the first device.
+
+You need both an XBee module and an adapter to talk to it over USB.
+
+I've successfully tried this program with the following adapters:
+
+=over 4
+
+=item *
+
+Sparkfun XBee Explorer USB (Sparkfun part number WRL-08687).  Make sure to get
+a USB Type A to USB Mini-B cable as well, it isn't included.
+
+=item *
+
+Sparkfun XBee Explorer Dongle, Sparkfun part number WRL-09819.  Note that there
+are two different Sparkfun XBee Explorer Dongle parts.
+
+=item *
+
+Sparkfun XBee Explorer Dongle, Sparkfun part number WRL-11697, on a newer
+(3.8.13) kernel.  This dongle doesn't work for me on my fairly ancient
+(2.6.32) kernel box, presumably because the ftdi driver in the old kernel
+doesn't support the newer chip on this dongle.
+
+=item *
+
+A random older USB dongle from Smiley Micros.
+
+=back
+
+I've succesfully tried this program with the following XBee modules:
+
+=over 4
+
+=item *
+
+Series 1 XBee 1mW Chip Antenna Module (Sparkfun part number WRL-08664),
+firmware version 10E6 (the version that ships with the module, at least for
+me).
+
+=item *
+
+Series 1 XBee 1mW Trace Antenna Module (Spartfun part number WRL-11215),
+firmware version 10EC (the version that came on the module, at least for me).
+
+=back
+
+Some other modules will likely work as well, though I tried an old XBee Pro
+from 2006 and it didn't work (couldn't get into command mode).  Series 2.5, ZB,
+and 2B modules probably won't work out of the box, but might with appropriate
+firmware installed.  I don't know on the 900 MHz, XSC or XSC S3B modules.  See
+this page for more information of the different module families:
+
+https://www.sparkfun.com/pages/xbee_guide
+
+Entering command mode while there is chatter on the network_id/channel which
+the XBee is configured to use is somewhat interesting.  You can't count on
+getting the initial "OK\r" string that you normall get back when you enter
+command (I suspect because it can end up jumbled together with radio data).
+This program handles this by throwing away data for a short time after sending
+the sequence that's supposed to initiate command mode, then automatically
+trying a command.  If the command returns the expected response then we assume
+we made it into command mode.
+
+On my old 2.6 kernel system, it takes a surprisingly long time (10 - 20
+seconds) for the module device file to become usable the first time the module
+is plugged in.  I don't know why.  This long delay isn't present on my 3.8.13
+kernel system.
+
+=head1 OPTIONS AND ARGUMENTS
+
+=over 4
+
+=item B<-d> I<DEVICE>, B<-device>=I<DEVICE>
+
+Specify the device file corresponding to the connected XBee module (e.g.
+"/dev/ttyUSB0").  It may be easist to find the correct device file in /dev by
+watching for it to appear when the device is plugged in.  Try this command:
+
+  ls -1 /dev >/tmp/oe; \
+  echo -n Plug in or unplug device then hit enter; \
+  read; \
+  sleep 1; \
+  ls -1 /dev >/tmp/ne; diff /tmp/oe /tmp/ne \
+    | grep -E '(\+|\-)[[:alpha:]]' \
+    | cut --bytes=2-
+  || ( echo error: did not detect and change in /dev contents 1>&2 \
+       && false )
+
+Note that the device file name is probably dynamically assigned and might
+change depending on what hardware you have plugged in and also on the order in
+which you plugged it in.
+
+=item B<-c>, B<--command-mode>
+
+WARNING: I have found that the XBee won't enter command mode if there is radio
+chatter on the network id and channel for which it is configured to listen.
+This is consistent with the implications of Figure 2-07 of the XBee datasheet.
+
+Enter command mode on startup by sending the sleep-bracketed '+++' AT command
+initiation sequence.  Then enable a convenient keep-alive feature and few
+tranformations on input and output:
+
+=over 4
+
+=item *
+
+If there is no input for a few seconds, sent an "AT\r" string to the
+XBee module to prevent it from automatically dropping out of command mode.
+Neither this command nor the corresponding returned string are shown on this
+program's stdin/stdout.
+
+=item *
+
+Input lines first have leading or trailing white space removed, then
+"AT" added as a prefix, and "\r" added as a suffix.
+
+=item *
+
+All input characters are translated to upper case (even though most
+if not all XBees are not case sensitive).
+
+=item *
+
+Output lines have "\r" characters replaced with "\n" characters.
+
+=back
+
+Note that if this program exits abnormally (i.e. other than by getting EOF on
+its stdin due to Cntrl-D being pressed), the XBee module will remain in command
+mode for up to 10 seconds after the last command is issued (unless an explicit
+exit-command-mode command ("CN") is issued, or the module has been reconfigured
+to remain in command mode for less time).
+
+FIXXME: there is at least one XBee command for which this program doesn't work
+right: the ED (energy scan) command.  This is because this command takes too
+long to run and a timeout occurs during the wait for the keep-alive command
+response.  You can work around this somewhat by continuing to send junk while
+watching the output but it's ugly and eventually an error happens.  To really
+fix this an option to disable the keep-alive commands would need to be added.
+
+=item B<-r>, B<--raw-mode>
+
+Raw mode.  In this mode, bytes from the standard input may be line-buffered (if
+stdin is connection to a terminal) but are otherwise sent unmodified to the
+XBee, and data sent to us from the XBee is passed unmodified to our standard
+output.
+
+There are some caveats related to RF packetization in raw mode, see the
+L<BUGS AND POTENTIAL WORK-AROUNDS> section.
+
+=item B<-p>, B<--packetized-lines-mode>
+
+WARNING: see also the description of the B<--xbee-ro> option.
+
+This mode is like raw mode, but it attempts to send each newline or end-of-file
+terminated line of input as a single radio packet.  If a line is too long
+(longer than 100 bytes) to transmit as a single frame, or if the timing
+requirements for single-packet transmission aren't met, this program prints
+an error message and exits with a non-zero exit code.  Note that no trailing
+NUL byte is added or transmitted.  See L<BUGS AND POTENTIAL WORK-AROUNDS> for
+more details.
+
+=item B<-f>, B<--framed-lines-mode>
+
+WARNING: see also the description of the B<--xbee-ro> option.
+
+This mode is like raw mode, but it attempts to send each newline or end-of-file
+terminated line of input as a single frame in the format described in
+wireless_xbee.h (see the wx_put_data_frame() in that file).  A frame payload
+can consist of up to 44 bytes of arbitrary data (100% bytes that require
+escaping), or 89 bytes of safe data (0% bytes that require escaping).  If an
+escaped line is too long (longer than 100 bytes) to transmit as a single frame,
+or if the timing requirements for single-packet transmission aren't met, this
+program prints an error message and exits with a non-zero exit code.  See
+L<BUGS AND POTENTIAL WORK-AROUNDS> for more details.
+
+Received data is assumed to consist of frames in the same format (the payloads
+of which are printed to stdout as in raw mode).  Incoming data which
+cannot be interpreted as part of a frame will result in an error message
+and exit with a non-zero exit code.
+
+=item B<--xbee-r0>=I<TIMEOUT>
+
+Indicate that the packetization timeout (RO) configuration parameter of the
+XBee module being used has been set to I<TIMEOUT> (which must be a value in
+[0x00, 0xFF]).  The default is 0x03, which is the default XBee configuration
+setting.  However, for more reliable operation in --packetized-lines-mode and
+--framed-lines-mode, you may want to set RO to a larger value.  WARNING: if you use an XBee module that has had its RO parameter changed from the Arduino side,
+you need to change the definition of
+WX_TRANSPARENT_MODE_PACKETIZATION_TIMEOUT_BYTES in wireless_xbee.h as well.
+You can change R0 to its maximum using this command (assuming your I<DEVICE> is
+/dev/ttyUSB0):
+
+  echo -e -n "ROFF\nWR\n" | ./usb_xbee -d /dev/ttyUSB0 -c
+
+Note that --packetized-lines-mode and --framed-lines-mode cannot possibly work
+if R0 is set to 0x00, since that setting forces the XBee to transmit characters
+immediately as soon as it gets them.
+
+Note that setting RO to a larger value will generally increase the round-trip
+time required for a send-receive iteration between two XBees, since a longer
+delay will be required to force packetization.  See
+L<BUGS AND POTENTIAL WORK-AROUNDS> for more details.
+
+=back
+
+=head1 BUGS AND POTENTIAL WORK-AROUNDS
+
+XBee series 1 modules (and probably other XBees also) in their default
+"transparent" mode depend on the timing of data coming in from the serial port
+to decide when to packetize and transmit an RF packet.  They do so every time
+they get 100 bytes, or when some particular (configurable) amount of time
+passes without any additional bytes being queued for transmission.
+
+In a microcontroller context this is a reasonable approach: it's easy to ensure
+that all the bytes in a short message are transmitted in quick succession,
+thereby guaranteeing that they will be grouped into a single atomic RF packet
+and make it to the receivers without being interleaved with other data.
+For an XBee connected to a computer via USB, it's more problematic because it's
+more difficult to ensure that the byte stream for a packet is continuous.
+
+In raw mode, this program normally ignores the problem.  Data coming from stdin
+is line buffered (mainly for convenience when testing things out from the
+terminal), so it's likely to end up packetized into individual lines, but
+there's no guarantee of this.  For simple testing with a single transmitter and
+no possibility of collisions, this doesn't matter.
+
+If on the other hand you're trying to use this program for something real, you
+have a few options:
+
+=over 4
+
+=item *
+
+Increase the XBee packetization timeout to the maximum 0xFF (using AT command
+RO, e.g. "ROFF" probably followed by "WR" in command mode), and use one of the
+--packetized-lines-mode or --framed-lines-mode options.
+
+When attempting to transmit a single packet, this program measures the time
+required to send an entire prospective packet of up to 100 bytes using perl's
+Time::Hires module.  If the entire transmission took less than 0xFF (256)
+"character times" (as the XBee Manual likes to call them), then it's probably
+reasonable to assume the entire chunk of data was successfully lumped into a
+single RF packet.  One "character time" at 9600 baud is probably at least 833
+microseconds:
+
+  (8 bits per byte) * (1 / 9600 bits per second) = 0.000833 seconds per byte
+
+Note: this is apparently one of the many contexts in which "baud" is
+incorrectly used to mean "bps".
+
+One "character time" could be a bit longer (should we include stop start/stop
+bits?), but this is the conservative interpretation.  See
+http://www.labbookpages.co.uk/electronics/serialPort.html for details.
+
+I've tested the --packetized-lines-mode option in the presense of continuous
+byte-at-a-time traffic from a second source (a second XBee with RO set to 0x00,
+indicating send-at-once operation), and it "seems to work" (TM).  That is, the
+receiver (a third XBee) didn't see any cases where the transmitter believed
+its transmission had been fast enough and the incoming packet was interleaved
+with data from the byte-at-a-time source.  However...
+
+The measured time to syswrite() the data to the serial port is also much
+shorter than would be possible for the actual transmission of the bytes to the
+hardware serial port on the sending XBee at 9600 baud: it typically takes less
+than 25 microseconds on my system.  This isn't really too surprising, since we
+aren't actually sending it to the serial port, but rather to the USB port which
+is connected to an FTDI FT232RL (or similar) chip that in turn sends the data
+on to the serial port.  The FT232RL is a USB 2.0 480 Mb/s device (making the
+above 25 microsecond value quite plausible as a transfer time) and presumably
+has a buffer of its own that is capable of absorbing high-speed bursts of data
+from the USB side.
+
+The FT232RL has no reason to hang onto the data, and if it makes it that far
+it's probably safe to assume in gets to the XBee fast enough to meet the timing
+requirements.
+
+Then again, perhaps the OS-side kernel squirrels the data away in a buffer of
+its own (despite the O_SYNC option having been used when the device file was
+opened).  In that case, the OS might subsequently be interrupted in such a way
+that the frams data doesn't make it out as a single RF packet afterall.  Our
+timer will fail to detect this failure :(  FIXXME: it should be possible to
+determine for sure how this works.
+
+=item *
+
+Use API mode rather than transparent mode on the XBee.  You're on your own
+here, though command mode can still be used to configure things, and raw mode
+can be used to assemble data frames (of the sort understoon by the XBee API).
+
+=item *
+
+Do nothing at the tranmission end, and deal with interleaved data at
+the receivers (reinvent ethernet :)
+
+=back
+
+=head1 AUTHOR
+
+Britton Kerin (britton.kerin@gmail.com)
+
+=cut
+
+# }}}1
+
+sub as_uint8 # {{{1
+{
+    # Return the argument with all bits higher than the 8th masked to zero
+
+    @_ == 1 or die "wrong number of arguments";
+
+    return $_[0] & 0xff
+} # }}}1
+
+sub as_uint16 # {{{1
+{
+    # Return the argument with all bits higher than the 16th masked to zero
+    @_ == 1 or die "wrong number of arguments";
+
+    return $_[0] & 0xffff
+} # }}}1
+
+sub crc_ccitt_update # {{{1
+{
+    # Return a new version of the 16 bit CRC value given as the first
+    # argument, produced using the 8 bit value given (as an integer) in the
+    # second argument, in the manner described for the _crc_ccitt_update()
+    # function from the util/crc16.h header of AVR libc.
+
+    @_ == 2 or confess "wrong number of arguments";
+    my ($crc, $bv) = @_;   # CRC Value, Byte Value
+
+    ($crc & 0xffff0000) == 0 or die "initial CRC value more than 16 bits wide";
+    looks_like_number($bv)
+        or confess "bug: perl doesn't think byte value is a number here";
+    ($bv & 0xffffff00) == 0 or die "byte value more than 8 bits wide";
+
+    $bv ^= (0xff & $crc);
+    $bv ^= 0x00ff & ($bv << 4);
+
+    return (
+        as_uint16(($bv << 8) | ((0xff00 & $crc) >> 8)) ^
+        as_uint8($bv >> 4) ^
+        as_uint16($bv << 3) );
+} # }}}1
+
+# CRC implementation crosscheck/verification.  See ccitt.c.not_normally_built.
+#{ # {{{1
+#    my $data_size = 100000;
+#    my @data = (1 .. $data_size);
+#    my $crc = 0xffff;
+#    my $uint8_max = 255;
+#    foreach ( @data ) {
+#        $crc = crc_ccitt_update($crc, ($_ % ($uint8_max + 1)));
+#        printf "New crc: %.4X\n", $crc
+#    }
+#    exit (0);
+#} # }}}1
+
+# Process Command Line Options/Arguments {{{1
+
+my $help;   # True iff we should just print usage information and exit
+my $df;     # Device File
+my $cm;     # Command Mode
+my $rm;     # Raw Mode
+my $xbro;   # XBee RO
+my $plm;    # Packetized Lines Mode
+my $flm;    # Framed Lines Mode
+my $spm;    # Single packet Mode
+
+GetOptions(
+    "help|?"                  => \$help,
+    "device-file|d=s"         => \$df,
+    "command-mode|c"          => \$cm,
+    "raw-mode|r"              => \$rm,
+    "xbee-ro=o"               => \$xbro,
+    "packetized-lines-mode|p" => \$plm,
+    "framed-lines-mode|f"     => \$flm,
+    "single-packet-mode|s"    => \$spm )
+    or die "usb_xbee: GetOptions failed, try usb_xbee --help\n";
+
+if ( $help ) {
+    pod2usage(-verbose => 1, -exitval => 0);
+}
+
+$df or die "--device-file option must be given";
+
+my $xbro_default = 0x03;   # Defaults to the XBee configuration default value
+defined($xbro) or $xbro = $xbro_default;
+$xbro >= 0x00 and $xbro <= 0xFF
+    or die "--xbee-ro option argument not in range [0x00, 0xFF]";
+
+if ( $xbro == 0x00 and ($plm or $flm) ) {
+    die "--packetized-lines-mode and --framed-lines-mode cannot work with ".
+        "--xbee-ro=0x00";
+}
+
+# FIXXME: --single-packet-mode worked as far as it goes last time it was
+# tried, but we currently don't document it or recognize it as a valid
+# mode when processing the command line.  It's a good start on a way
+# to move binary data though.  But it's incomplete: it doesn't listen
+# for an answering packet.  Also, to be useful it should probably really
+# send/listen for a frame (send-one-listen-for-one-exit would be sensible
+# operation for this mode, I think).  Since I'm planning to use text and
+# not binary for communication, I'm not going to implement this at the moment.
+not $spm
+    or die "--single-packet-mode worked when last checked but isn't done";
+
+($cm xor $rm xor $plm xor $flm )
+    or die "exactly one of the --command-mode, --raw-mode, ".
+           "--packetized-lines-mode, or --framed-lines-mode options must be ".
+           "given";
+
+# }}}1
+
+sysopen(UD, "$df", O_RDWR | O_SYNC)   # USB Device
+    or die "sysopen() of device file '$df' for read/write failed: $!";
+
+sub configure_tty # {{{1
+{
+    # Use the stty program to configure the serial device given as an
+    # argument st we can send it raw data and it will get through to the
+    # XBee unmolested.
+    #
+    # It's important to undertand that when the stdin and/or stdout of this
+    # program are connected to a terminal, the existing settings for that
+    # terminal still apply.  We're configuring the settings for the serial
+    # connection to the XBee, NOT the ones for the terminal you type into.
+    # Thus backspace and such still work.  All your input is resolved into
+    # a single line then sent off to the XBee serial port.
+
+    @_ == 1 or die "wrong number of arguments";
+    my $df = shift;
+
+    # The device tty file for the XBee adapter must be configured as
+    # illustrated here:
+    #
+    #   $ stty -a -F /dev/ttyUSB0
+    #   speed 9600 baud; rows 0; columns 0; line = 0;
+    #   intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^A; eol = <undef>;
+    #   eol2 = <undef>; swtch = <undef>; start = ^Q; stop = ^S; susp = ^Z;
+    #   rprnt = ^R; werase = ^W; lnext = ^V; flush = ^O; min = 1; time = 0;
+    #   -parenb -parodd cs8 hupcl -cstopb cread -clocal -crtscts
+    #   -ignbrk -brkint -ignpar -parmrk -inpck -istrip -inlcr -igncr -icrnl
+    #   -ixon -ixoff -iuclc -ixany -imaxbel -iutf8 -opost -olcuc -ocrnl -onlcr
+    #   -onocr -onlret -ofill -ofdel nl0 cr0 tab0 bs0 vt0 ff0
+    #   -isig -icanon -iexten -echo -echoe -echok -echonl -noflsh -xcase
+    #   -tostop -echoprt -echoctl -echoke
+    #
+    # This is a sort of super-raw mode in which nothing is echoed or mangled
+    # or anything.  Note that the 'raw' setting offered by the stty program
+    # is not enough: it doesn't set many options that are enabled by default
+    # on at least some systems (e.g. echoctl, echonl, etc.)
+    #
+    # Here are the stty-readable settings corresponding to the above (as
+    # produced by stty -g -F /dev/ttyUSB0):
+    my $stty_settings = '0:0:4bd:0:3:1c:7f:15:1:0:1:0:11:13:1a:0:12:f:17:16:'.
+                        '0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0';
+
+    # We try this twice, because when I tried first changing the speed then
+    # using this command as a test, I get a behavior where the first attempt
+    # reports a failure to be able to perform all requested operations,
+    # though all the setting then looked ok and things work, and then the
+    # same command repeated succeeds...
+    system("stty -F $df $stty_settings 2>/dev/null");
+    not system("stty -F $df $stty_settings") or die "stty failed twice";
+} # }}}1
+
+sub flush_data_from_xbee_for_a_short_time # {{{1
+{
+    # UGLY HACK WARNING.  The problem is that when we first enter command
+    # mode in the presence of chatter on the network_id/channel, we don't
+    # necessarilly ever get a clean "OK\n" response as far as I can tell,
+    # even if we throw away leading data.  Unless it's outracing our read
+    # for it, which I think is highly unlikely.  Anyway, what we want to
+    # do is throw away any incoming garbage for "a while" after we send the
+    # sequence that's supposed to initiate command mode.  Then we can try a
+    # command and see if it gives a clean response.  We don't know how much
+    # junk we will get, of course.  So we just read stuff while waiting
+    # for a timer to go off.  Of course, the scaler we set to detect the
+    # alarm in the SIGALRM handler might not be truly atomic.  Something on
+    # the internet said if it's an operation supported by tie, it's atomic,
+    # which I think scalar assignment probably is :)
+
+    my $ft = 300042;
+    my $not_real_atom = 0;   # NOTE: am I really atmoic?  Who knows
+    $SIG{ALRM} = sub { $not_real_atom = 1; };
+    ualarm($ft);
+    my $junk_storage;
+    while ( not $not_real_atom ) {
+      sysread(UD, $junk_storage, 10042);
+    }
+} # }}}1
+
+sub get_response # {{{1
+{
+    # Get a response to an AT command (which we assume was previously sent),
+    # or die if we get nothing for too long or too much garbage.  The trailing
+    # '\r' character which signals the end of the response is returned with
+    # the rest of the response.
+
+    my $rt = '';   # Response Text
+
+    # Maximum Response Length.  If we don't see the "\r" within this many
+    # characters, something is wrong.
+    my $mrl = 20;
+
+    # Timeout Time.  If we don't see the "\r" within this many seconds,
+    # something is wrong.
+    my $tt  = 5;
+
+    # Set an alarm so we'll die instead of hanging forever if we don't get
+    # a response.
+    $SIG{ALRM}
+        = sub
+          {
+              die "invalid command response: no \"\\r\" within $tt ".
+                  "seconds.  Perhaps we exited command mode somehow?";
+          };
+    alarm($tt);
+
+    for ( my $ii = 0 ; $ii < $mrl ; $ii++ ) {
+
+        my $rr = sysread(UD, $rt, 1, $ii);   # Read Return value
+        defined($rr)
+            or die "sysread failed on $df: $!.  Perhaps we exited command ".
+                   "mode somehow?";
+        $rr == 1
+            or die "failed to read exactly one character from $df.  Perhaps ".
+                   "we exited command mode somehow?";
+
+        if ( substr($rt, $ii, 1) eq "\r" ) {
+
+            # Cancel the alarm
+            alarm(0);
+            $SIG{ALRM} = 'DEFAULT';
+
+            return $rt;
+        }
+    }
+
+    # Cancel the alarm
+    alarm(0);
+    $SIG{ALRM} = 'DEFAULT';
+
+    die "didn't get command response with trailing '\\r' within $mrl bytes.  ".
+        "Perhaps we exited command mode somehow?";
+} # }}}1
+
+sub at_command ($) # {{{1
+{
+    # Given an AT command, send it to the XBee and return any response up to
+    # the first "\r" received.  Die with an error if we don't get a "\r" back.
+    # Note that this should only be used after enter_command_mode().
+
+    @_ == 1 or die "wrong number of arguments";
+    my $command = shift;
+
+    my $swr = syswrite(UD, $command);
+    defined($swr) or die "syswrite failed: $!";
+    $swr == length($command)
+	or die "syswrite didn't write the expected number of bytes";
+
+    my $rl = get_response();   # Response Line (from XBee)
+
+    return $rl;
+} # }}}1
+
+sub enter_command_mode # {{{1
+{
+    # Perform the wait-one-second, send-+++, wait-1-second sequence required
+    # to go into command mode, flush potential garbage data for a short time
+    # (see flush_data_from_xbee_for_a_short_time()), and try an empty command
+    # to see if we get "OK\r" back, dying if we don't.
+
+    sleep 1;
+    my $swr = syswrite(UD, '+++');   # SysWrite Return
+    defined($swr)
+        or die "syswrite to $df failed: $!";
+    $swr == length('+++')
+        or die "syswrite didn't write the expected number of bytes to $df";
+    sleep 1;
+
+    flush_data_from_xbee_for_a_short_time();
+
+    my $response = at_command("AT\r");
+
+    $response eq "OK\r" or die "failed to enter command mode";
+} # }}}1
+
+sub leave_command_mode # {{{1
+{
+    # Leave command mode by issuing the AT command that leaves command mode.
+
+    my $ecmcs = "ATCN\r";   # Exit Command Mode Command String
+
+    my $swr = syswrite(UD, $ecmcs);   # SysWrite Return
+    defined($swr)
+        or die "syswrite to $df failed: $!";
+    $swr == length($ecmcs)
+        or die "syswrite didn't write the expected number of bytes to $df";
+
+    # NOTE: I hope to hell the first thing you see when you leave command mode
+    # is the response sequence, regardless of what's going on on the radio.
+    # But who knows?
+    get_response() eq "OK\r" or die "failed to leave command mode";
+} # }}}1
+
+sub timed_wait_for_stdin # {{{1
+{
+    # Wait up to the given number of seconds for STDIN to have something we
+    # can read.  Return true iff it does.
+
+    @_ == 1 or die "wrong number of arguments";
+    my $to = shift;   # Timout, in seconds
+
+    my $rin = '';
+    my $rout = '';
+    my $sifn = fileno(STDIN);
+    vec($rin, $sifn, 1) = 1;
+    my $rfc = select($rout = $rin, undef, undef, $to);   # Ready File Count
+    $rfc != -1 or die "select failed: $!";
+    $rfc == 0 or $rfc == 1
+        or die "select indicated an unexpected number of ready files";
+    if ( $rfc == 1 ) {
+        vec($rout, $sifn, 1) == 1
+            or die "select doesn't indicate the expected ready file set";
+        return 1;
+    }
+    else {
+        return 0;
+    }
+} # }}}1
+
+my $mps = 100;   # XBees (Series 1 at least) Maximum (RF) Packet Size
+
+sub send_single_packet # {{{1
+{
+    # Attempt to send data in the argument scalar to the XBee in such a
+    # way that it goes out as a single radio packet (see BUGS AND POTENTIAL
+    # WORK-AROUNDS in the POD for details).  Return "success" on success,
+    # or a string beginning with "failure: " (followed by details of the
+    # failure) on failure.  If a system call does something really unexpected,
+    # die internally.
+
+    @_ == 1 or die "wrong number of arguments";
+    my $dts = shift;   # Data To Send
+
+    # First slurp all the input data
+
+    my $mps = 100;   # XBees (Series 1 at least) Maximum (RF) Packet Size
+    my $dtsl = length($dts);   # Data To Send Length (non-utf8 handle required)
+    if ( $dtsl > $mps ) {
+        return "failure: got >$mps bytes (max radio packet size) of input";
+    }
+
+    # In theory, we could be checking the byte-to-byte times.  But that
+    # would require sending the bytes in seperate syswrite() calls, which
+    # is probably at least as likely to result in an unnaceptable delay,
+    # since the OS is probably more likely to interrupt us between syswrite()
+    # calls than during one.
+
+    # But that introduces so many measurements.  This really conservative
+    # approach seems safer to me somehow.
+
+    # Now try to send it all real quick, so the XBee puts it one packet.
+    my $st = time();   # Start Time
+    my $swr = syswrite(UD, $dts, $dtsl);   # Syswrite Return
+    defined($swr) or die "syswrite to $df failed: $!";
+    $swr == $dtsl
+        or die "syswrite didn't write the expected number of bytes to $df";
+    my $et = time();
+
+    # Timing calculations.  See BUGS AND POTENTIAL WORK-AROUNDS in the POD.
+    my $bpp = 8.0;      # Bits Per Byte
+    my $bps = 9600.0;   # Bits Per Second
+    my $pts = $xbro * $bpp / $bps;   # Packetization Timeout in Seconds
+
+    my $tmoe = 0.1;   # Time Margin Of Error
+
+    # Did we make it fast enough?
+    if ( $et - $st > $pts * (1.0 - $tmoe) ) {
+        # It really might work next time, maybe OS won't interrupt us then :)
+        return "failure: didn't get data written fast enough";
+    }
+
+    # Now we want to delay long enough to make sure a transmission is forced.
+    # Here the factor of safety works the opposite direction of the one above,
+    # since we want to ensure that a transmission does happen.  It's also
+    # more conservative, since our estimation of what constitutes a single
+    # "character time" is a bit on the conservative side.
+    my $usps = 1000000;   # microSeconds Per Second
+    my $ptfs = 1.5;   # Packetization Time Factor of Safety
+    usleep($pts * $ptfs * $usps);
+
+    return "success";
+} # }}}1
+
+# Frame related constants {{{1
+
+# Special byte values
+my $frame_delimiter = 0x7e;
+my $escape          = 0x7d;   # This one is used in order to escape too :)
+my $xon             = 0x11;
+my $xoff            = 0x13;
+my $xflfv           = 0xff;   # Xor'ed Frame Length Flag Value
+my $nxflfv          = 0x00;   # Not Xor'ed Frame Length Flag Value
+my $escape_modifier = 0x20;   # Escaped bytes are XOR'ed with this value
+
+# Maximum field sizes and espansion factor
+my $fdl   = 1;   # Frame Delimiter Length
+my $flfl  = 2;   # Frame Length Field Length (including flag byte but not CRC)
+my $fmcb  = 8;   # Frame Max Crc Bytes (after possible escaping)
+my $fmpef = 2;   # Frame Maximum Payload Expansion Factor (due to escaping)
+
+# Frame Safe Safe Payload Length
+my $fsspl = $mps - $fdl - $flfl - $fmcb;
+
+$fsspl == 89
+    or die "frame safe safe payload length doesn't match documented value";
+
+# Frame Safe Arbitrary Payload Length
+my $fsapl = int($fsspl / $fmpef);
+
+$fsapl == 44
+    or die "frame safe arbitrary payload length doesn't match documented value";
+
+# }}}1
+
+sub needs_escaped # {{{1
+{
+    # Return true iff the given byte argument needs escaping in our
+    # frame scheme.  Note that this function takes an character value
+    # (i.e. something perl thinks is a number, not a short string).
+
+    @_ == 1 or die "wrong number of arguments";
+    my $bv = shift;
+
+    my $ubm = 255;   # Unsigned Byte Maximum
+    $bv <= $ubm or confess "argument isn't <= $ubm";
+
+    return(
+        $bv == $frame_delimiter or
+        $bv == $escape or
+        $bv == $xon or
+        $bv == $xoff );
+} # }}}1
+
+sub escaped_crc_bytes # {{{1
+{
+    # Given a 16 bit CRC, return a pack of two to four bytes containing the
+    # escaped form of the CRC.
+
+    @_ == 1 or die "wrong number of arguments";
+    my $crc = shift;
+
+    my $ecrc = '';   # Escaped CRC to be returned
+
+    my $hb = (0xff00 & $crc) >> 8;   # High Byte
+    my $lb = 0xff & $crc;   # Low Byte
+    if ( needs_escaped($hb) ) {
+        $ecrc .= pack("CC", $escape, $hb ^ $escape_modifier);
+    }
+    else {
+        $ecrc .= pack("C", $hb);
+    }
+    if ( needs_escaped($lb) ) {
+        $ecrc .= pack("CC", $escape, $lb ^ $escape_modifier);
+    }
+    else {
+        $ecrc .= pack("C", $lb);
+    }
+
+    (length($ecrc) >= 2 and length($ecrc) <= 4)
+        or die "escaped CRC doesn't appear to be between 2 and 4 bytes long";
+
+    return $ecrc;
+} # }}}1
+
+sub frame # {{{1
+{
+    # Return a frame in the format described in wireless_xbee.h from the
+    # given argument data.  Note that this function doesn't verify that the
+    # frame is short enough to go in a single radio packet.
+
+    @_ == 1 or die "wrong number of arguments";
+    my $pd = shift;   # Payload Data
+
+    my $crciv = 0xffff;   # CRC initial value for our CRC algorithm
+
+    my $lcrc = $crciv;   # CRC of the delimiter and escaped length field bytes
+    my $pcrc = $crciv;   # CRC of the escaped payload bytes
+
+    my $fd = '';    # Frame Data
+    my $epd = '';   # Escaped Payload Data
+
+    # Compute escaped payload data and associated CRC {{{2
+    for ( my $ii = 0 ; $ii < length($pd) ; $ii++ ) {
+        my $cc = substr($pd, $ii, 1);   # Current Character
+        if ( needs_escaped(ord($cc)) ) {
+            $pcrc = crc_ccitt_update($pcrc, $escape);
+            my $xored_bv = ord($cc) ^ $escape_modifier;
+            $pcrc = crc_ccitt_update($pcrc, $xored_bv);
+            $epd .= pack "CC", $escape, $xored_bv;
+        }
+        else {
+            $pcrc = crc_ccitt_update($pcrc, ord($cc));
+            $epd .= pack "C", vec($cc, 0, 8);
+        }
+    }
+    # }}}2
+
+    # Begin delimiter + length CRC calculation, add frame delimiter {{{2
+
+    $lcrc = crc_ccitt_update($lcrc, $frame_delimiter);    # Updata CRC
+    $fd .= pack "C", $frame_delimiter;
+
+    # }}}2
+
+    my $dplbl = 3;   # Delimiter byte plus length field bytes total
+
+    # Add the length field, update delimiter + length CRC {{{2
+
+    my $xflfv  = 0xff;   # Xor'ed Frame Length Flag Value
+    my $nxflfv = 0x00;   # Not Xor'ed Frame Length Flag Value
+
+    my $epdl = length($epd);   # Escaped Payload Data Length
+
+    my $lne = needs_escaped($epdl);   # Length Needs Escaped?
+
+    my $efv = $lne ? $xflfv : $nxflfv;   # Escape Flag Value
+    $lcrc = crc_ccitt_update($lcrc, $efv);    # Updata CRC
+
+    # Possibly Xor'ed Length Value Itself
+    my $pxlvi = $lne ? $epdl ^ $escape_modifier : $epdl;
+    $lcrc = crc_ccitt_update($lcrc, $pxlvi);    # Update CRC
+
+    my $lfb = pack("CC", $efv, $pxlvi);   # Length Field Bytes
+
+    $fd .= $lfb;
+
+    length($fd) == $dplbl or die "BUG: frame length not as expected";
+
+     # }}}2
+
+     my $elcrc_bytes = escaped_crc_bytes($lcrc);   # Escaped lcrc bytes
+     my $epcrc_bytes = escaped_crc_bytes($pcrc);   # Escaped pcrc bytes
+
+     $fd .= $elcrc_bytes;   # Add the escaped frame delimiter/lengch CRC bytes
+
+     # Add the escaped payload data {{{2
+
+     for ( my $ii = 0 ; $ii < length($epd) ; $ii++ ) {
+         $fd .= pack("C", ord(substr($epd, $ii, 1)));
+     }
+
+     # }}}2
+
+     $fd .= $epcrc_bytes;   # Add the escaped payload CRC bytes
+
+     length($fd) == (
+         $dplbl +
+         length($elcrc_bytes) +
+         $epdl +
+         length($epcrc_bytes) )
+         or die "BUG: frame length not as expected";
+
+     return $fd;
+} # }}}1
+
+sub byte_available # {{{1
+{
+    # Return true iff a byte appears to be available to read from the
+    # serial device.
+
+    my ($rin, $rout, $ein, $eout) = ('', '', '', '');
+    my $udfn = fileno(UD);
+    vec($rin, $udfn, 1) = 1;
+
+    my ($rfc, $tl) = select($rout = $rin, undef, $eout = $ein, 0);
+
+    not vec($eout, $udfn, 1)
+        or die "select() reported an exception related to file '$df'";
+
+    if ( $rfc == 0 ) {
+        return 0;
+    }
+    elsif ( $rfc == 1 ) {
+        vec($rout, $udfn, 1)
+            or die "BUG: file we expected to be readable isn't after select";
+        return 1;
+    }
+    else {
+        confess "BUG: unexpected ready file count from select()";
+    }
+} # }}}1
+
+sub get_byte # {{{1
+{
+    # Read exactly one byte from the serial device.  It's wise to call
+    # byte_available() first, to avoid potentially hanging forever.
+    # Return the read byte as an integer.
+
+    my $rd;           # Read Data
+    my $rr = sysread(UD, $rd, 1);   # Read Return value
+    defined($rr) or die "sysread failed on $df: $!";
+    $rr == 1 or die "sysread() didn't read exactly one byte as expected";
+
+    return ord($rd);
+} # }}}1
+
+sub high_byte # {{{1
+{
+    # Return the high byte of the given 16 bit value
+
+    @_ == 1 or die "wrong number of arguments";
+    my ($val16) = @_;
+
+    ($val16 & 0xffff0000) == 0
+        or die "BUG: supposed 16 bit argument has bits > 16 set";
+
+    return ($val16 & 0xff00) >> 8;
+} # }}}1
+
+sub low_byte # {{{1
+{
+    # Return the low byte of the given 16 bit value
+
+    @_ == 1 or die "wrong number of arguments";
+    my ($val16) = @_;
+
+    ($val16 & 0xffff0000) == 0
+        or die "BUG: supposed 16 bit argument has bits > 16 set";
+
+    return $val16 & 0x00ff;
+} # }}}1
+
+sub get_frame # {{{1
+{
+    # Like wx_get_frame() from wireless_xbee.c, but with a perlesque
+    # signature.  Most of the explanatory comments are there.  Unlike that
+    # function, this one gives some feedback when things go wrong: it
+    # returns "success" on success, or a string beginning with "failure: "
+    # on failure.  As arguments we require a ref to an empty string (where
+    # the payload data will be stored) and a timeout value in milliseconds.
+    # The timeout value is actually the time spent polling the serial port,
+    # other code time isn't included (but is pretty negligible).
+
+    @_ == 2 or die "wrong number of arguments";
+    my ($pdr, $to) = @_;   # Payload Data Ref, Timeout
+
+    # We return the string into a referenced scaler which must be undef or ''.
+    not defined ($$pdr) or length($$pdr) == 0
+        or die "defined payload data ref doesn't point to empty string";
+    $$pdr = '';
+
+    my $fs = "outside frame";   # Frame State
+    my $crciv = 0xffff;         # CRC initial value for our CRC algorithm
+    my $crc = $crciv;           # CRC value
+    my $et = 0;                 # Elapsed Time (in milliseconds)
+    my $epl;                    # Escaped Payload Length
+    my $epbr = 0;               # Escaped Payload Bytes Read (so far)
+    my $lxorfb;                 # Length XOR'ed Flag Byte
+
+    # Note that we don't count the time executing code, just the time spent
+    # sleeping between polls.  It's very close though.
+    while ( $et < $to ) {
+
+        if ( byte_available() ) {
+
+            my $cb = get_byte();
+
+            if ( $cb == $frame_delimiter ) {
+                $crc = crc_ccitt_update($crc, $cb);
+                if ( $fs ne "outside frame" ) {
+                    return "failure: frame delimiter while not outside frame";
+                }
+                $fs = "at length xored flag";
+            }
+
+            else {
+                if    ( $fs eq "at length xored flag" ) {
+                    $crc = crc_ccitt_update($crc, $cb);
+                    $lxorfb = $cb;
+                    $lxorfb == $xflfv or $lxorfb == $nxflfv
+                        or return "failure: invalid length xor'ed flag value";
+                    $fs = "at length itself";
+                }
+
+                elsif ( $fs eq "at length itself" ) {
+                    $crc = crc_ccitt_update($crc, $cb);
+                    $epl = $cb;
+                    if ( $lxorfb == $xflfv ) {
+                        $epl ^= $escape_modifier;
+                    }
+                    $fs = "at length crc high byte";
+                }
+
+                elsif ( $fs eq "at length crc high byte" ) {
+                    if ( $cb == $escape ) {
+                        $fs = "at length crc high byte escaped";
+                    }
+                    else {
+                        if ( $cb != high_byte($crc) ) {
+                            return "failure: delimiter/length CRC error";
+                        }
+                        $fs = "at length crc low byte";
+                    }
+                }
+
+                elsif ( $fs eq "at length crc high byte escaped" ) {
+                    my $ucb = ($cb ^ $escape_modifier);   # Unescaped $cb
+                    if ( $ucb != high_byte($crc) ) {
+                        return "failure: delimiter/length CRC error";
+                    }
+                    $fs = "at length crc low byte";
+                }
+
+                elsif ( $fs eq "at length crc low byte" ) {
+                    if ( $cb == $escape ) {
+                        $fs = "at length crc low byte escaped";
+                    }
+                    else {
+                        if ( $cb != low_byte($crc) ) {
+                            return "failure: delimiter/length CRC error";
+                        }
+                        $crc = $crciv;   # Reset for later use on payload
+                        if ( $epl > 0 ) {
+                            $fs = "in payload";
+                        }
+                        else {
+                            $fs = "at payload crc high byte";
+                        }
+                    }
+                }
+
+                elsif ( $fs eq "at length crc low byte escaped" ) {
+                    my $ucb = ($cb ^ $escape_modifier);   # Unescaped $cb
+                    if ( $ucb != low_byte($crc) ) {
+                        return "failure: delimiter/length CRC error";
+                    }
+                    $crc = $crciv;   # Reset for later use on payload
+                    if ( $epl > 0 ) {
+                        $fs = "in payload";
+                    }
+                    else {
+                        $fs = "at payload crc high byte";
+                    }
+                }
+
+                elsif ( $fs eq "in payload" ) {
+                    $crc = crc_ccitt_update($crc, $cb);
+                    if ( $cb == $escape ) {
+                        $fs = "in payload escaped";
+                    }
+                    else {
+                        $$pdr .= chr($cb);
+                    }
+                    $epbr++;
+                    if ( $epbr == $epl ) {
+                        $fs = "at payload crc high byte";
+                    }
+                }
+
+                elsif ( $fs eq "in payload escaped" ) {
+                    $crc = crc_ccitt_update($crc, $cb);
+                    $$pdr .= chr($cb ^ $escape_modifier);
+                    $epbr++;
+                    if ( $epbr == $epl ) {
+                        $fs = "at payload crc high byte";
+                    }
+                    else {
+                        $fs = "in payload";
+                    }
+                }
+
+                elsif ( $fs eq "at payload crc high byte" ) {
+                    if ( $cb == $escape ) {
+                        $fs = "at payload crc high byte escaped";
+                    }
+                    else {
+                        if ( $cb != high_byte($crc) ) {
+                            return "failure: payload CRC error";
+                        }
+                        $fs = "at payload crc low byte";
+                    }
+                }
+
+                elsif ( $fs eq "at payload crc high byte escaped" ) {
+                    my $ucb = ($cb ^ $escape_modifier);   # Unescepd $cb
+                    if ( $ucb != high_byte($crc) ) {
+                        return "failure: payload CRC error";
+                    }
+                    $fs = "at payload crc low byte";
+                }
+
+                elsif ( $fs eq "at payload crc low byte" ) {
+                    if ( $cb == $escape ) {
+                        $fs = "at payload crc low byte escaped";
+                    }
+                    else {
+                        if ( $cb != low_byte($crc) ) {
+                            return "failure: payload CRC error";
+                        }
+                        return "success";
+                    }
+                }
+
+                elsif ( $fs eq "at payload crc low byte escaped" ) {
+                    my $ucb = ($cb ^ $escape_modifier);   # Unescepd $cb
+                    if ( $ucb != low_byte($crc) ) {
+                        return "failure: payload CRC error";
+                    }
+                    return "success";
+                }
+            }
+        }
+
+        else {
+            my $poll_interval_ms = 1;   # Poll interval in milliseconds
+            my $uspms = 1000;   # MicroSeconds Per MilliSecond
+            usleep($poll_interval_ms * $uspms);
+            $et += $poll_interval_ms;   # Elapsed time
+        }
+    }
+
+    return "failure: timed out before receiving full (possibly any of) frame";
+} # }}}1
+
+configure_tty($df);
+
+# FIXME: There exist situation where this error: get_frame() failed: timed
+# out before receiving full (possibly any of) frame at ./usb_xbee line 1305.
+# is guaranteed to trigger at startup even if there is no radio traffic. It
+# must be because some message fragments are left over in the XBee or UART
+# buffer when we start reading from it.  I'm not sure this should be allowe
+# to happen at startup.  Perhaps any broken messages should first be flushed
+# somehow? Then again, how do we distinguish them from broken traffic that
+# just happens to arrive then?  Perhaps the real answer is that this very
+# common error message must be documented better :)
+
+if ( $cm ) {   # --command-mode {{{1
+
+    enter_command_mode();
+
+    my $ki = 4;   # Keepalive Interval (seconds)
+
+    for ( ; ; ) {
+
+        my $gsi = timed_wait_for_stdin($ki);   # Got Standard Input?
+        my $cts;   # Command To Send
+
+        if ( $gsi ) {
+            # Get the line of input
+            $cts = STDIN->getline();
+            not STDIN->error() or die "error reading line from STDIN";
+            # Now undef means we must have got EOF (possibley from Cntrl-D),
+            # so we're done
+            defined($cts) or (leave_command_mode() and exit(0));
+        }
+        else {
+            # Note that we'll add the AT and "\r" as for normal commands
+            $cts = '';
+        }
+
+        if ( $cts =~ m/^\s*ED\s*$/ ) {
+            warn "\nThe ED command causes problems.  see man page for this ".
+                 "program for details\n\n"
+        }
+
+        if ( $cts =~ m/^\s*VL\s*$/ ) {
+            warn "\nThe VL command doesn't work: its output is too long.".
+                 "Note that this command is deprecated anyway\n\n";
+        }
+
+        # Transform input line as promised
+        $cts =~ s/\s*(.*)\s*/$1/;    # Strip leading/trailing white space
+        $cts =~ tr/a-z/A-Z/;         # Translate to upper case
+        $cts = "AT".$cts."\r";       # Add leading "AT" and trailing "\r"
+
+        my $rl = at_command($cts);   # Response Line
+
+        if ( $gsi ) {
+            # Transform output line as promised
+            $rl =~ s/\r$/\n/
+                or die "command response didn't end with a carriage return";
+
+            # Display the output
+            print $rl or die "print() (to stdout) failed";
+        }
+        else {
+            $rl eq "OK\r"
+                or die "didn't get OK response to empty keep-alive commmand";
+        }
+    }
+} # }}}1
+
+elsif ( $rm or $plm or $flm ) {   # One of the non-command modes {{{1
+
+    # In these modes we can't depend no synchronous responses from the XBee:
+    # data could come in at any time, and when it does we want to get it to
+    # our stdout ASAP.  At the same time, we want to allow the user to supply
+    # data on stdin.  So we select() on both of these potential inputs and
+    # move data appropriately as it comes in.
+
+    my ($rin, $rout, $ein, $eout) = ('', '', '', '');
+    my $sifn = fileno(STDIN);
+    my $udfn = fileno(UD);
+    vec($rin, $sifn, 1) = 1;
+    vec($rin, $udfn, 1) = 1;
+
+    for ( ; ; ) {
+
+        # Find any inputs that have data (or exceptions) ready for us
+        my ($rfc, $tl) = select($rout = $rin, undef, $eout = $ein, undef);
+        $rfc != -1 or die "select failed: $!";
+        ($rfc >= 0 and $rfc <= 2)
+            or die "select indicated an unexpected number of ready files";
+
+        # Check for and report any input exceptions
+        if ( vec($eout, $udfn, 1) ) {
+            die "select() reported an exception related to file '$df'";
+        }
+        if ( vec($eout, $sifn, 1) ) {
+            die "select() reported an exception related to stdin";
+        }
+
+        # For each ready input...
+        for ( my $ii = 0 ; $ii < $rfc ; $ii++ ) {
+
+            # If it's data from the XBee module, send it to our stdout
+            if ( vec($rout, $udfn, 1) ) {
+                if ( $rm or $plm ) {
+                    my $btrao = $mps;   # Bytes To Read At Once (maximum)
+                    my $rd;           # Read Data
+                    my $rr = sysread(UD, $rd, $btrao);   # Read Return value
+                    defined($rr) or die "sysread failed on $df: $!";
+                    $rr >= 1 or
+                    die "sysread() read 0 bytes despite select() saying it ".
+                        "had data ready to read";
+                    print $rd or die "print() (to stdout) failed";
+                    STDOUT->flush();   # Flush output (avoid any buffering)
+                }
+                elsif ( $flm ) {
+                    # Given that each byte takes somewhat less than a
+                    # millisecond at 9600 "baud" (see calculations in POD
+                    # documentation), a whole frame shouldn't take this long.
+                    my $to = 200;   # Timeout (milliseconds) for whole frame
+                    my $fp;   # Frame Payload
+                    my $result = get_frame(\$fp, $to);
+                    if ( $result =~ m/^failure:\s(.*)$/ ) {
+                        die "get_frame() failed: $1";
+                    }
+                    print $fp or die "print() (to stdout) failed";
+                    STDOUT->flush();   # Flush output (avoid any buffering)
+                }
+            }
+
+            # If it's data from stdin, send it to the XBee module
+            if ( vec($rout, $sifn, 1) ) {
+                # Note: using getline() means that we may end up sending
+                # binary data in funny-sized chunks (because we probably
+                # send both on newline and when the stdin buffer gets full).
+                # When stdin is connected to a terminal it's convenient,
+                # but it could have surprising effects on packetization
+                # for binary data (see BUGS AND POTENTIAL WORK-AROUNDS in
+                # the POD).  FIXXME: this getline() seems to works slightly
+                # different than the terminal and probably other GNU readline
+                # and possibly other input functions with respect to EOF
+                # (Cntrl-D) inputs: when Cntrl-D is typed on a non-empty line,
+                # nothing whatsoever happens (rather than the existing text
+                # on the line getting returned).  On empty lines it behaves
+                # is as expected.  Not worth fixing.
+                my $il = STDIN->getline();   # Input Line
+                not STDIN->error() or die "error reading line from STDIN";
+                # Now undef means we must have got EOF on an empty line
+                # (possibly from Cntrl-D), so we're done
+                defined($il) or exit(0);
+                # This can be uncommented to test zero-length packets
+                #chomp($il);
+
+                my $dts;   # Data To Send
+
+                if ( $flm ) {
+                    $dts = frame($il);
+                    # This can be used instead of the above to verify that
+                    # the microcontroller wx_get_frame() can read to frames
+                    # in the same packet (to verify it recovers fast enough).
+                    #$dts = frame($il).frame($il);
+                    # This can be used instead of the above to test the effects
+                    # of non-frame data before the start of the frame (supposed
+                    # to work except for a bogus delimiter of course).
+                    #$dts = "wewogwj324}}}".frame($il);
+                    $dts or die "BUG: frame() returned false";
+                }
+                else {
+                    $dts = $il;
+                }
+
+                if ( $plm or $flm ) {
+                    my $sr = send_single_packet($dts);
+                    if ( $sr eq "failure: got >$mps bytes (max radio packet ".
+                                "size) of input" ) {
+                        die "can't send >$mps bytes as a single packet";
+                    }
+                    elsif ( $sr eq "failure: didn't get data written fast ".
+                                   "enough" ) {
+                        die "didn't get data written fast enough to feel ".
+                            "confident it will go out as a single RF packet, ".
+                            "maybe better luck next time :)";
+                    }
+                    elsif ( $sr eq "success" ) {
+                        ; # Do nothing on success
+                    }
+                    else {
+                        die "BUG: unrecognized send_single_packet() return ".
+                            "value";
+                    }
+                }
+
+                else {
+                    my $swr = syswrite(UD, $dts);   # SysWrite Return
+                    defined($swr) or die "syswrite to $df failed: $!";
+                    $swr == length($dts)
+                        or die "syswrite didn't write the expected number of ".
+                               "bytes to $df";
+                }
+            }
+        }
+    }
+
+} # }}}1
+
+elsif ( $spm ) {   # Single Packet Mode {{{1
+
+    # First slurp all the input data
+    my $dts = '';
+    while ( <STDIN> ) {
+      $dts .= $_;
+    }
+
+    my $sr = send_single_packet($dts);   # Send Result
+
+    if ( $sr eq "failure: got >$mps bytes (max radio packet size) of input" ) {
+        die "got more than $mps bytes (XBee's maximum packet size) on stdin ".
+            "in single-packet-mode";
+    }
+    elsif ( $sr eq "failure: didn't get data written fast enough" ) {
+        die "didn't get data written fast enough to feel confident it will ".
+            "go out as a single RF packet, maybe better luck next time :)";
+    }
+    elsif ( $sr eq "success" ) {
+        ;   # Do nothing on success
+    }
+    else {
+        die "BUG: unrecognized send_single_packet() return value";
+    }
+
+} # }}}1
+
+else {
+    die "shouldn't be here";
+}
+
+exit 0;

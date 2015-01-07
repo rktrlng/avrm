@@ -1,0 +1,92 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Interface to hardware serial port (UART) controller.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Test driver: <a href="uart_test.c.html">uart_test.c</a>    Implementation: <a href="uart.c.html">uart.c</a></font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This module supports serial port initialization and byte transfer</font></i>
+<i><font color="#9A1900">// using polling (i.e. busy waits, not interrupts).  Only the core UART</font></i>
+<i><font color="#9A1900">// functionality is implemented here, not all the serial bells and whistles</font></i>
+<i><font color="#9A1900">// (i.e. no CTS/RTS or other extra serial port signals).</font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="uart.h.html#11">UART_H</a>
+<b><font color="#000080">#define</font></b> <a name="11">UART_H</a>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+
+<i><font color="#9A1900">// F_CPU is supposed to be defined in the Makefile (because that's where</font></i>
+<i><font color="#9A1900">// the other part and programmer specs go).</font></i>
+<b><font color="#000080">#ifndef</font></b> F_CPU
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> <font color="#FF0000">"F_CPU not defined"</font>
+<b><font color="#000080">#endif</font></b>
+
+<b><font color="#000080">#define</font></b> <a name="21">UART_BAUD</a> <font color="#993399">9600</font>
+
+<i><font color="#9A1900">// Initialize the USART0 to 9600 Bd, TX/RX, 8N1.  Note that this sets up</font></i>
+<i><font color="#9A1900">// the PD0 (RXD) and PD1 (TXD) pins such that they cannot be used for normal</font></i>
+<i><font color="#9A1900">// digital IO.  The ATMega328P datasheet says that SART0 must be reinitialized</font></i>
+<i><font color="#9A1900">// after waking from sleep.  In practive I haven't found it to need this, but</font></i>
+<i><font color="#9A1900">// this function is guaranteed to be callable in this situation just in case.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="uart.c.html#21">uart_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Send a byte to the serial port</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="32">UART_PUT_BYTE</a></font></b><font color="#990000">(</font>byte<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+    <b><font color="#000000">loop_until_bit_is_set</font></b> <font color="#990000">(</font>UCSR0A<font color="#990000">,</font> UDRE0<font color="#990000">);</font> <font color="#990000">\</font>
+    UDR0 <font color="#990000">=</font> <font color="#990000">(</font>byte<font color="#990000">);</font> <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">);</font>
+
+<i><font color="#9A1900">// Evaluate to true iff an incoming byte is ready to be read.  You should</font></i>
+<i><font color="#9A1900">// check for errors before actually reading it, since you can't do so</font></i>
+<i><font color="#9A1900">// afterwords.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="41">UART_BYTE_AVAILABLE</a></font></b><font color="#990000">()</font> <font color="#990000">(</font>UCSR0A <font color="#990000">&amp;</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>RXC0<font color="#990000">))</font>
+
+<i><font color="#9A1900">// Block until a byte comes in from the serial port.  Note that this could</font></i>
+<i><font color="#9A1900">// block forever.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="45">UART_WAIT_FOR_BYTE</a></font></b><font color="#990000">()</font> <b><font color="#000000">loop_until_bit_is_set</font></b> <font color="#990000">(</font>UCSR0A<font color="#990000">,</font> RXC0<font color="#990000">)</font>
+
+<i><font color="#9A1900">// This macro evaluates to true iff there is a receiver error flag set.</font></i>
+<i><font color="#9A1900">// This should be called immediately after UART_BYTE_AVAILABLE() or</font></i>
+<i><font color="#9A1900">// UART_WIAT_FOR_BYTE() and before UART_GET_BYTE().  When a receiver</font></i>
+<i><font color="#9A1900">// error is detected, the receive buffer should be flushed using</font></i>
+<i><font color="#9A1900">// UART_FLUSH_RX_BUFFER() before any other attempt to use the UART (except</font></i>
+<i><font color="#9A1900">// for the UART_RX_FRAME_ERROR() and UART_RX_DATA_OVERRUN_ERROR() macros).</font></i>
+<i><font color="#9A1900">// Flushing the receive buffer clears the error flags (rendering error details</font></i>
+<i><font color="#9A1900">// unrecoverable).  Not clearing the flag can result in confusing errors</font></i>
+<i><font color="#9A1900">// later, and/or endless failure of other function that try to read data.</font></i>
+<i><font color="#9A1900">// FIXXME: if we supported parity mode, we would need to check for the UPE0</font></i>
+<i><font color="#9A1900">// bit as well.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="58">UART_RX_ERROR</a></font></b><font color="#990000">()</font> <font color="#990000">(</font>UCSR0A <font color="#990000">&amp;</font> <font color="#990000">(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>FE0<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>DOR0<font color="#990000">)))</font>
+
+<i><font color="#9A1900">// This macro evaluates to true when the frame error flag is set (indicating</font></i>
+<i><font color="#9A1900">// that a stop bit failed to be 1).</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="62">UART_RX_FRAME_ERROR</a></font></b><font color="#990000">()</font> <font color="#990000">(</font>UCSR0A <font color="#990000">&amp;</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>FE0<font color="#990000">))</font>
+
+<i><font color="#9A1900">// This macro evaluates to true when the receiver buffer overflow flag it set.</font></i>
+<i><font color="#9A1900">// The receiver buffer is only two bytes deep, so this can easily occur if</font></i>
+<i><font color="#9A1900">// you don't poll the serial port fast enough.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="67">UART_RX_DATA_OVERRUN_ERROR</a></font></b><font color="#990000">()</font> <font color="#990000">(</font>UCSR0A <font color="#990000">&amp;</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>DOR0<font color="#990000">))</font>
+
+<i><font color="#9A1900">// Get the byte that is ready to be recieved.  This should only be used after</font></i>
+<i><font color="#9A1900">// UART_BYTE_AVAILABLE() evaluates to true or UART_WAIT_FOR_BYTE() completes.</font></i>
+<i><font color="#9A1900">// Using this macro will probably clear the error flags underlying the</font></i>
+<i><font color="#9A1900">// UART_RX_ERROR_*() macros, but UART_FLUSH_RX_BUFFER() is the certain way</font></i>
+<i><font color="#9A1900">// to do that.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="74">UART_GET_BYTE</a></font></b><font color="#990000">()</font> UDR0
+
+<i><font color="#9A1900">// Flush the receive buffer.  This should be called after a receiver error</font></i>
+<i><font color="#9A1900">// has occurred.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="78">UART_FLUSH_RX_BUFFER</a></font></b><font color="#990000">()</font> <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+    <font color="#008080">uint8_t</font> XxX_dummy<font color="#990000">;</font> <font color="#990000">\</font>
+    <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="uart.h.html#41">UART_BYTE_AVAILABLE</a></font></b><font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font> <font color="#990000">\</font>
+      XxX_dummy <font color="#990000">=</font> <b><font color="#000000"><a href="uart.h.html#74">UART_GET_BYTE</a></font></b> <font color="#990000">();</font> <font color="#990000">\</font>
+      XxX_dummy <font color="#990000">=</font> XxX_dummy<font color="#990000">;</font> <font color="#990000">\</font>
+    <font color="#FF0000">}</font> <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">);</font>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// UART_H</font></i>
+</tt></pre>

@@ -1,0 +1,107 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Interface to the DFRobot DFR0009 LCD and keypad shield.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Test driver: <a href="lcd_keypad_test.c.html">lcd_keypad_test.c</a>    Implementation: <a href="lcd_keypad.c.html">lcd_keypad.c</a></font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This shield features a Hitachi HD44780 compatible LCD, and five pushbuttons</font></i>
+<i><font color="#9A1900">// (labeled select, left, right, up, and down).  The highest level routine</font></i>
+<i><font color="#9A1900">// in this module is lcd_keypad_set_value(), take a look at that routine's</font></i>
+<i><font color="#9A1900">// comments to get an idea of the overall interface features.</font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="lcd_keypad.h.html#11">LCD_KEYPAD_H</a>
+<b><font color="#000080">#define</font></b> <a name="11">LCD_KEYPAD_H</a>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="lcd.h.html">lcd.h</a>"</font>
+
+<i><font color="#9A1900">// The keypad uses a string resistor ladder network connected to this ADC</font></i>
+<i><font color="#9A1900">// pin to detect button presses.</font></i>
+<b><font color="#000080">#define</font></b> <a name="17">LCD_KEYPAD_ADC_PIN</a> <font color="#993399">0</font>
+
+<i><font color="#9A1900">// Initialize the LCD and ADC devices.  The ADC reference is always</font></i>
+<i><font color="#9A1900">// initialized to ADC_REFERENCE_AVCC.  After this routine is called,</font></i>
+<i><font color="#9A1900">// routines from <a href="lcd.h.html">lcd.h</a> can be called freely (without calling lcd_init),</font></i>
+<i><font color="#9A1900">// though of course many of the routines in this interface manipulate the LCD</font></i>
+<i><font color="#9A1900">// contents themselves.  The interactions are simple and hopefully obvious.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="lcd_keypad.c.html#17">lcd_keypad_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// The various buttons on the keypad, plus two special related values:</font></i>
+<i><font color="#9A1900">// LCD_KEYPAD_BUTTON_NONE which corresponds to the condition in which no</font></i>
+<i><font color="#9A1900">// button is pressed, and LCD_KAYPAD_BUTTON_INDETERMINATE, which arises</font></i>
+<i><font color="#9A1900">// when the state of buttons appears to have changed during the reading.</font></i>
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="32">LCD_KEYPAD_BUTTON_RIGHT</a> <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">,</font>
+  <a name="33">LCD_KEYPAD_BUTTON_UP</a> <font color="#990000">=</font> <font color="#993399">1</font><font color="#990000">,</font> 
+  <a name="34">LCD_KEYPAD_BUTTON_DOWN</a> <font color="#990000">=</font> <font color="#993399">2</font><font color="#990000">,</font> 
+  <a name="35">LCD_KEYPAD_BUTTON_LEFT</a> <font color="#990000">=</font> <font color="#993399">3</font><font color="#990000">,</font> 
+  <a name="36">LCD_KEYPAD_BUTTON_SELECT</a> <font color="#990000">=</font> <font color="#993399">4</font><font color="#990000">,</font>
+  <a name="37">LCD_KEYPAD_BUTTON_NONE</a> <font color="#990000">=</font> <font color="#993399">5</font><font color="#990000">,</font>
+  <a name="38">LCD_KEYPAD_BUTTON_INDETERMINATE</a>
+<font color="#FF0000">}</font> <a name="39">lcd_keypad_button_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// See description of lcd_keypad_button_name().</font></i>
+<b><font color="#000080">#define</font></b> <a name="42">LCD_KEYPAD_MAX_BUTTON_NAME_LENGTH</a> <font color="#993399">13</font>
+
+<i><font color="#9A1900">// Set name to the (null-byte terminated) string name of button</font></i>
+<i><font color="#9A1900">// ("RIGHT", "UP", etc.).  The name array must be able hold at least</font></i>
+<i><font color="#9A1900">// LCD_KEYPAD_MAX_BUTTON_NAME_LENGTH + 1 bytes.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="lcd_keypad.c.html#25">lcd_keypad_button_name</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="lcd_keypad.h.html#39">lcd_keypad_button_t</a></font> button<font color="#990000">,</font> <font color="#009900">char</font> <font color="#990000">*</font>name<font color="#990000">);</font>
+
+<i><font color="#9A1900">// NOTE: this is a fairly low-level routine, lcd_keypad_wait_for_button()</font></i>
+<i><font color="#9A1900">// is probably more useful in most circumstances.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Check to see if a button is currently pressed, and return the</font></i>
+<i><font color="#9A1900">// button, or LCD_KEYPAD_BUTTON_NONE if no button is currently pressed,</font></i>
+<i><font color="#9A1900">// or LCD_KEYPAD_BUTTON_INDETERMINATE if it seems that the buttons are</font></i>
+<i><font color="#9A1900">// changing state.  Due to the way the hardware resistors/ADC input are</font></i>
+<i><font color="#9A1900">// connected, if multiple buttons are pressed simultaneously, the one</font></i>
+<i><font color="#9A1900">// nearest the top of the lcd_keypad_button_t enumeration is returned.</font></i>
+<a href="lcd_keypad.h.html#39">lcd_keypad_button_t</a>
+<b><font color="#000000"><a href="lcd_keypad.c.html#98">lcd_keypad_check_buttons</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Wait in a busy loop until a button (other than LCD_KEYPAD_BUTTON_NONE)</font></i>
+<i><font color="#9A1900">// is pressed, and return that button.  Note that overlapping button presses</font></i>
+<i><font color="#9A1900">// can't be handled using the voltage-divider-and-ADC approach.  Also,</font></i>
+<i><font color="#9A1900">// since clients will likely want to wait for buttons in a loop, we would</font></i>
+<i><font color="#9A1900">// like this routine to return a single button press event for one actual</font></i>
+<i><font color="#9A1900">// press in this case without the clients having to worry about timing.</font></i>
+<i><font color="#9A1900">// This routine therefore returns when the button is released, not when it</font></i>
+<i><font color="#9A1900">// is first pressed.  This is still a pretty natural-feeling approach given</font></i>
+<i><font color="#9A1900">// the tiny momentary push-buttons involved.  Also note that this routine</font></i>
+<i><font color="#9A1900">// will catch button releases even when the corresponding depression occurs</font></i>
+<i><font color="#9A1900">// before it is called.</font></i>
+<a href="lcd_keypad.h.html#39">lcd_keypad_button_t</a>
+<b><font color="#000000"><a href="lcd_keypad.c.html#126">lcd_keypad_wait_for_button</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// The name of a value to be shown using lcd_keypad_show_value or set using</font></i>
+<i><font color="#9A1900">// lcd_keypad_set_value() should not be longer than this (not including</font></i>
+<i><font color="#9A1900">// the trailing null byte).  Longer value names will be truncated.</font></i>
+<b><font color="#000080">#define</font></b> <a name="79">LCD_KEYPAD_VALUE_NAME_MAX_LENGTH</a> <font color="#993399">15</font>
+
+<i><font color="#9A1900">// The printf format string used by lcd_keypad_show_value() and</font></i>
+<i><font color="#9A1900">// lcd_keypad_set_value().  Clients hopefully shouldn't have to care.</font></i>
+<b><font color="#000080">#define</font></b> <a name="83">LCD_KEYPAD_VALUE_DISPLAY_FORMAT</a> <font color="#FF0000">"  %-14.6g"</font>
+
+<i><font color="#9A1900">// Display the given named value until a button is released, then return</font></i>
+<i><font color="#9A1900">// the button pushed (leaving the display unchanged).</font></i>
+<a href="lcd_keypad.h.html#39">lcd_keypad_button_t</a>
+<b><font color="#000000"><a href="lcd_keypad.c.html#158">lcd_keypad_show_value</a></font></b> <font color="#990000">(</font><b><font color="#0000FF">const</font></b> <font color="#009900">char</font> <font color="#990000">*</font>name<font color="#990000">,</font> <font color="#009900">double</font> <font color="#990000">*</font>value<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Clear display and prompt user to set the named value.  The value is</font></i>
+<i><font color="#9A1900">// changed with the up and down buttons, and the routine returns when one</font></i>
+<i><font color="#9A1900">// of the other three buttons is pushed, with that other button as the</font></i>
+<i><font color="#9A1900">// return value (and the display left unchanged).  The value is changed by</font></i>
+<i><font color="#9A1900">// step per button push, unless the button is held down, in which case the</font></i>
+<i><font color="#9A1900">// value starts changing rapidly while the button remains down.</font></i>
+<a href="lcd_keypad.h.html#39">lcd_keypad_button_t</a>
+<b><font color="#000000"><a href="lcd_keypad.c.html#212">lcd_keypad_set_value</a></font></b> <font color="#990000">(</font><b><font color="#0000FF">const</font></b> <font color="#009900">char</font> <font color="#990000">*</font>name<font color="#990000">,</font> <font color="#009900">double</font> <font color="#990000">*</font>value<font color="#990000">,</font> <font color="#009900">double</font> step<font color="#990000">);</font>
+
+<i><font color="#9A1900">// FIXXME: should have method to get strings and maybe some specialized</font></i>
+<i><font color="#9A1900">// methods to get things like email addresses, IP addresses, etc.</font></i>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// LCD_KEYPAD_H</font></i>
+</tt></pre>

@@ -1,0 +1,583 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Test/demo for the <a href="dio.h.html">dio.h</a> interface.</font></i>
+
+<i><font color="#9A1900">// vim: foldmethod=marker</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;assert.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+<i><font color="#9A1900">// FIXME: We neeed this because assert.h doesn't include it.  When that is</font></i>
+<i><font color="#9A1900">// fixed this include could go.</font></i>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdlib.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="dio.h.html">dio.h</a>"</font>
+
+<b><font color="#000080">#define</font></b> <a name="13">MILLISECONDS_PER_SECOND</a> <font color="#993399">1000</font>
+
+<i><font color="#9A1900">// Signal a checkpoint by blinking the PB5 LED quickly.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="dio_test.c.html#19">signal_checkpoint_with_pb5_blinks</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font> <b><font color="#000000">__attribute__</font></b> <font color="#990000">((</font>unused<font color="#990000">));</font>
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="19">signal_checkpoint_with_pb5_blinks</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<i><font color="#9A1900">// {{{1</font></i>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="dio.h.html#319">DIO_INIT_PB5</a></font></b> <font color="#990000">(</font><a href="dio.h.html#184">DIO_OUTPUT</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">,</font> <a href="util.h.html#16">LOW</a><font color="#990000">);</font>
+
+  <b><font color="#0000FF">const</font></b> <font color="#009900">int</font> blink_count <font color="#990000">=</font> <font color="#993399">3</font><font color="#990000">,</font> blinks_per_second <font color="#990000">=</font> <font color="#993399">4</font><font color="#990000">;</font>
+  <b><font color="#0000FF">const</font></b> <font color="#009900">int</font> post_blink_pause_ms <font color="#990000">=</font> <font color="#993399">500</font><font color="#990000">;</font>
+
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#009900">int</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> blink_count <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="dio.h.html#491">DIO_SET_PB5</a></font></b> <font color="#990000">(</font><a href="util.h.html#15">HIGH</a><font color="#990000">);</font>
+    <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font><a href="dio_test.c.html#13">MILLISECONDS_PER_SECOND</a> <font color="#990000">/</font> <font color="#990000">(</font>blinks_per_second <font color="#990000">*</font> <font color="#993399">2</font><font color="#990000">));</font>
+    <b><font color="#000000"><a href="dio.h.html#491">DIO_SET_PB5</a></font></b> <font color="#990000">(</font><a href="util.h.html#16">LOW</a><font color="#990000">);</font>
+    <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font><a href="dio_test.c.html#13">MILLISECONDS_PER_SECOND</a> <font color="#990000">/</font> <font color="#990000">(</font>blinks_per_second <font color="#990000">*</font> <font color="#993399">2</font><font color="#990000">));</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>post_blink_pause_ms<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+<i><font color="#9A1900">// }}}1</font></i>
+
+<i><font color="#9A1900">// Signal a checkpoint by blinking the PB0 LED quickly.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="dio_test.c.html#42">signal_checkpoint_with_pb0_blinks</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font> <b><font color="#000000">__attribute__</font></b> <font color="#990000">((</font>unused<font color="#990000">));</font>
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="42">signal_checkpoint_with_pb0_blinks</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<i><font color="#9A1900">// {{{1</font></i>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="dio.h.html#301">DIO_INIT_PB0</a></font></b> <font color="#990000">(</font><a href="dio.h.html#184">DIO_OUTPUT</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">,</font> <a href="util.h.html#16">LOW</a><font color="#990000">);</font>
+
+  <b><font color="#0000FF">const</font></b> <font color="#009900">int</font> blink_count <font color="#990000">=</font> <font color="#993399">3</font><font color="#990000">,</font> blinks_per_second <font color="#990000">=</font> <font color="#993399">4</font><font color="#990000">;</font>
+  <b><font color="#0000FF">const</font></b> <font color="#009900">int</font> post_blink_pause_ms <font color="#990000">=</font> <font color="#993399">500</font><font color="#990000">;</font>
+
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#009900">int</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> blink_count <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="dio.h.html#483">DIO_SET_PB0</a></font></b> <font color="#990000">(</font><a href="util.h.html#15">HIGH</a><font color="#990000">);</font>
+    <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font><a href="dio_test.c.html#13">MILLISECONDS_PER_SECOND</a> <font color="#990000">/</font> <font color="#990000">(</font>blinks_per_second <font color="#990000">*</font> <font color="#993399">2</font><font color="#990000">));</font>
+    <b><font color="#000000"><a href="dio.h.html#483">DIO_SET_PB0</a></font></b> <font color="#990000">(</font><a href="util.h.html#16">LOW</a><font color="#990000">);</font>
+    <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font><a href="dio_test.c.html#13">MILLISECONDS_PER_SECOND</a> <font color="#990000">/</font> <font color="#990000">(</font>blinks_per_second <font color="#990000">*</font> <font color="#993399">2</font><font color="#990000">));</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>post_blink_pause_ms<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+<i><font color="#9A1900">// }}}1</font></i>
+
+<i><font color="#9A1900">// Normally we signal checkpoints by blinking the LED attached to PB5,</font></i>
+<i><font color="#9A1900">// but if we're testing the pin for some other purpose we have to use a</font></i>
+<i><font color="#9A1900">// different pin for signalling.</font></i>
+<b><font color="#000080">#if</font></b> <font color="#990000">(!</font> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB5_HIGH_PB0_SIGNAL_LED_OTHERS_NC<font color="#990000">))</font> <font color="#990000">&amp;&amp;</font> <font color="#990000">\</font>
+    <font color="#990000">(!</font> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB5_LOW_PB0_SIGNAL_LED_OTHERS_NC<font color="#990000">))</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a name="66">SIGNAL_CHECKPOINT</a></font> <a href="dio_test.c.html#19">signal_checkpoint_with_pb5_blinks</a>
+<b><font color="#000080">#else</font></b>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a name="68">SIGNAL_CHECKPOINT</a></font> <a href="dio_test.c.html#42">signal_checkpoint_with_pb0_blinks</a>
+<b><font color="#000080">#endif</font></b>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="72">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// It's a sin in my book to distribute untested code without clearly</font></i>
+  <i><font color="#9A1900">// acknowledging the fact.</font></i>
+<b><font color="#000080">#ifndef</font></b> UNDERSTAND_PB6_PB7_PC6_MACROS_UNTESTED
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> <font color="#008080">The</font> PB6<font color="#990000">,</font> PB7<font color="#990000">,</font> and PC6 control macros are identical in form <font color="#008080">to</font> the <font color="#990000">\</font>
+   other macros in <font color="#008080">this</font> interface<font color="#990000">,</font> but have not been tested <font color="#008080">because</font> the <font color="#990000">\</font>
+   arduino hardware uses them <b><font color="#0000FF">for</font></b> <font color="#008080">other</font> <b><font color="#000000">purposes</font></b> <font color="#990000">(</font>see comments <font color="#008080">in</font> dio<font color="#990000">.</font><font color="#008080">h</font> <b><font color="#0000FF">for</font></b> <font color="#990000">\</font>
+   details<font color="#990000">).</font>  The Makefile <b><font color="#0000FF">for</font></b> this module includes a line which <font color="#008080">may</font> be <font color="#990000">\</font>
+   uncommented to override this <font color="#008080"><a href="sd_card.c.html#114">error</a></font> trap<font color="#990000">:</font> <a href="one_wire_master.c.html#160">search</a> <font color="#008080">for</font> UNDERSTAND_ <font color="#008080">in</font> the <font color="#990000">\</font>
+   Makefile<font color="#990000">.</font>
+<b><font color="#000080">#endif</font></b>
+
+<i><font color="#9A1900">// It's a sin in my book to distribute untested code without clearly</font></i>
+<i><font color="#9A1900">// acknowledging the fact.</font></i>
+<b><font color="#000080">#ifndef</font></b> UNDERSTAND_PB5_PD0_PD1_WEAK_LOW_470_KOHM_CONDITIONS_UNTESTED
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> It is not possible to test the operation <font color="#008080">of</font> PB5<font color="#990000">,</font> PD0<font color="#990000">,</font> or PD1 <font color="#008080">with</font> a <font color="#990000">\</font>
+   weak tie to ground with <font color="#008080">arduino</font> hardware<font color="#990000">,</font> because those pins <font color="#008080">are</font> connected <font color="#990000">\</font>
+   to ground by <font color="#008080">other</font> paths<font color="#990000">.</font> So the pullup control on these pins <font color="#008080">is</font> somewhat <font color="#990000">\</font>
+   untested<font color="#990000">.</font>  I think this is ok since all the other pins are <font color="#008080">tested</font> in <font color="#990000">\</font>
+   highly <font color="#008080">similar</font> code<font color="#990000">.</font>  The Makefile <b><font color="#0000FF">for</font></b> this module includes a <font color="#008080">line</font> which <font color="#990000">\</font>
+   may be uncommented to override this <font color="#008080"><a href="sd_card.c.html#114">error</a></font> trap<font color="#990000">:</font> <a href="one_wire_master.c.html#160">search</a> <font color="#008080">for</font> <font color="#008080">UNDERSTAND_</font> in <font color="#990000">\</font>
+   <font color="#008080">the</font> Makefile<font color="#990000">.</font>
+<b><font color="#000080">#endif</font></b>
+
+<i><font color="#9A1900">// We're going to be a bit careless with out lack of namespace prefixes</font></i>
+<i><font color="#9A1900">// here so we have this check.</font></i>
+<b><font color="#000080">#ifdef</font></b> <a href="dio_test.c.html#254">INIT</a>
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> <font color="#008080">uh</font> oh<font color="#990000">,</font> <a href="dio_test.c.html#254">INIT</a> is already defined
+<b><font color="#000080">#endif</font></b>
+<b><font color="#000080">#ifdef</font></b> <a href="dio_test.c.html#255">SET</a>
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> <font color="#008080">uh</font> oh<font color="#990000">,</font> <a href="dio_test.c.html#255">SET</a> is already defined
+<b><font color="#000080">#endif</font></b>
+<b><font color="#000080">#ifdef</font></b> <a href="dio_test.c.html#256">READ</a>
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> <font color="#008080">uh</font> oh<font color="#990000">,</font> <a href="dio_test.c.html#256">READ</a> is already defined
+<b><font color="#000080">#endif</font></b>
+
+  <i><font color="#9A1900">// The time we allow to give the pull-up resistors a chance to get their</font></i>
+  <i><font color="#9A1900">// pins pulled high.  Note that in practice they shouldn't need a this long</font></i>
+  <i><font color="#9A1900">// to settle, at least with the anticipated capacitances connected to them.</font></i>
+  <i><font color="#9A1900">// But the chip runs fast enough that not waiting at all can be too fast.</font></i>
+  <b><font color="#0000FF">const</font></b> <font color="#009900">double</font> <font color="#008080">settling_time_ms</font> <b><font color="#000000">__attribute__</font></b> <font color="#990000">((</font>unused<font color="#990000">))</font> <font color="#990000">=</font> <font color="#993399">10</font><font color="#990000">;</font>
+
+  <font color="#008080">uint8_t</font> value <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>   <i><font color="#9A1900">// Holds value set to or read from a pin.</font></i>
+  value <font color="#990000">=</font> value<font color="#990000">;</font>   <i><font color="#9A1900">// Prevent compiler from whining</font></i>
+
+<b><font color="#000080">#ifdef</font></b> TEST_CONDITION_ALL_PINS_NC
+
+  <i><font color="#9A1900">// For this test, we assume all the pins have nothing connected externally.</font></i>
+  <i><font color="#9A1900">// We then set the pins for input with pullups enabled, wait a few</font></i>
+  <i><font color="#9A1900">// milliseconds for the pins to settle high, and read all their values.</font></i>
+  <i><font color="#9A1900">// They should all read as high.</font></i>
+  <i><font color="#9A1900">// {{{1</font></i>
+
+  <b><font color="#000000"><a href="dio.h.html#301">DIO_INIT_PB0</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio.h.html#304">DIO_INIT_PB1</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio.h.html#307">DIO_INIT_PB2</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+<b><font color="#000080">#  ifdef</font></b> TEST_ISP_PINS
+  <b><font color="#000000"><a href="dio.h.html#311">DIO_INIT_PB3</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio.h.html#315">DIO_INIT_PB4</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio.h.html#319">DIO_INIT_PB5</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+<b><font color="#000080">#  endif</font></b>
+  <b><font color="#000000"><a href="dio.h.html#334">DIO_INIT_PC0</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio.h.html#337">DIO_INIT_PC1</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio.h.html#340">DIO_INIT_PC2</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio.h.html#343">DIO_INIT_PC3</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio.h.html#346">DIO_INIT_PC4</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio.h.html#349">DIO_INIT_PC5</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+<b><font color="#000080">#  ifdef</font></b> TEST_SERIAL_PINS
+  <b><font color="#000000"><a href="dio.h.html#361">DIO_INIT_PD0</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio.h.html#365">DIO_INIT_PD1</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+<b><font color="#000080">#  endif</font></b>
+  <b><font color="#000000"><a href="dio.h.html#368">DIO_INIT_PD2</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio.h.html#371">DIO_INIT_PD3</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio.h.html#374">DIO_INIT_PD4</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio.h.html#377">DIO_INIT_PD5</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio.h.html#380">DIO_INIT_PD6</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio.h.html#383">DIO_INIT_PD7</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>settling_time_ms<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#544">DIO_READ_PB0</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#545">DIO_READ_PB1</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#546">DIO_READ_PB2</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+<b><font color="#000080">#  ifdef</font></b> TEST_ISP_PINS
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#548">DIO_READ_PB3</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#550">DIO_READ_PB4</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// NOTE: on the Arduino Duemilanove, PB5 is pulled towards ground via</font></i>
+  <i><font color="#9A1900">// one or two 1 kohm resistors in parallel and a LED.  This is a stronger</font></i>
+  <i><font color="#9A1900">// pull than that exerted by the internal pull-up resistor (which is at</font></i>
+  <i><font color="#9A1900">// least 20 kohm), and so we would expect to read a low value from this</font></i>
+  <i><font color="#9A1900">// pin even with the pull-up enabled.  However, on the Arduino Uno Rev. 3</font></i>
+  <i><font color="#9A1900">// (and perhaps on earlier Uno boards) an op-amp buffer (refdes U5B on</font></i>
+  <i><font color="#9A1900">// my schematic) is included between PB5 and the resistor and led L.</font></i>
+  <i><font color="#9A1900">// This high-impedance buffer doesn't out-pull in internal pull-up, so</font></i>
+  <i><font color="#9A1900">// this pin will still read high on these boards.</font></i>
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#552">DIO_READ_PB5</a></font></b> <font color="#990000">();</font>
+<b><font color="#000080">#    ifdef</font></b> ARDUINO_MODEL_IS_UNO_REV3
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+<b><font color="#000080">#    endif</font></b>
+<b><font color="#000080">#    ifdef</font></b> ARDUINO_MODEL_IS_DUEMILANOVE
+  <b><font color="#000000">assert</font></b> <font color="#990000">(!</font>value<font color="#990000">);</font>
+<b><font color="#000080">#    endif</font></b>
+<b><font color="#000080">#    if</font></b> <font color="#990000">!(</font><b><font color="#000000">defined</font></b> <font color="#990000">(</font>ARDUINO_MODEL_IS_UNO_REV3<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+          <b><font color="#000000">defined</font></b> <font color="#990000">(</font>ARDUINO_MODEL_IS_DUEMILANOVE<font color="#990000">))</font>
+<b><font color="#000080">#      </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> Neither of the expected Arduino model defines is actually defined
+<b><font color="#000080">#    endif</font></b>
+
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+<b><font color="#000080">#  endif</font></b> <i><font color="#9A1900">// TEST_ISP_PINS</font></i>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#558">DIO_READ_PC0</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#559">DIO_READ_PC1</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#560">DIO_READ_PC2</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#561">DIO_READ_PC3</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#562">DIO_READ_PC4</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#563">DIO_READ_PC5</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+<b><font color="#000080">#  ifdef</font></b> TEST_SERIAL_PINS
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#568">DIO_READ_PD0</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#570">DIO_READ_PD1</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+<b><font color="#000080">#  endif</font></b>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#571">DIO_READ_PD2</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#572">DIO_READ_PD3</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#573">DIO_READ_PD4</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#574">DIO_READ_PD5</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#575">DIO_READ_PD6</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio.h.html#576">DIO_READ_PD7</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value<font color="#990000">);</font>
+
+  <b><font color="#000000">SIGNAL_CHECKPOINT</font></b> <font color="#990000">();</font>
+<a href="dio_test.c.html#66">SIGNAL_CHECKPOINT -> dio_test.c:66</a>
+<a href="dio_test.c.html#68">SIGNAL_CHECKPOINT -> dio_test.c:68</a>
+  <b><font color="#0000FF">return</font></b> <font color="#993399">0</font><font color="#990000">;</font>   <i><font color="#9A1900">// Success;</font></i>
+
+<i><font color="#9A1900">// }}}1</font></i>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// TEST_CONDITION_ALL_PINS_NC</font></i>
+
+  <i><font color="#9A1900">// Macros for pin INIT/SET/READ depending on which TEST_CONDITION_* is</font></i>
+  <i><font color="#9A1900">// in effect.</font></i>
+  <i><font color="#9A1900">// {{{1</font></i>
+
+<b><font color="#000080">#if</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB0_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB0_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB0_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB0_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a name="254">INIT</a></font> <a href="dio.h.html#301">DIO_INIT_PB0</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a name="255">SET</a></font> <a href="dio.h.html#483">DIO_SET_PB0</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a name="256">READ</a></font> <a href="dio.h.html#544">DIO_READ_PB0</a>
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB1_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB1_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB1_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB1_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#304">DIO_INIT_PB1</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#484">DIO_SET_PB1</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#545">DIO_READ_PB1</a>
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB2_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB2_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB2_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB2_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#307">DIO_INIT_PB2</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#485">DIO_SET_PB2</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#546">DIO_READ_PB2</a>
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB3_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB3_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB3_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB3_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#311">DIO_INIT_PB3</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#487">DIO_SET_PB3</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#548">DIO_READ_PB3</a>
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB4_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB4_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB4_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB4_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#315">DIO_INIT_PB4</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#489">DIO_SET_PB4</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#550">DIO_READ_PB4</a>
+<b><font color="#000080">#elif</font></b> <font color="#990000">\</font>
+  <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB5_HIGH_PB0_SIGNAL_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+  <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB5_LOW_PB0_SIGNAL_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+  <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB5_WEAK_LOW_470_KOHM_PB0_SIGNAL_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+  <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB5_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#319">DIO_INIT_PB5</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#491">DIO_SET_PB5</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#552">DIO_READ_PB5</a>
+
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC0_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC0_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC0_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC0_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#334">DIO_INIT_PC0</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#501">DIO_SET_PC0</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#558">DIO_READ_PC0</a>
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC1_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC1_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC1_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC1_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#337">DIO_INIT_PC1</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#502">DIO_SET_PC1</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#559">DIO_READ_PC1</a>
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC2_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC2_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC2_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC2_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#340">DIO_INIT_PC2</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#503">DIO_SET_PC2</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#560">DIO_READ_PC2</a>
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC3_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC3_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC3_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC3_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#343">DIO_INIT_PC3</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#504">DIO_SET_PC3</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#561">DIO_READ_PC3</a>
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC4_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC4_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC4_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC4_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#346">DIO_INIT_PC4</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#505">DIO_SET_PC4</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#562">DIO_READ_PC4</a>
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC5_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC5_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC5_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC5_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#349">DIO_INIT_PC5</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#506">DIO_SET_PC5</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#563">DIO_READ_PC5</a>
+
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD0_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD0_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD0_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD0_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#361">DIO_INIT_PD0</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#515">DIO_SET_PD0</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#568">DIO_READ_PD0</a>
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD1_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD1_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD1_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD1_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#365">DIO_INIT_PD1</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#517">DIO_SET_PD1</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#570">DIO_READ_PD1</a>
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD2_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD2_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD2_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD2_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#368">DIO_INIT_PD2</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#518">DIO_SET_PD2</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#571">DIO_READ_PD2</a>
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD3_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD3_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD3_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD3_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#371">DIO_INIT_PD3</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#519">DIO_SET_PD3</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#572">DIO_READ_PD3</a>
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD4_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD4_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD4_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD4_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#374">DIO_INIT_PD4</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#520">DIO_SET_PD4</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#573">DIO_READ_PD4</a>
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD5_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD5_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD5_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD5_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#377">DIO_INIT_PD5</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#521">DIO_SET_PD5</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#574">DIO_READ_PD5</a>
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD6_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD6_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD6_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD6_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#380">DIO_INIT_PD6</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#522">DIO_SET_PD6</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#575">DIO_READ_PD6</a>
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD7_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD7_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD7_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+      <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD7_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#254">INIT</a></font> <a href="dio.h.html#383">DIO_INIT_PD7</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#255">SET</a></font> <a href="dio.h.html#523">DIO_SET_PD7</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a href="dio_test.c.html#256">READ</a></font> <a href="dio.h.html#576">DIO_READ_PD7</a>
+<b><font color="#000080">#endif</font></b>
+
+  <i><font color="#9A1900">// }}}1</font></i>
+
+  <i><font color="#9A1900">// Macros describing particular condition of pin being tested, depending</font></i>
+  <i><font color="#9A1900">// on which TEST_CONDITION_* is in effect.</font></i>
+  <i><font color="#9A1900">// {{{1</font></i>
+<b><font color="#000080">#if</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB0_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB1_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB2_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB3_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB4_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB5_HIGH_PB0_SIGNAL_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC0_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC1_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC2_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC3_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC4_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC5_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD0_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD1_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD2_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD3_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD4_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD5_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD6_HIGH_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD7_HIGH_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <a name="420">INPUT_HIGH</a>
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB0_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB1_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB2_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB3_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB4_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB5_LOW_PB0_SIGNAL_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC0_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC1_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC2_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC3_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC4_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC5_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD0_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD1_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD2_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD3_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD4_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD5_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD6_LOW_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD7_LOW_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> INPUT_LOW
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB0_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB1_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB2_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB3_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB4_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB5_WEAK_LOW_470_KOHM_PB0_SIGNAL_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC0_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC1_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC2_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC3_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC4_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC5_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD0_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD1_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD2_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD3_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD4_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD5_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD6_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD7_WEAK_LOW_470_KOHM_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> INPUT_WEAK_LOW_470_KOHM
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB0_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB1_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB2_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB3_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB4_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PB5_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC0_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC1_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC2_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC3_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC4_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PC5_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD0_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD1_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD2_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD3_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD4_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD5_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD6_LED_OTHERS_NC<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_PD7_LED_OTHERS_NC<font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> OUTPUT_LED
+<b><font color="#000080">#endif</font></b>
+  <i><font color="#9A1900">// }}}1</font></i>
+
+  <i><font color="#9A1900">// Test particular pins as inputs or outputs (depending ultimately on</font></i>
+  <i><font color="#9A1900">// which TEST_CONDITION_* is in effect).</font></i>
+  <i><font color="#9A1900">// {{{1</font></i>
+
+<b><font color="#000080">#if</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font><a href="dio_test.c.html#420">INPUT_HIGH</a><font color="#990000">)</font> <font color="#990000">||</font> <b><font color="#000000">defined</font></b><font color="#990000">(</font>INPUT_LOW<font color="#990000">)</font>
+
+  <i><font color="#9A1900">// NOTE: these tests depend on the pin in question being connected as</font></i>
+  <i><font color="#9A1900">// indicated by the test condition name.</font></i>
+
+  <i><font color="#9A1900">// Test pin as input with pull-up enabled.</font></i>
+  <b><font color="#000000"><a href="dio_test.c.html#254">INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>settling_time_ms<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio_test.c.html#256">READ</a></font></b> <font color="#990000">();</font>
+<b><font color="#000080">#  if</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font><a href="dio_test.c.html#420">INPUT_HIGH</a><font color="#990000">)</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value <font color="#990000">==</font> <a href="util.h.html#15">HIGH</a><font color="#990000">);</font>
+<b><font color="#000080">#  elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>INPUT_LOW<font color="#990000">)</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value <font color="#990000">==</font> <a href="util.h.html#16">LOW</a><font color="#990000">);</font>
+<b><font color="#000080">#  else</font></b>
+<b><font color="#000080">#    </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> Should not be here
+<b><font color="#000080">#  endif</font></b>
+
+  <i><font color="#9A1900">// Test pin again as input but this time with pull-up disabled.</font></i>
+  <b><font color="#000000"><a href="dio_test.c.html#254">INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#186">DIO_DISABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>settling_time_ms<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio_test.c.html#256">READ</a></font></b> <font color="#990000">();</font>
+<b><font color="#000080">#  if</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font><a href="dio_test.c.html#420">INPUT_HIGH</a><font color="#990000">)</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value <font color="#990000">==</font> <a href="util.h.html#15">HIGH</a><font color="#990000">);</font>
+<b><font color="#000080">#  elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>INPUT_LOW<font color="#990000">)</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value <font color="#990000">==</font> <a href="util.h.html#16">LOW</a><font color="#990000">);</font>
+<b><font color="#000080">#  else</font></b>
+<b><font color="#000080">#    </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> Should not be here
+<b><font color="#000080">#  endif</font></b>
+
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>INPUT_WEAK_LOW_470_KOHM<font color="#990000">)</font>
+
+  <i><font color="#9A1900">// NOTE: these tests depend on the pin in question being connected as</font></i>
+  <i><font color="#9A1900">// indicated by the test condition name.</font></i>
+
+  <i><font color="#9A1900">// Test pin as input with pull-up enabled.</font></i>
+  <b><font color="#000000"><a href="dio_test.c.html#254">INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#185">DIO_ENABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>settling_time_ms<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio_test.c.html#256">READ</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value <font color="#990000">==</font> <a href="util.h.html#15">HIGH</a><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Test pin again as input but this time with pull-up disabled.</font></i>
+  <b><font color="#000000"><a href="dio_test.c.html#254">INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#186">DIO_DISABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>settling_time_ms<font color="#990000">);</font>
+
+  value <font color="#990000">=</font> <b><font color="#000000"><a href="dio_test.c.html#256">READ</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>value <font color="#990000">==</font> <a href="util.h.html#16">LOW</a><font color="#990000">);</font>
+
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>OUTPUT_LED<font color="#990000">)</font>
+
+  <i><font color="#9A1900">// NOTE: these tests depend on a LED being connected in the manner indicated</font></i>
+  <i><font color="#9A1900">// by the test condition name and also on careful human observation of</font></i>
+  <i><font color="#9A1900">// the LED during the test.</font></i>
+
+  <b><font color="#0000FF">const</font></b> <font color="#009900">float</font> second_in_ms <font color="#990000">=</font> <font color="#993399">1000.0</font><font color="#990000">;</font>
+
+  <i><font color="#9A1900">// Initialize pin off, then turn on for one second.</font></i>
+  <b><font color="#000000"><a href="dio_test.c.html#254">INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#184">DIO_OUTPUT</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">,</font> <a href="util.h.html#16">LOW</a><font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>second_in_ms<font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio_test.c.html#255">SET</a></font></b> <font color="#990000">(</font><a href="util.h.html#15">HIGH</a><font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>second_in_ms<font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio_test.c.html#255">SET</a></font></b> <font color="#990000">(</font><a href="util.h.html#16">LOW</a><font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>second_in_ms<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Now initialize pin on, then turn off for one second.</font></i>
+  <b><font color="#000000"><a href="dio_test.c.html#254">INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#184">DIO_OUTPUT</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">,</font> <a href="util.h.html#15">HIGH</a><font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>second_in_ms<font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio_test.c.html#255">SET</a></font></b> <font color="#990000">(</font><a href="util.h.html#16">LOW</a><font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>second_in_ms<font color="#990000">);</font>
+  <b><font color="#000000"><a href="dio_test.c.html#255">SET</a></font></b> <font color="#990000">(</font><a href="util.h.html#15">HIGH</a><font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>second_in_ms<font color="#990000">);</font>
+
+<b><font color="#000080">#elif</font></b> <b><font color="#000000">defined</font></b><font color="#990000">(</font>TEST_CONDITION_ALL_PINS_NC<font color="#990000">)</font>
+<b><font color="#000080">#else</font></b>
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> Should not be here
+<b><font color="#000080">#endif</font></b>
+
+  <b><font color="#000000">SIGNAL_CHECKPOINT</font></b> <font color="#990000">();</font>
+<a href="dio_test.c.html#66">SIGNAL_CHECKPOINT -> dio_test.c:66</a>
+<a href="dio_test.c.html#68">SIGNAL_CHECKPOINT -> dio_test.c:68</a>
+  <b><font color="#0000FF">return</font></b> <font color="#993399">0</font><font color="#990000">;</font>   <i><font color="#9A1900">// Success (assuming observed LED behaved correctly).</font></i>
+
+  <i><font color="#9A1900">// }}}1</font></i>
+<font color="#FF0000">}</font>
+</tt></pre>

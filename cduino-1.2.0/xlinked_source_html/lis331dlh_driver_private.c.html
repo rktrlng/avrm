@@ -1,0 +1,1413 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Turns out ST Microelectronics already provides an almost-finished</font></i>
+<i><font color="#9A1900">// interface for the LIS331DLH, which is an almost identical device: the</font></i>
+<i><font color="#9A1900">// WHO_AM_I register document for that device isn't documented for the</font></i>
+<i><font color="#9A1900">// LIS331HH, but thats the only difference I've notice in the datasheet</font></i>
+<i><font color="#9A1900">// (besides the different pin out and dynmic ranges and sensitivities of</font></i>
+<i><font color="#9A1900">// the devices, which aren't relevant to this interface).  The original</font></i>
+<i><font color="#9A1900">// ST Microelectronics code is included in the LIS331DLH.model directory.</font></i>
+<i><font color="#9A1900">// For consistency with our build system, the individual sources files have</font></i>
+<i><font color="#9A1900">// had _private added to them.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// All we had to do is fill in the in the LIS331DLH_ReadReg() and</font></i>
+<i><font color="#9A1900">// LIS331DLH_WriteReg() functions in <a href="lis331dlh_driver_private.c.html">lis331dlh_driver_private.c</a>.  Note that</font></i>
+<i><font color="#9A1900">// the accelerometer_init() function in <a href="accelerometer.h.html">accelerometer.h</a> must still be called</font></i>
+<i><font color="#9A1900">// first to ensure that SPI is set up correctly, so that our implementation</font></i>
+<i><font color="#9A1900">// of these routines works.</font></i>
+
+<i><font color="#9A1900">/******************** (C) COPYRIGHT 2012 STMicroelectronics ********************</font></i>
+<i><font color="#9A1900">* File Name          : lis331dlh_driver.c</font></i>
+<i><font color="#9A1900">* Author             : MSH Application Team</font></i>
+<i><font color="#9A1900">* Author             : Abhishek Anand	</font></i>
+<i><font color="#9A1900">* Version            : $Revision:$</font></i>
+<i><font color="#9A1900">* Date               : $Date:$</font></i>
+<i><font color="#9A1900">* Description        : LIS331DLH driver file</font></i>
+<i><font color="#9A1900">*                      </font></i>
+<i><font color="#9A1900">* HISTORY:</font></i>
+<i><font color="#9A1900">* Date               |	Modification                    |	Author</font></i>
+<i><font color="#9A1900">* 16/05/2012         |	Initial Revision                |	Abhishek Anand</font></i>
+<i><font color="#9A1900">* 17/05/2012         |  Modified to support multiple drivers in the same program                |	Abhishek Anand</font></i>
+
+<i><font color="#9A1900">********************************************************************************</font></i>
+<i><font color="#9A1900">* THE PRESENT FIRMWARE WHICH IS FOR GUIDANCE ONLY AIMS AT PROVIDING CUSTOMERS</font></i>
+<i><font color="#9A1900">* WITH CODING INFORMATION REGARDING THEIR PRODUCTS IN ORDER FOR THEM TO SAVE TIME.</font></i>
+<i><font color="#9A1900">* AS A RESULT, STMICROELECTRONICS SHALL NOT BE HELD LIABLE FOR ANY DIRECT,</font></i>
+<i><font color="#9A1900">* INDIRECT OR CONSEQUENTIAL DAMAGES WITH RESPECT TO ANY CLAIMS ARISING FROM THE</font></i>
+<i><font color="#9A1900">* CONTENT OF SUCH FIRMWARE AND/OR THE USE MADE BY CUSTOMERS OF THE CODING</font></i>
+<i><font color="#9A1900">* INFORMATION CONTAINED HEREIN IN CONNECTION WITH THEIR PRODUCTS.</font></i>
+<i><font color="#9A1900">*</font></i>
+<i><font color="#9A1900">* THIS SOFTWARE IS SPECIFICALLY DESIGNED FOR EXCLUSIVE USE WITH ST PARTS.</font></i>
+<i><font color="#9A1900">*</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+
+<i><font color="#9A1900">/* Includes ------------------------------------------------------------------*/</font></i>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="lis331dlh_driver_private.h.html">lis331dlh_driver_private.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="spi.h.html">spi.h</a>"</font>
+
+<i><font color="#9A1900">// SPI communication uses PB5, so we rewire our debugging macros to use a</font></i>
+<i><font color="#9A1900">// LED on a different pin.</font></i>
+<b><font color="#000080">#ifdef</font></b> CHKP
+<a href="accelerometer_test.c.html#26">CHKP -> accelerometer_test.c:26</a>
+<a href="accelerometer_test.c.html#27">CHKP -> accelerometer_test.c:27</a>
+<a href="lis331dlh_driver_private.c.html#49">CHKP -> lis331dlh_driver_private.c:49</a>
+<a href="lis331dlh_driver_private.c.html#50">CHKP -> lis331dlh_driver_private.c:50</a>
+<a href="spi_test.c.html#35">CHKP -> spi_test.c:35</a>
+<a href="spi_test.c.html#36">CHKP -> spi_test.c:36</a>
+<a href="util.h.html#99">CHKP -> util.h:99</a>
+<b><font color="#000080">#  undef</font></b> <a name="49">CHKP</a>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="50">CHKP</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="util.h.html#72">CHKP_USING</a></font></b><font color="#990000">(</font>DDRD<font color="#990000">,</font> DDD2<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD2<font color="#990000">,</font> <font color="#993399">300.0</font><font color="#990000">,</font> <font color="#993399">3</font><font color="#990000">)</font>
+<b><font color="#000080">#endif</font></b>
+<b><font color="#000080">#ifdef</font></b> BTRAP
+<a href="accelerometer_test.c.html#30">BTRAP -> accelerometer_test.c:30</a>
+<a href="accelerometer_test.c.html#31">BTRAP -> accelerometer_test.c:31</a>
+<a href="lis331dlh_driver_private.c.html#53">BTRAP -> lis331dlh_driver_private.c:53</a>
+<a href="lis331dlh_driver_private.c.html#54">BTRAP -> lis331dlh_driver_private.c:54</a>
+<a href="spi_test.c.html#39">BTRAP -> spi_test.c:39</a>
+<a href="spi_test.c.html#40">BTRAP -> spi_test.c:40</a>
+<a href="util.h.html#102">BTRAP -> util.h:102</a>
+<a href="wireless_xbee.c.html#23">BTRAP -> wireless_xbee.c:23</a>
+<a href="wireless_xbee.c.html#24">BTRAP -> wireless_xbee.c:24</a>
+<a href="wireless_xbee_test.c.html#59">BTRAP -> wireless_xbee_test.c:59</a>
+<a href="wireless_xbee_test.c.html#60">BTRAP -> wireless_xbee_test.c:60</a>
+<b><font color="#000080">#  undef</font></b> <a name="53">BTRAP</a>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="54">BTRAP</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="util.h.html#86">BTRAP_USING</a></font></b><font color="#990000">(</font>DDRD<font color="#990000">,</font> DDD2<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD2<font color="#990000">,</font> <font color="#993399">100.0</font><font color="#990000">)</font>
+<b><font color="#000080">#endif</font></b>
+
+<i><font color="#9A1900">/* Private typedef -----------------------------------------------------------*/</font></i>
+<i><font color="#9A1900">/* Private define ------------------------------------------------------------*/</font></i>
+<i><font color="#9A1900">/* Private macro -------------------------------------------------------------*/</font></i>
+<i><font color="#9A1900">/* Private variables ---------------------------------------------------------*/</font></i>
+<i><font color="#9A1900">/* Private function prototypes -----------------------------------------------*/</font></i>
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name		: LIS331DLH_ReadReg</font></i>
+<i><font color="#9A1900">* Description		: Generic Reading function. It must be fullfilled with either</font></i>
+<i><font color="#9A1900">*			: I2C or SPI reading functions					</font></i>
+<i><font color="#9A1900">* Input			: Register Address</font></i>
+<i><font color="#9A1900">* Output		: Data Read</font></i>
+<i><font color="#9A1900">* Return		: Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+
+<i><font color="#9A1900">// SPI-related macros as described in <a href="spi.h.html">spi.h</a>.</font></i>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="73">MY_SPI_SLAVE_ACCELEROMETER_SELECT_SET_LOW</a></font> <a href="spi.h.html#146">SPI_SS_SET_LOW</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="74">MY_SPI_SLAVE_ACCELEROMETER_SELECT_SET_HIGH</a></font> <a href="spi.h.html#147">SPI_SS_SET_HIGH</a>
+
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> <b><font color="#000000"><a name="76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> deviceAddr<font color="#990000">,</font> <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> Reg<font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#41">u8_t</a><font color="#990000">*</font> Data<font color="#990000">)</font> <font color="#FF0000">{</font>
+  
+  <i><font color="#9A1900">//To be completed with either I2c or SPI reading function</font></i>
+  <i><font color="#9A1900">// i.e. *Data = SPI_Mems_Read_Reg( Reg );</font></i>
+  <i><font color="#9A1900">// i.e. if(!I2C_BufferRead(Data, deviceAddr, Reg, 1)) </font></i>
+  <i><font color="#9A1900">// return MEMS_ERROR;</font></i>
+  <i><font color="#9A1900">// else  </font></i>
+  <i><font color="#9A1900">// return MEMS_SUCCESS;</font></i>
+
+  <i><font color="#9A1900">// Our implementation of the pseudocode above follows.  Note that</font></i>
+  <i><font color="#9A1900">// accelerometer_init() declared in <a href="accelerometer.h.html">accelerometer.h</a> must be called to</font></i>
+  <i><font color="#9A1900">// ensure that SPI is initialized before this implementation can be used.</font></i>
+
+  <i><font color="#9A1900">// In our case the SPI slave device is selected using a particular hardware</font></i>
+  <i><font color="#9A1900">// line that is configured at compile time using macros, so we don't need</font></i>
+  <i><font color="#9A1900">// this argument.</font></i>
+  deviceAddr <font color="#990000">=</font> deviceAddr<font color="#990000">;</font>
+
+  <b><font color="#000000">MY_SPI_SLAVE_ACCELEROMETER_SELECT_SET_LOW</font></b> <font color="#990000">();</font>
+<a href="accelerometer.c.html#18">MY_SPI_SLAVE_ACCELEROMETER_SELECT_SET_LOW -> accelerometer.c:18</a>
+<a href="lis331dlh_driver_private.c.html#73">MY_SPI_SLAVE_ACCELEROMETER_SELECT_SET_LOW -> lis331dlh_driver_private.c:73</a>
+  <font color="#FF0000">{</font>
+    <i><font color="#9A1900">// NOTE: the datasheet seems to imply that we could read a stream of</font></i>
+    <i><font color="#9A1900">// register values sequentially.  This would be a tiny bit faster since</font></i>
+    <i><font color="#9A1900">// both "directions" of each spi_transfer() call could be used (except</font></i>
+    <i><font color="#9A1900">// for the first byte of the request and last byte of the result).</font></i>
+    <i><font color="#9A1900">// But this interface doesn't seem to do it, so we're sure not going to</font></i>
+    <i><font color="#9A1900">// worry about it.</font></i>
+    <b><font color="#000000"><a href="spi.c.html#97">spi_transfer</a></font></b> <font color="#990000">(</font><a href="util.h.html#657">B10000000</a> <font color="#990000">|</font> Reg<font color="#990000">);</font>
+    <font color="#008080">uint8_t</font> dont_care_value <font color="#990000">=</font> <font color="#993399">0x00</font><font color="#990000">;</font>
+    <font color="#990000">*</font>Data <font color="#990000">=</font> <b><font color="#000000"><a href="spi.c.html#97">spi_transfer</a></font></b> <font color="#990000">(</font>dont_care_value<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000">MY_SPI_SLAVE_ACCELEROMETER_SELECT_SET_HIGH</font></b> <font color="#990000">();</font>
+<a href="accelerometer.c.html#19">MY_SPI_SLAVE_ACCELEROMETER_SELECT_SET_HIGH -> accelerometer.c:19</a>
+<a href="lis331dlh_driver_private.c.html#74">MY_SPI_SLAVE_ACCELEROMETER_SELECT_SET_HIGH -> lis331dlh_driver_private.c:74</a>
+
+  <i><font color="#9A1900">// The SPI interface which we inherited from the Arduino project doesn't</font></i>
+  <i><font color="#9A1900">// provide any possibility for error so far as I know, so we always report</font></i>
+  <i><font color="#9A1900">// success here :)</font></i>
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name		: LIS331DLH_WriteReg</font></i>
+<i><font color="#9A1900">* Description		: Generic Writing function. It must be fullfilled with either</font></i>
+<i><font color="#9A1900">*			: I2C or SPI writing function</font></i>
+<i><font color="#9A1900">* Input			: Register Address, Data to be written</font></i>
+<i><font color="#9A1900">* Output		: None</font></i>
+<i><font color="#9A1900">* Return		: Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> <b><font color="#000000"><a name="123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> deviceAddress<font color="#990000">,</font> <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> WriteAddr<font color="#990000">,</font> <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> Data<font color="#990000">)</font> <font color="#FF0000">{</font>
+  
+  <i><font color="#9A1900">//To be completed with either I2c or SPI writing function</font></i>
+  <i><font color="#9A1900">// i.e. SPI_Mems_Write_Reg(Reg, Data);</font></i>
+  <i><font color="#9A1900">// i.e. I2C_ByteWrite(&amp;Data,  deviceAddress,  WriteAddr);  </font></i>
+  <i><font color="#9A1900">//  return MEMS_SUCCESS;</font></i>
+  
+  <i><font color="#9A1900">// Our implementation of the pseudocode above follows.  Note that</font></i>
+  <i><font color="#9A1900">// accelerometer_init() declared in <a href="accelerometer.h.html">accelerometer.h</a> must be called to</font></i>
+  <i><font color="#9A1900">// ensure that SPI is initialized before this implementation can be used.</font></i>
+
+  <i><font color="#9A1900">// In our case the SPI slave device is selected using a particular hardware</font></i>
+  <i><font color="#9A1900">// line that is configured at compile time using macros, so we don't need</font></i>
+  <i><font color="#9A1900">// this argument.</font></i>
+  deviceAddress <font color="#990000">=</font> deviceAddress<font color="#990000">;</font>
+
+  <b><font color="#000000">MY_SPI_SLAVE_ACCELEROMETER_SELECT_SET_LOW</font></b> <font color="#990000">();</font>
+<a href="accelerometer.c.html#18">MY_SPI_SLAVE_ACCELEROMETER_SELECT_SET_LOW -> accelerometer.c:18</a>
+<a href="lis331dlh_driver_private.c.html#73">MY_SPI_SLAVE_ACCELEROMETER_SELECT_SET_LOW -> lis331dlh_driver_private.c:73</a>
+  <font color="#FF0000">{</font>
+    <i><font color="#9A1900">// NOTE: looks like they change Reg to WriteAddr between the time the</font></i>
+    <i><font color="#9A1900">// comments were written and the time the prototype was written.</font></i>
+    <b><font color="#000000"><a href="spi.c.html#97">spi_transfer</a></font></b> <font color="#990000">(</font>WriteAddr<font color="#990000">);</font>
+    <b><font color="#000000"><a href="spi.c.html#97">spi_transfer</a></font></b> <font color="#990000">(</font>Data<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000">MY_SPI_SLAVE_ACCELEROMETER_SELECT_SET_HIGH</font></b> <font color="#990000">();</font>
+<a href="accelerometer.c.html#19">MY_SPI_SLAVE_ACCELEROMETER_SELECT_SET_HIGH -> accelerometer.c:19</a>
+<a href="lis331dlh_driver_private.c.html#74">MY_SPI_SLAVE_ACCELEROMETER_SELECT_SET_HIGH -> lis331dlh_driver_private.c:74</a>
+
+  <i><font color="#9A1900">// The SPI interface which we inherited from the Arduino project doesn't</font></i>
+  <i><font color="#9A1900">// provide any possibility for error so far as I know, so we always report</font></i>
+  <i><font color="#9A1900">// success here :)</font></i>
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">/* Private functions ---------------------------------------------------------*/</font></i>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_GetWHO_AM_I</font></i>
+<i><font color="#9A1900">* Description    : Read identification code from LIS331DLH_WHO_AM_I register</font></i>
+<i><font color="#9A1900">* Input          : char to be filled with the Device identification Value</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [value of FSS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<i><font color="#9A1900">// This probably doesn't work on the LIS331HH, though it would be nice and</font></i>
+<i><font color="#9A1900">// should work fine on the LIS331DHL.  But since LIS331HH is the part I have</font></i>
+<i><font color="#9A1900">// to play with I'm disabling it.</font></i>
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900">status_t LIS331DLH_GetWHO_AM_I(u8_t* val){</font></i>
+<i><font color="#9A1900">  </font></i>
+<i><font color="#9A1900">  if( !LIS331DLH_ReadReg(LIS331DLH_MEMS_I2C_ADDRESS, LIS331DLH_WHO_AM_I, val) )</font></i>
+<i><font color="#9A1900">    return MEMS_ERROR;</font></i>
+<i><font color="#9A1900">  </font></i>
+<i><font color="#9A1900">  return MEMS_SUCCESS;</font></i>
+<i><font color="#9A1900">}</font></i>
+<i><font color="#9A1900">*/</font></i>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetODR</font></i>
+<i><font color="#9A1900">* Description    : Sets LIS331DLH Accelerometer Output Data Rate </font></i>
+<i><font color="#9A1900">* Input          : Output Data Rate</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="185">LIS331DLH_SetODR</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#78">LIS331DLH_ODR_t</a></font> dr<font color="#990000">)</font><font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#194">LIS331DLH_CTRL_REG1</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0xE7</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> dr<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#196">LIS331DLH_DR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#194">LIS331DLH_CTRL_REG1</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetMode</font></i>
+<i><font color="#9A1900">* Description    : Sets LIS331DLH Accelerometer Operating Mode</font></i>
+<i><font color="#9A1900">* Input          : Modality (LIS331DLH_LOW_POWER, LIS331DLH_NORMAL, LIS331DLH_POWER_DOWN...)</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="208">LIS331DLH_SetMode</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#94">LIS331DLH_Mode_t</a></font> pm<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#194">LIS331DLH_CTRL_REG1</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0x1F</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> <font color="#990000">(</font>pm<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#195">LIS331DLH_PM</a><font color="#990000">);</font>   
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#194">LIS331DLH_CTRL_REG1</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetAxis</font></i>
+<i><font color="#9A1900">* Description    : Enable/Disable LIS331DLH Axis</font></i>
+<i><font color="#9A1900">* Input          : LIS331DLH_X_ENABLE/LIS331DLH_X_DISABLE | LIS331DLH_Y_ENABLE/LIS331DLH_Y_DISABLE</font></i>
+<i><font color="#9A1900">                   | LIS331DLH_Z_ENABLE/LIS331DLH_Z_DISABLE</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Note           : You MUST use all input variable in the argument, as example</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="232">LIS331DLH_SetAxis</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#48">LIS331DLH_Axis_t</a></font> axis<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#194">LIS331DLH_CTRL_REG1</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0xF8</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> <font color="#990000">(</font><font color="#993399">0x07</font> <font color="#990000">&amp;</font> axis<font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#194">LIS331DLH_CTRL_REG1</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>   
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetFullScale</font></i>
+<i><font color="#9A1900">* Description    : Sets the LIS331DLH FullScale</font></i>
+<i><font color="#9A1900">* Input          : LIS331DLH_FULLSCALE_2/LIS331DLH_FULLSCALE_4/LIS331DLH_FULLSCALE_8</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="255">LIS331DLH_SetFullScale</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#127">LIS331DLH_Fullscale_t</a></font> fs<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#220">LIS331DLH_CTRL_REG4</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0xCF</font><font color="#990000">;</font>	
+  value <font color="#990000">|=</font> <font color="#990000">(</font>fs<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#223">LIS331DLH_FS</a><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#220">LIS331DLH_CTRL_REG4</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">// Analogous to LIS331DLH_SetFullScale().</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="271">LIS331HH_SetFullScale</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#135">LIS331HH_Fullscale_t</a></font> fs<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Values of type LIS331HH_Fullscale_t can be used where values</font></i>
+  <i><font color="#9A1900">// of type LIS331DLH_Fullscale_t are called for, so we can use</font></i>
+  <i><font color="#9A1900">// LIS331DLH_SetFullScale() to implement this function.</font></i>
+  <b><font color="#0000FF">return</font></b> <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#255">LIS331DLH_SetFullScale</a></font></b> <font color="#990000">(</font>fs<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetBDU</font></i>
+<i><font color="#9A1900">* Description    : Enable/Disable Block Data Update Functionality</font></i>
+<i><font color="#9A1900">* Input          : MEMS_ENABLE/MEMS_DISABLE</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="285">LIS331DLH_SetBDU</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> bdu<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#220">LIS331DLH_CTRL_REG4</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0x7F</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> <font color="#990000">(</font>bdu<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#221">LIS331DLH_BDU</a><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#220">LIS331DLH_CTRL_REG4</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetBLE</font></i>
+<i><font color="#9A1900">* Description    : Set Endianess (MSB/LSB)</font></i>
+<i><font color="#9A1900">* Input          : LIS331DLH_BLE_LSB / LIS331DLH_BLE_MSB</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="308">LIS331DLH_SetBLE</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#140">LIS331DLH_Endianess_t</a></font> ble<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#220">LIS331DLH_CTRL_REG4</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0xBF</font><font color="#990000">;</font>	
+  value <font color="#990000">|=</font> <font color="#990000">(</font>ble<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#222">LIS331DLH_BLE</a><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#220">LIS331DLH_CTRL_REG4</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetFDS</font></i>
+<i><font color="#9A1900">* Description    : Set Filter Data Selection</font></i>
+<i><font color="#9A1900">* Input          : MEMS_ENABLE/MEMS_DISABLE</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="331">LIS331DLH_SetFDS</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> fds<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#202">LIS331DLH_CTRL_REG2</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0xEF</font><font color="#990000">;</font>	
+  value <font color="#990000">|=</font> <font color="#990000">(</font>fds<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#205">LIS331DLH_FDS</a><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#202">LIS331DLH_CTRL_REG2</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetBOOT</font></i>
+<i><font color="#9A1900">* Description    : Rebot memory content</font></i>
+<i><font color="#9A1900">* Input          : MEMS_ENABLE/MEMS_DISABLE</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="354">LIS331DLH_SetBOOT</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> boot<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#202">LIS331DLH_CTRL_REG2</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0x7F</font><font color="#990000">;</font>	
+  value <font color="#990000">|=</font> <font color="#990000">(</font>boot<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#203">LIS331DLH_BOOT</a><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#202">LIS331DLH_CTRL_REG2</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetSelfTest</font></i>
+<i><font color="#9A1900">* Description    : Set Self Test Modality</font></i>
+<i><font color="#9A1900">* Input          : MEMS_DISABLE/MEMS_ENABLE</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="377">LIS331DLH_SetSelfTest</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> st<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#220">LIS331DLH_CTRL_REG4</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0xFD</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> <font color="#990000">(</font>st<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#225">LIS331DLH_ST</a><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#220">LIS331DLH_CTRL_REG4</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetSelfTestSign</font></i>
+<i><font color="#9A1900">* Description    : Set Self Test Sign (Disable = st_plus, Enable = st_minus)</font></i>
+<i><font color="#9A1900">* Input          : MEMS_DISABLE/MEMS_ENABLE</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="400">LIS331DLH_SetSelfTestSign</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> st_sign<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#220">LIS331DLH_CTRL_REG4</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0xF7</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> <font color="#990000">(</font>st_sign<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#224">LIS331DLH_ST_SIGN</a><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#220">LIS331DLH_CTRL_REG4</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetIntHighLow</font></i>
+<i><font color="#9A1900">* Description    : Set Interrupt active state (Disable = active high, Enable = active low)</font></i>
+<i><font color="#9A1900">* Input          : MEMS_DISABLE/MEMS_ENABLE</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="423">LIS331DLH_SetIntHighLow</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> ihl<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#211">LIS331DLH_CTRL_REG3</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0x7F</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> <font color="#990000">(</font>ihl<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#212">LIS331DLH_IHL</a><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#211">LIS331DLH_CTRL_REG3</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetIntPPOD</font></i>
+<i><font color="#9A1900">* Description    : Set Interrupt Push-Pull/OpenDrain Pad (Disable = Push-Pull, Enable = OpenDrain)</font></i>
+<i><font color="#9A1900">* Input          : MEMS_DISABLE/MEMS_ENABLE</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="446">LIS331DLH_SetIntPPOD</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> pp_od<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#211">LIS331DLH_CTRL_REG3</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0xBF</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> <font color="#990000">(</font>pp_od<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#213">LIS331DLH_PP_OD</a><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#211">LIS331DLH_CTRL_REG3</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetInt1DataSign</font></i>
+<i><font color="#9A1900">* Description    : Set Data signal Interrupt 1 pad</font></i>
+<i><font color="#9A1900">* Input          : Modality by LIS331DLH_INT_Conf_t Typedef </font></i>
+<i><font color="#9A1900">                  (LIS331DLH_INT_SOURCE, LIS331DLH_INT_1OR2_SOURCE, LIS331DLH_DATA_READY, LIS331DLH_BOOT_RUNNING)</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="470">LIS331DLH_SetInt1DataSign</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#114">LIS331DLH_INT_Conf_t</a></font> i_cfg<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#211">LIS331DLH_CTRL_REG3</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0xFC</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> <font color="#990000">(</font>i_cfg<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#217">LIS331DLH_I1_CFG</a><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#211">LIS331DLH_CTRL_REG3</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetInt2DataSign</font></i>
+<i><font color="#9A1900">* Description    : Set Data signal Interrupt 2 pad</font></i>
+<i><font color="#9A1900">* Input          : Modality by LIS331DLH_INT_Conf_t Typedef </font></i>
+<i><font color="#9A1900">                  (LIS331DLH_INT_SOURCE, LIS331DLH_INT_1OR2_SOURCE, LIS331DLH_DATA_READY, LIS331DLH_BOOT_RUNNING)</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="494">LIS331DLH_SetInt2DataSign</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#114">LIS331DLH_INT_Conf_t</a></font> i_cfg<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#211">LIS331DLH_CTRL_REG3</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0xE7</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> <font color="#990000">(</font>i_cfg<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#215">LIS331DLH_I2_CFG</a><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#211">LIS331DLH_CTRL_REG3</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetSPI34Wire</font></i>
+<i><font color="#9A1900">* Description    : Set SPI mode </font></i>
+<i><font color="#9A1900">* Input          : Modality by LIS331DLH_SPIMode_t Typedef (LIS331DLH_SPI_4_WIRE, LIS331DLH_SPI_3_WIRE)</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="517">LIS331DLH_SetSPI34Wire</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#145">LIS331DLH_SPIMode_t</a></font> sim<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#220">LIS331DLH_CTRL_REG4</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0xFE</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> <font color="#990000">(</font>sim<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#226">LIS331DLH_SIM</a><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#220">LIS331DLH_CTRL_REG4</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_TurnONEnable</font></i>
+<i><font color="#9A1900">* Description    : TurnON Mode selection for sleep to wake function</font></i>
+<i><font color="#9A1900">* Input          : LIS331DLH_SLEEP_TO_WAKE_DIS/LIS331DLH_SLEEP_TO_WAKE_ENA</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="540">LIS331DLH_TurnONEnable</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#119">LIS331DLH_Sleep_To_Wake_Conf_t</a></font> stw<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#229">LIS331DLH_CTRL_REG5</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0x00</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> <font color="#990000">(</font>stw<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#230">LIS331DLH_TURN_ON</a><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#229">LIS331DLH_CTRL_REG5</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_HPFilterReset</font></i>
+<i><font color="#9A1900">* Description    : Reading register for reset the content of internal HP filter</font></i>
+<i><font color="#9A1900">* Input          : None</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+
+<i><font color="#9A1900">// This function didn't have a prototype in <a href="lis331dlh_driver_private.h.html">lis331dlh_driver_private.h</a>,</font></i>
+<i><font color="#9A1900">// so I'm commenting it out.  Given its signature, I think the default</font></i>
+<i><font color="#9A1900">// signature thingy C assumes of undeclared functions would probably work,</font></i>
+<i><font color="#9A1900">// so it may have been working despite the lack of a prototype.  But it</font></i>
+<i><font color="#9A1900">// does something weird that I don't care about anyway so I'm playing it</font></i>
+<i><font color="#9A1900">// safe and taking it out.</font></i>
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900">status_t LIS331DLH_HPFilterReset(void) {</font></i>
+<i><font color="#9A1900">  u8_t value;</font></i>
+<i><font color="#9A1900">  </font></i>
+<i><font color="#9A1900">  if( !LIS331DLH_ReadReg(LIS331DLH_MEMS_I2C_ADDRESS, LIS331DLH_HP_FILTER_RESET, &amp;value) )</font></i>
+<i><font color="#9A1900">    return MEMS_ERROR;</font></i>
+<i><font color="#9A1900">  </font></i>
+<i><font color="#9A1900">  return MEMS_SUCCESS;</font></i>
+<i><font color="#9A1900">}</font></i>
+<i><font color="#9A1900">*/</font></i>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetReference</font></i>
+<i><font color="#9A1900">* Description    : Sets Reference register acceleration value as a reference for HP filter</font></i>
+<i><font color="#9A1900">* Input          : Value of reference acceleration value (0-255)</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="589">LIS331DLH_SetReference</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#44">i8_t</a></font> ref<font color="#990000">)</font> <font color="#FF0000">{</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#235">LIS331DLH_REFERENCE_REG</a><font color="#990000">,</font> ref<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetHPFMode</font></i>
+<i><font color="#9A1900">* Description    : Set High Pass Filter Modality</font></i>
+<i><font color="#9A1900">* Input          : LIS331DLH_HPM_NORMAL_MODE_RES/LIS331DLH_HPM_REF_SIGNAL/LIS331DLH_HPM_NORMAL_MODE</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="605">LIS331DLH_SetHPFMode</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#100">LIS331DLH_HPFMode_t</a></font> hpm<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#202">LIS331DLH_CTRL_REG2</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0x9F</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> <font color="#990000">(</font>hpm<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#204">LIS331DLH_HPM</a><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#202">LIS331DLH_CTRL_REG2</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetHPFCutOFF</font></i>
+<i><font color="#9A1900">* Description    : Set High Pass CUT OFF Freq</font></i>
+<i><font color="#9A1900">* Input          : LIS331DLH_HPFCF [0,3]</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="628">LIS331DLH_SetHPFCutOFF</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#107">LIS331DLH_HPFCutOffFreq_t</a></font> hpf<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#202">LIS331DLH_CTRL_REG2</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0xFC</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> <font color="#990000">(</font>hpf<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#208">LIS331DLH_HPCF</a><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#202">LIS331DLH_CTRL_REG2</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+  
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetInt2HPEnable</font></i>
+<i><font color="#9A1900">* Description    : Set Interrupt2 hp filter enable/disable</font></i>
+<i><font color="#9A1900">* Input          : MEMS_ENABLE/MEMS_DISABLE</font></i>
+<i><font color="#9A1900">* example        : LIS331DLH_SetInt2HPEnable(MEMS_ENABLE)</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="653">LIS331DLH_SetInt2HPEnable</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> stat<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#202">LIS331DLH_CTRL_REG2</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0xF7</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> stat<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#206">LIS331DLH_HPEN2</a> <font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#202">LIS331DLH_CTRL_REG2</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>     
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetInt1HPEnable</font></i>
+<i><font color="#9A1900">* Description    : Set Interrupt1 hp filter enable/disable</font></i>
+<i><font color="#9A1900">* Input          : MEMS_ENABLE/MEMS_DISABLE</font></i>
+<i><font color="#9A1900">* example        : LIS331DLH_SetInt1HPEnable(MEMS_ENABLE)</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="677">LIS331DLH_SetInt1HPEnable</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> stat<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#202">LIS331DLH_CTRL_REG2</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0xFB</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> stat<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#207">LIS331DLH_HPEN1</a> <font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#202">LIS331DLH_CTRL_REG2</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>  
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_Int1LatchEnable</font></i>
+<i><font color="#9A1900">* Description    : Enable Interrupt 1 Latching function</font></i>
+<i><font color="#9A1900">* Input          : ENABLE/DISABLE</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="700">LIS331DLH_Int1LatchEnable</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> latch<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#211">LIS331DLH_CTRL_REG3</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0xFB</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> latch<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#216">LIS331DLH_LIR1</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#211">LIS331DLH_CTRL_REG3</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_Int2LatchEnable</font></i>
+<i><font color="#9A1900">* Description    : Enable Interrupt 2 Latching function</font></i>
+<i><font color="#9A1900">* Input          : ENABLE/DISABLE</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="723">LIS331DLH_Int2LatchEnable</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#63">State_t</a></font> latch<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#211">LIS331DLH_CTRL_REG3</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0xDF</font><font color="#990000">;</font>
+  value <font color="#990000">|=</font> latch<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#214">LIS331DLH_LIR2</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#211">LIS331DLH_CTRL_REG3</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_ResetInt1Latch</font></i>
+<i><font color="#9A1900">* Description    : Reset Interrupt 1 Latching function</font></i>
+<i><font color="#9A1900">* Input          : None</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="746">LIS331DLH_ResetInt1Latch</a></font></b><font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#256">LIS331DLH_INT1_SRC</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_ResetInt2Latch</font></i>
+<i><font color="#9A1900">* Description    : Reset Interrupt 2 Latching function</font></i>
+<i><font color="#9A1900">* Input          : None</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="763">LIS331DLH_ResetInt2Latch</a></font></b><font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#257">LIS331DLH_INT2_SRC</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetInt1Configuration</font></i>
+<i><font color="#9A1900">* Description    : Interrupt 1 Configuration (without 6D_INT)</font></i>
+<i><font color="#9A1900">* Input          : LIS331DLH_INT_AND/OR | LIS331DLH_INT_ZHIE_ENABLE/DISABLE | LIS331DLH_INT_ZLIE_ENABLE/DISABLE...</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Note           : You MUST use ALL input variable in the argument, as in example above</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="781">LIS331DLH_SetInt1Configuration</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#49">LIS331DLH_IntConf_t</a></font> ic<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#242">LIS331DLH_INT1_CFG</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0x40</font><font color="#990000">;</font> 
+  value <font color="#990000">|=</font> ic<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#242">LIS331DLH_INT1_CFG</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetInt2Configuration</font></i>
+<i><font color="#9A1900">* Description    : Interrupt 2 Configuration (without 6D_INT)</font></i>
+<i><font color="#9A1900">* Input          : LIS331DLH_INT_AND/OR | LIS331DLH_INT_ZHIE_ENABLE/DISABLE | LIS331DLH_INT_ZLIE_ENABLE/DISABLE...</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Note           : You MUST use all input variable in the argument, as example</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="805">LIS331DLH_SetInt2Configuration</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#49">LIS331DLH_IntConf_t</a></font> ic<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#245">LIS331DLH_INT2_CFG</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0x40</font><font color="#990000">;</font> 
+  value <font color="#990000">|=</font> ic<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#245">LIS331DLH_INT2_CFG</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetInt1Mode</font></i>
+<i><font color="#9A1900">* Description    : Interrupt 1 Configuration mode (OR, 6D Movement, AND, 6D Position)</font></i>
+<i><font color="#9A1900">* Input          : LIS331DLH_INT_MODE_OR, LIS331DLH_INT_MODE_6D_MOVEMENT, LIS331DLH_INT_MODE_AND, LIS331DLH_INT_MODE_6D_POSITION</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="828">LIS331DLH_SetInt1Mode</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#170">LIS331DLH_IntMode_t</a></font> int_mode<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#242">LIS331DLH_INT1_CFG</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0x3F</font><font color="#990000">;</font> 
+  value <font color="#990000">|=</font> <font color="#990000">(</font>int_mode<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#247">LIS331DLH_INT_6D</a><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#242">LIS331DLH_INT1_CFG</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetInt2Mode</font></i>
+<i><font color="#9A1900">* Description    : Interrupt 2 Configuration mode (OR, 6D Movement, AND, 6D Position)</font></i>
+<i><font color="#9A1900">* Input          : LIS331DLH_INT_MODE_OR, LIS331DLH_INT_MODE_6D_MOVEMENT, LIS331DLH_INT_MODE_AND, LIS331DLH_INT_MODE_6D_POSITION</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="851">LIS331DLH_SetInt2Mode</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#170">LIS331DLH_IntMode_t</a></font> int_mode<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#245">LIS331DLH_INT2_CFG</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0x3F</font><font color="#990000">;</font> 
+  value <font color="#990000">|=</font> <font color="#990000">(</font>int_mode<font color="#990000">&lt;&lt;</font><a href="lis331dlh_driver_private.h.html#247">LIS331DLH_INT_6D</a><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#245">LIS331DLH_INT2_CFG</a><font color="#990000">,</font> value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_Get6DPositionInt1</font></i>
+<i><font color="#9A1900">* Description    : 6D Interrupt 1 Position Detect</font></i>
+<i><font color="#9A1900">* Input          : Byte to be filled with LIS331DLH_POSITION_6D_t Typedef</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="874">LIS331DLH_Get6DPositionInt1</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#41">u8_t</a><font color="#990000">*</font> val<font color="#990000">)</font><font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#256">LIS331DLH_INT1_SRC</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0x7F</font><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">switch</font></b> <font color="#990000">(</font>value<font color="#990000">)</font><font color="#FF0000">{</font>
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#157">LIS331DLH_UP_SX</a><font color="#990000">:</font>   
+    <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#157">LIS331DLH_UP_SX</a><font color="#990000">;</font>    
+    <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#158">LIS331DLH_UP_DX</a><font color="#990000">:</font>   
+    <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#158">LIS331DLH_UP_DX</a><font color="#990000">;</font>    
+    <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#159">LIS331DLH_DW_SX</a><font color="#990000">:</font>   
+    <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#159">LIS331DLH_DW_SX</a><font color="#990000">;</font>    
+    <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#160">LIS331DLH_DW_DX</a><font color="#990000">:</font>   
+    <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#160">LIS331DLH_DW_DX</a><font color="#990000">;</font>    
+    <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#161">LIS331DLH_TOP</a><font color="#990000">:</font>     
+    <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#161">LIS331DLH_TOP</a><font color="#990000">;</font>      
+    <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#162">LIS331DLH_BOTTOM</a><font color="#990000">:</font>  
+    <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#162">LIS331DLH_BOTTOM</a><font color="#990000">;</font>  
+    <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>  
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_Get6DPositionInt2</font></i>
+<i><font color="#9A1900">* Description    : 6D Interrupt 2 Position Detect</font></i>
+<i><font color="#9A1900">* Input          : Byte to be filled with LIS331DLH_POSITION_6D_t Typedef</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="914">LIS331DLH_Get6DPositionInt2</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#41">u8_t</a><font color="#990000">*</font> val<font color="#990000">)</font><font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#257">LIS331DLH_INT2_SRC</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  value <font color="#990000">&amp;=</font> <font color="#993399">0x7F</font><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">switch</font></b> <font color="#990000">(</font>value<font color="#990000">)</font><font color="#FF0000">{</font>
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#157">LIS331DLH_UP_SX</a><font color="#990000">:</font>   
+    <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#157">LIS331DLH_UP_SX</a><font color="#990000">;</font>    
+    <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#158">LIS331DLH_UP_DX</a><font color="#990000">:</font>   
+    <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#158">LIS331DLH_UP_DX</a><font color="#990000">;</font>    
+    <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#159">LIS331DLH_DW_SX</a><font color="#990000">:</font>   
+    <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#159">LIS331DLH_DW_SX</a><font color="#990000">;</font>    
+    <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#160">LIS331DLH_DW_DX</a><font color="#990000">:</font>   
+    <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#160">LIS331DLH_DW_DX</a><font color="#990000">;</font>    
+    <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#161">LIS331DLH_TOP</a><font color="#990000">:</font>     
+    <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#161">LIS331DLH_TOP</a><font color="#990000">;</font>      
+    <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#162">LIS331DLH_BOTTOM</a><font color="#990000">:</font>  
+    <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#162">LIS331DLH_BOTTOM</a><font color="#990000">;</font>   
+    <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>  
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetInt1Threshold</font></i>
+<i><font color="#9A1900">* Description    : Sets Interrupt 1 Threshold</font></i>
+<i><font color="#9A1900">* Input          : Threshold = [0,127]</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="954">LIS331DLH_SetInt1Threshold</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> ths<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font>ths <font color="#990000">&gt;</font> <font color="#993399">127</font><font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#250">LIS331DLH_INT1_THS</a><font color="#990000">,</font> ths<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>    
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetInt1Duration</font></i>
+<i><font color="#9A1900">* Description    : Sets Interrupt 1 Duration</font></i>
+<i><font color="#9A1900">* Input          : Duration = [0,127]</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="972">LIS331DLH_SetInt1Duration</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> id<font color="#990000">)</font> <font color="#FF0000">{</font>  
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font>id <font color="#990000">&gt;</font> <font color="#993399">127</font><font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#251">LIS331DLH_INT1_DURATION</a><font color="#990000">,</font> id<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetInt2Threshold</font></i>
+<i><font color="#9A1900">* Description    : Sets Interrupt 2 Threshold</font></i>
+<i><font color="#9A1900">* Input          : Threshold = [0,127]</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="990">LIS331DLH_SetInt2Threshold</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> ths<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font>ths <font color="#990000">&gt;</font> <font color="#993399">127</font><font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#252">LIS331DLH_INT2_THS</a><font color="#990000">,</font> ths<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>    
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_SetInt2Duration</font></i>
+<i><font color="#9A1900">* Description    : Sets Interrupt 2 Duration</font></i>
+<i><font color="#9A1900">* Input          : Duration = [0,127]</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="1008">LIS331DLH_SetInt2Duration</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> id<font color="#990000">)</font> <font color="#FF0000">{</font>  
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font>id <font color="#990000">&gt;</font> <font color="#993399">127</font><font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#123">LIS331DLH_WriteReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#253">LIS331DLH_INT2_DURATION</a><font color="#990000">,</font> id<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_GetStatusReg</font></i>
+<i><font color="#9A1900">* Description    : Read the status register</font></i>
+<i><font color="#9A1900">* Input          : char to empty by Status Reg Value</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="1026">LIS331DLH_GetStatusReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#41">u8_t</a><font color="#990000">*</font> val<font color="#990000">)</font> <font color="#FF0000">{</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#239">LIS331DLH_STATUS_REG</a><font color="#990000">,</font> val<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>  
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_GetStatusBIT</font></i>
+<i><font color="#9A1900">* Description    : Read the status register BIT</font></i>
+<i><font color="#9A1900">* Input          : LIS331DLH_STATUS_REG_ZYXOR, LIS331DLH_STATUS_REG_ZOR, LIS331DLH_STATUS_REG_YOR, LIS331DLH_STATUS_REG_XOR,</font></i>
+<i><font color="#9A1900">                   LIS331DLH_STATUS_REG_ZYXDA, LIS331DLH_STATUS_REG_ZDA, LIS331DLH_STATUS_REG_YDA, LIS331DLH_STATUS_REG_XDA, </font></i>
+<i><font color="#9A1900">                   LIS331DLH_DATAREADY_BIT</font></i>
+<i><font color="#9A1900">* Output         : status register BIT</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="1043">LIS331DLH_GetStatusBit</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> statusBIT<font color="#990000">,</font> <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> <font color="#990000">*</font>val<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>  
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#239">LIS331DLH_STATUS_REG</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">switch</font></b> <font color="#990000">(</font>statusBIT<font color="#990000">)</font><font color="#FF0000">{</font>
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#293">LIS331DLH_STATUS_REG_ZYXOR</a><font color="#990000">:</font>     
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#293">LIS331DLH_STATUS_REG_ZYXOR</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>  
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#295">LIS331DLH_STATUS_REG_ZOR</a><font color="#990000">:</font>       
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#295">LIS331DLH_STATUS_REG_ZOR</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>  
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#297">LIS331DLH_STATUS_REG_YOR</a><font color="#990000">:</font>       
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#297">LIS331DLH_STATUS_REG_YOR</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>                                 
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#299">LIS331DLH_STATUS_REG_XOR</a><font color="#990000">:</font>       
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#299">LIS331DLH_STATUS_REG_XOR</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>  
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#301">LIS331DLH_STATUS_REG_ZYXDA</a><font color="#990000">:</font>     
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#301">LIS331DLH_STATUS_REG_ZYXDA</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>   
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#303">LIS331DLH_STATUS_REG_ZDA</a><font color="#990000">:</font>       
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#303">LIS331DLH_STATUS_REG_ZDA</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>   
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#305">LIS331DLH_STATUS_REG_YDA</a><font color="#990000">:</font>       
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#305">LIS331DLH_STATUS_REG_YDA</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>   
+  <b><font color="#0000FF">case</font></b> <a href="lis331dlh_driver_private.h.html#307">LIS331DLH_STATUS_REG_XDA</a><font color="#990000">:</font>       
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#307">LIS331DLH_STATUS_REG_XDA</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>                                      
+  <font color="#FF0000">}</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_GetAccAxesRaw</font></i>
+<i><font color="#9A1900">* Description    : Read the Acceleration Values Output Registers</font></i>
+<i><font color="#9A1900">* Input          : buffer to empity by AccAxesRaw_t Typedef</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="1135">LIS331DLH_GetAccAxesRaw</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#69">AxesRaw_t</a><font color="#990000">*</font> buff<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#43">i16_t</a></font> value<font color="#990000">;</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> <font color="#990000">*</font>valueL <font color="#990000">=</font> <font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#41">u8_t</a> <font color="#990000">*)(&amp;</font>value<font color="#990000">);</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> <font color="#990000">*</font>valueH <font color="#990000">=</font> <font color="#990000">((</font><a href="lis331dlh_driver_private.h.html#41">u8_t</a> <font color="#990000">*)(&amp;</font>value<font color="#990000">)+</font><font color="#993399">1</font><font color="#990000">);</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#285">LIS331DLH_OUT_X_L</a><font color="#990000">,</font> valueL<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#286">LIS331DLH_OUT_X_H</a><font color="#990000">,</font> valueH<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  buff<font color="#990000">-&gt;</font><a href="lis331dlh_driver_private.h.html#66">AXIS_X</a> <font color="#990000">=</font> value<font color="#990000">/</font><font color="#993399">16</font><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#287">LIS331DLH_OUT_Y_L</a><font color="#990000">,</font> valueL<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#288">LIS331DLH_OUT_Y_H</a><font color="#990000">,</font> valueH<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  buff<font color="#990000">-&gt;</font><a href="lis331dlh_driver_private.h.html#67">AXIS_Y</a> <font color="#990000">=</font> value<font color="#990000">/</font><font color="#993399">16</font><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#289">LIS331DLH_OUT_Z_L</a><font color="#990000">,</font> valueL<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#290">LIS331DLH_OUT_Z_H</a><font color="#990000">,</font> valueH<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  buff<font color="#990000">-&gt;</font><a href="lis331dlh_driver_private.h.html#68">AXIS_Z</a> <font color="#990000">=</font> value<font color="#990000">/</font><font color="#993399">16</font><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>  
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_GetInt1Src</font></i>
+<i><font color="#9A1900">* Description    : Reset Interrupt 1 Latching function</font></i>
+<i><font color="#9A1900">* Input          : buffer to empty by Int1 Source Value</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="1175">LIS331DLH_GetInt1Src</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#41">u8_t</a><font color="#990000">*</font> val<font color="#990000">)</font> <font color="#FF0000">{</font>  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#256">LIS331DLH_INT1_SRC</a><font color="#990000">,</font> val<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_GetInt2Src</font></i>
+<i><font color="#9A1900">* Description    : Reset Interrupt 2 Latching function</font></i>
+<i><font color="#9A1900">* Input          : buffer to empty by Int2 Source Value</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="1190">LIS331DLH_GetInt2Src</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#41">u8_t</a><font color="#990000">*</font> val<font color="#990000">)</font> <font color="#FF0000">{</font>  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#257">LIS331DLH_INT2_SRC</a><font color="#990000">,</font> val<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_GetInt1SrcBit</font></i>
+<i><font color="#9A1900">* Description    : Reset Interrupt 1 Latching function</font></i>
+<i><font color="#9A1900">* Input          : LIS331DLH_INT1_SRC_IA, LIS331DLH_INT1_SRC_ZH, LIS331DLH_INT1_SRC_ZL .....</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status of BIT [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="1205">LIS331DLH_GetInt1SrcBit</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> statusBIT<font color="#990000">,</font> <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> <font color="#990000">*</font>val<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>  
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#256">LIS331DLH_INT1_SRC</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font>statusBIT <font color="#990000">==</font> <a href="lis331dlh_driver_private.h.html#276">LIS331DLH_INT_SRC_IA</a><font color="#990000">)</font><font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#276">LIS331DLH_INT_SRC_IA</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>    
+  <font color="#FF0000">}</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font>statusBIT <font color="#990000">==</font> <a href="lis331dlh_driver_private.h.html#277">LIS331DLH_INT_SRC_ZH</a><font color="#990000">)</font><font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#277">LIS331DLH_INT_SRC_ZH</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>   
+  <font color="#FF0000">}</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font>statusBIT <font color="#990000">==</font> <a href="lis331dlh_driver_private.h.html#278">LIS331DLH_INT_SRC_ZL</a><font color="#990000">)</font><font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#278">LIS331DLH_INT_SRC_ZL</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>   
+  <font color="#FF0000">}</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font>statusBIT <font color="#990000">==</font> <a href="lis331dlh_driver_private.h.html#279">LIS331DLH_INT_SRC_YH</a><font color="#990000">)</font><font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#279">LIS331DLH_INT_SRC_YH</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>   
+  <font color="#FF0000">}</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font>statusBIT <font color="#990000">==</font> <a href="lis331dlh_driver_private.h.html#280">LIS331DLH_INT_SRC_YL</a><font color="#990000">)</font><font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#280">LIS331DLH_INT_SRC_YL</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>  
+  <font color="#FF0000">}</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font>statusBIT <font color="#990000">==</font> <a href="lis331dlh_driver_private.h.html#281">LIS331DLH_INT_SRC_XH</a><font color="#990000">)</font><font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#281">LIS331DLH_INT_SRC_XH</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>   
+  <font color="#FF0000">}</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font>statusBIT <font color="#990000">==</font> <a href="lis331dlh_driver_private.h.html#282">LIS331DLH_INT_SRC_XL</a><font color="#990000">)</font><font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#282">LIS331DLH_INT_SRC_XL</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>    
+  <font color="#FF0000">}</font> 
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">/*******************************************************************************</font></i>
+<i><font color="#9A1900">* Function Name  : LIS331DLH_GetInt2SrcBit</font></i>
+<i><font color="#9A1900">* Description    : Reset Interrupt 2 Latching function</font></i>
+<i><font color="#9A1900">* Input          : LIS331DLH_INT_SRC_IA, LIS331DLH_INT_SRC_ZH, LIS331DLH_INT_SRC_ZL .....</font></i>
+<i><font color="#9A1900">* Output         : None</font></i>
+<i><font color="#9A1900">* Return         : Status of BIT [MEMS_ERROR, MEMS_SUCCESS]</font></i>
+<i><font color="#9A1900">*******************************************************************************/</font></i>
+<font color="#008080"><a href="lis331dlh_driver_private.h.html#58">status_t</a></font> <b><font color="#000000"><a name="1298">LIS331DLH_GetInt2SrcBit</a></font></b><font color="#990000">(</font><font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> statusBIT<font color="#990000">,</font> <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> <font color="#990000">*</font>val<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#41">u8_t</a></font> value<font color="#990000">;</font>  
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#257">LIS331DLH_INT2_SRC</a><font color="#990000">,</font> <font color="#990000">&amp;</font>value<font color="#990000">)</font> <font color="#990000">)</font>
+    <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font>statusBIT <font color="#990000">==</font> <a href="lis331dlh_driver_private.h.html#276">LIS331DLH_INT_SRC_IA</a><font color="#990000">)</font><font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#276">LIS331DLH_INT_SRC_IA</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>   
+  <font color="#FF0000">}</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font>statusBIT <font color="#990000">==</font> <a href="lis331dlh_driver_private.h.html#277">LIS331DLH_INT_SRC_ZH</a><font color="#990000">)</font><font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#277">LIS331DLH_INT_SRC_ZH</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>  
+  <font color="#FF0000">}</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font>statusBIT <font color="#990000">==</font> <a href="lis331dlh_driver_private.h.html#278">LIS331DLH_INT_SRC_ZL</a><font color="#990000">)</font><font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#278">LIS331DLH_INT_SRC_ZL</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>  
+  <font color="#FF0000">}</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font>statusBIT <font color="#990000">==</font> <a href="lis331dlh_driver_private.h.html#279">LIS331DLH_INT_SRC_YH</a><font color="#990000">)</font><font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#279">LIS331DLH_INT_SRC_YH</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>    
+  <font color="#FF0000">}</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font>statusBIT <font color="#990000">==</font> <a href="lis331dlh_driver_private.h.html#280">LIS331DLH_INT_SRC_YL</a><font color="#990000">)</font><font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#280">LIS331DLH_INT_SRC_YL</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>   
+  <font color="#FF0000">}</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font>statusBIT <font color="#990000">==</font> <a href="lis331dlh_driver_private.h.html#281">LIS331DLH_INT_SRC_XH</a><font color="#990000">)</font><font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#281">LIS331DLH_INT_SRC_XH</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>  
+  <font color="#FF0000">}</font>
+  
+  <b><font color="#0000FF">if</font></b><font color="#990000">(</font>statusBIT <font color="#990000">==</font> <a href="lis331dlh_driver_private.h.html#282">LIS331DLH_INT_SRC_XL</a><font color="#990000">)</font><font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b><font color="#990000">(</font>value <font color="#990000">&amp;=</font> <a href="lis331dlh_driver_private.h.html#282">LIS331DLH_INT_SRC_XL</a><font color="#990000">)</font><font color="#FF0000">{</font>     
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#178">MEMS_SET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>  
+      <font color="#990000">*</font>val <font color="#990000">=</font> <a href="lis331dlh_driver_private.h.html#179">MEMS_RESET</a><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#56">MEMS_SUCCESS</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>    
+  <font color="#FF0000">}</font> 
+  <b><font color="#0000FF">return</font></b> <a href="lis331dlh_driver_private.h.html#57">MEMS_ERROR</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+<i><font color="#9A1900">/******************* (C) COPYRIGHT 2012 STMicroelectronics *****END OF FILE****/</font></i>
+</tt></pre>

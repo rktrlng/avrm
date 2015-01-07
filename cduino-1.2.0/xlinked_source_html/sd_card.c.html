@@ -1,0 +1,902 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Implementation of the interface described in <a href="sd_card.h.html">sd_card.h</a>.</font></i>
+
+<i><font color="#9A1900">/* Arduino Sd2Card Library</font></i>
+<i><font color="#9A1900"> * Copyright (C) 2009 by William Greiman</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * This file is part of the Arduino Sd2Card Library</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * This Library is free software: you can redistribute it and/or modify</font></i>
+<i><font color="#9A1900"> * it under the terms of the GNU General Public License as published by</font></i>
+<i><font color="#9A1900"> * the Free Software Foundation, either version 3 of the License, or</font></i>
+<i><font color="#9A1900"> * (at your option) any later version.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * This Library is distributed in the hope that it will be useful,</font></i>
+<i><font color="#9A1900"> * but WITHOUT ANY WARRANTY; without even the implied warranty of</font></i>
+<i><font color="#9A1900"> * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</font></i>
+<i><font color="#9A1900"> * GNU General Public License for more details.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * You should have received a copy of the GNU General Public License</font></i>
+<i><font color="#9A1900"> * along with the Arduino Sd2Card Library.  If not, see</font></i>
+<i><font color="#9A1900"> * </font></i><u><font color="#0000FF">&lt;http://www.gnu.org/licenses/&gt;</font></u><i><font color="#9A1900">.</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;assert.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/pgmspace.h&gt;</font>
+<i><font color="#9A1900">// FIXME: here only cause assert.h wrongly needs it, remove when that bug</font></i>
+<i><font color="#9A1900">// is fixed (which it is in more recent upstream AVR libc)</font></i>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdlib.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;string.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="sd_card.h.html">sd_card.h</a>"</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="dio.h.html">dio.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="spi.h.html">spi.h</a>"</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="35">SD_CARD_SPI_SLAVE_SELECT_INIT</a></font></b><font color="#990000">(</font>for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font> <font color="#990000">\</font>
+      SD_CARD_SPI_SLAVE_SELECT_PIN<font color="#990000">,</font> for_input<font color="#990000">,</font> enable_pullup<font color="#990000">,</font> initial_value <font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="38">SD_CARD_SPI_SLAVE_SELECT_SET_LOW</a></font></b><font color="#990000">()</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font>SD_CARD_SPI_SLAVE_SELECT_PIN<font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="40">SD_CARD_SPI_SLAVE_SELECT_SET_HIGH</a></font></b><font color="#990000">()</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font>SD_CARD_SPI_SLAVE_SELECT_PIN<font color="#990000">)</font>
+
+<b><font color="#000080">#if</font></b> <font color="#990000">!</font> SD_CARD_USE_TIMER0_FOR_TIMEOUTS
+
+<b><font color="#000080">#  if</font></b> F_CPU <font color="#990000">!=</font> <font color="#993399">16000000</font>
+<b><font color="#000080">#    </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> This interface is not tested <font color="#008080">with</font> F_CPU <font color="#990000">!=</font> <font color="#993399">16000000</font><font color="#990000">,</font> <font color="#008080">though</font> it <font color="#990000">\</font>
+           should work down to <font color="#993399">1</font> MHz <font color="#008080">at</font> least<font color="#990000">.</font>  Disable this trap and <font color="#008080">try</font> it <font color="#990000">:)</font>
+<b><font color="#000080">#  endif</font></b>  <i><font color="#9A1900">// F_CPU != 16000000</font></i>
+
+   <i><font color="#9A1900">// When using an iteration count to determine when we get a timeout,</font></i>
+   <i><font color="#9A1900">// a lower F_CPU will probably mean fewer iterations per unit time.</font></i>
+   <i><font color="#9A1900">// BUT maybe the SPI bus dominates the iteration time (though I don't</font></i>
+   <i><font color="#9A1900">// think so, since quarter speed SPI seems to end up working with the same</font></i>
+   <i><font color="#9A1900">// timeouts).  As the the above trap notes the non-16MHz case is untested.</font></i>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="55">TIMEOUT_FREQ_FACTOR</a></font></b> <font color="#990000">((</font>F_CPU <font color="#990000">/</font> <font color="#993399">1000</font><font color="#990000">)</font> <font color="#990000">/</font> <font color="#993399">16000</font><font color="#990000">)</font>
+
+   <i><font color="#9A1900">// We use a large factor of safety when uing iteration counts to determine</font></i>
+   <i><font color="#9A1900">// timeouts.  Using 16 here should make us ok down to 1 MHz, even if the</font></i>
+   <i><font color="#9A1900">// freq. factor isn't good enough somehow :)</font></i>
+<b><font color="#000080">#  define</font></b> <a name="60">TIMEOUT_FS</a> <font color="#993399">16</font>
+
+   <i><font color="#9A1900">// The Total Approximation Factor by which we multiply the approximate</font></i>
+   <i><font color="#9A1900">// observed worst case timeout iteration counts :)</font></i>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="64">TIMEOUT_TAF</a></font></b> <font color="#990000">(</font><a href="sd_card.c.html#55">TIMEOUT_FREQ_FACTOR</a> <font color="#990000">*</font> <a href="sd_card.c.html#60">TIMEOUT_FS</a><font color="#990000">)</font>
+
+  <i><font color="#9A1900">// Timeouts, expressed in terms of iterations transferring data in from the</font></i>
+  <i><font color="#9A1900">// SPI bus.  The constants in these values are sort of a joke: I got them</font></i>
+  <i><font color="#9A1900">// by measung the worst case behavior in iterations for write timeouts,</font></i>
+  <i><font color="#9A1900">// then extrapolating for the other constants from that measurement and</font></i>
+  <i><font color="#9A1900">// the millisecond timeout values in <a href="sd_card.h.html">sd_card.h</a>.  We then multiply by a</font></i>
+  <i><font color="#9A1900">// big factor of safety and a factor to compensate for slower frequencies.</font></i>
+  <i><font color="#9A1900">// As the interface says, when not using timer0 to measure real timeouts,</font></i>
+  <i><font color="#9A1900">// expect multi-second delays in cases where real timeouts happen :)</font></i>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="74">SD_CARD_PRECMD_TIMEOUT_ITERATIONS</a></font></b> <font color="#990000">(</font><a href="sd_card.c.html#64">TIMEOUT_TAF</a> <font color="#990000">*</font> <font color="#993399">33000</font><font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="75">SD_CARD_INIT_TIMEOUT_ITERATIONS</a></font></b>   <font color="#990000">(</font><a href="sd_card.c.html#64">TIMEOUT_TAF</a> <font color="#990000">*</font> <font color="#993399">133332</font><font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="76">SD_CARD_ERASE_TIMEOUT_ITERATIONS</a></font></b>  <font color="#990000">(</font><a href="sd_card.c.html#64">TIMEOUT_TAF</a> <font color="#990000">*</font> <font color="#993399">666666</font><font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="77">SD_CARD_READ_TIMEOUT_ITERATIONS</a></font></b>   <font color="#990000">(</font><a href="sd_card.c.html#64">TIMEOUT_TAF</a> <font color="#990000">*</font> <font color="#993399">33333</font><font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="78">SD_CARD_WRITE_TIMEOUT_ITERATIONS</a></font></b>  <font color="#990000">(</font><a href="sd_card.c.html#64">TIMEOUT_TAF</a> <font color="#990000">*</font> <font color="#993399">40000</font><font color="#990000">)</font>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// ! SD_CARD_USE_TIMER0_FOR_TIMEOUTS</font></i>
+
+<b><font color="#0000FF">static</font></b> <font color="#008080">uint32_t</font> <a name="82">cur_block</a><font color="#990000">;</font>   <i><font color="#9A1900">// Current block</font></i>
+<b><font color="#0000FF">static</font></b> <font color="#008080"><a href="sd_card.h.html#149">sd_card_error_t</a></font> <a name="83">cur_error</a><font color="#990000">;</font>   <i><font color="#9A1900">// Current error (might be none)</font></i>
+<b><font color="#0000FF">static</font></b> <font color="#008080">uint8_t</font> <a name="84">in_block</a><font color="#990000">;</font>   <i><font color="#9A1900">// True iff we are in the process of reading a block</font></i>
+<b><font color="#0000FF">static</font></b> <font color="#008080">uint16_t</font> <a name="85">cur_offset</a><font color="#990000">;</font>   <i><font color="#9A1900">// Offset within current block</font></i>
+<i><font color="#9A1900">// FIXXME: the interface fctn to enable this mode currently doesn't</font></i>
+<i><font color="#9A1900">// exist, could be included from model easily enough.  I don't need</font></i>
+<i><font color="#9A1900">// it though.  Also, I'm not sure it's even supported by SDHC cards, it</font></i>
+<i><font color="#9A1900">// may be an SD1 and SD2 only thing.  NOTE: this it *not* related to the</font></i>
+<i><font color="#9A1900">// sd_card_read/write_partial_block() functions.</font></i>
+<b><font color="#0000FF">static</font></b> <font color="#008080">uint8_t</font> <a name="91">partial_block_read_mode</a><font color="#990000">;</font>   <i><font color="#9A1900">// Mode supporting partai block reads</font></i>
+<b><font color="#0000FF">static</font></b> <font color="#008080">uint8_t</font> <a name="92">status</a><font color="#990000">;</font>   <i><font color="#9A1900">// SD controller status</font></i>
+<b><font color="#0000FF">static</font></b> <font color="#008080"><a href="sd_card.h.html#224">sd_card_type_t</a></font> <a name="93">card_type</a><font color="#990000">;</font>   <i><font color="#9A1900">// Type of installed SD card</font></i>
+
+<font color="#008080"><a href="sd_card.h.html#192">sd_card_spi_speed_t</a></font> <a name="95">speed</a> <font color="#990000">=</font> <a href="sd_card.h.html#188">SD_CARD_SPI_SPEED_UNSET</a><font color="#990000">;</font>
+
+<b><font color="#0000FF">static</font></b>
+<font color="#009900">void</font> <b><font color="#000000"><a name="98">send_byte</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> bts<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Send byte bts (Byte To Send) to the SD controller</font></i>
+
+  <b><font color="#000000"><a href="spi.c.html#97">spi_transfer</a></font></b> <font color="#990000">(</font>bts<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b>
+<font color="#008080">uint8_t</font> <b><font color="#000000"><a name="106">receive_byte</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Receive a byte from the SD controller</font></i>
+
+  <b><font color="#0000FF">return</font></b> <b><font color="#000000"><a href="spi.c.html#97">spi_transfer</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#112">SD_CARD_DUMMY_BYTE_VALUE</a><font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">void</font>
+<b><font color="#000000"><a name="114">error</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="sd_card.h.html#149">sd_card_error_t</a></font> code<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Set the current error code</font></i>
+
+  <a href="sd_card.c.html#83">cur_error</a> <font color="#990000">=</font> code<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">// Elapsed milliseconds since most recent timer0_stopwatch_reset().</font></i>
+<i><font color="#9A1900">// Note that this result can end up truncated to zero, which in our use</font></i>
+<i><font color="#9A1900">// cases is fine since that means the operation being times was easily fast</font></i>
+<i><font color="#9A1900">// enough to be within spec.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="125">EMILLIS</a></font></b><font color="#990000">()</font> <font color="#990000">(</font><b><font color="#000000"><a href="timer0_stopwatch.c.html#136">timer0_stopwatch_microseconds</a></font></b> <font color="#990000">()</font> <font color="#990000">/</font> <font color="#993399">1000</font><font color="#990000">)</font>
+
+<b><font color="#0000FF">static</font></b> uint8_t
+<b><font color="#000080">#if</font></b> SD_CARD_USE_TIMER0_FOR_TIMEOUTS
+<b><font color="#000000"><a name="129">wait_not_busy</a></font></b> <font color="#990000">(</font><font color="#008080">uint16_t</font> timeout_ms<font color="#990000">)</font>
+<b><font color="#000080">#else</font></b>
+<b><font color="#000000"><a href="sd_card.c.html#129">wait_not_busy</a></font></b> <font color="#990000">(</font><font color="#008080">uint32_t</font> timeout_iterations<font color="#990000">)</font>
+<b><font color="#000080">#endif</font></b>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Wait timeout_ms milliseconds for card to go not busy.</font></i>
+
+<b><font color="#000080">#ifdef</font></b> SD_CARD_USE_TIMER0_FOR_TIMEOUTS
+  <b><font color="#000000"><a href="timer0_stopwatch.c.html#90">timer0_stopwatch_reset</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font>
+    <i><font color="#9A1900">// Wait for card to go non-busy (to get done programming).</font></i>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="sd_card.c.html#106">receive_byte</a></font></b> <font color="#990000">()</font> <font color="#990000">!=</font> <a href="sd_card_private.h.html#102">SD_CARD_BUSY_SIGNAL_BYTE_VALUE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+      <font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="sd_card.c.html#125">EMILLIS</a></font></b> <font color="#990000">()</font> <font color="#990000">&lt;</font> timeout_ms <font color="#990000">);</font>
+<b><font color="#000080">#else</font></b> <i><font color="#9A1900">// The case where SD_CARD_USE_TIMER0_FOR_TIMEOUTS isn't defined</font></i>
+  <font color="#008080">uint32_t</font> iteration_count <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font>
+    <i><font color="#9A1900">// Wait for card to go non-busy (to get done programming).</font></i>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="sd_card.c.html#106">receive_byte</a></font></b> <font color="#990000">()</font> <font color="#990000">!=</font> <a href="sd_card_private.h.html#102">SD_CARD_BUSY_SIGNAL_BYTE_VALUE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+      iteration_count<font color="#990000">++;</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> iteration_count <font color="#990000">&lt;</font> timeout_iterations <font color="#990000">);</font>
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// SD_CARD_USE_TIMER0_FOR_TIMEOUTS</font></i>
+
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">void</font>
+<b><font color="#000000"><a name="164">read_end</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Read any remaining block data and checksum, set chip select high,</font></i>
+  <i><font color="#9A1900">// and clear the in_block flag.</font></i>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <a href="sd_card.c.html#84">in_block</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <i><font color="#9A1900">// Skip data (hence +1) and CRC (hence other +1) bytes</font></i>
+    <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <a href="sd_card.c.html#85">cur_offset</a><font color="#990000">++</font> <font color="#990000">&lt;</font> <a href="sd_card.h.html#98">SD_CARD_BLOCK_SIZE</a> <font color="#990000">+</font> <font color="#993399">1</font> <font color="#990000">+</font> <font color="#993399">1</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="sd_card.c.html#106">receive_byte</a></font></b> <font color="#990000">();</font>
+    <font color="#FF0000">}</font>
+
+    <b><font color="#000000"><a href="sd_card.c.html#40">SD_CARD_SPI_SLAVE_SELECT_SET_HIGH</a></font></b> <font color="#990000">();</font>
+    <a href="sd_card.c.html#84">in_block</a> <font color="#990000">=</font> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">//------------------------------------------------------------------------------</font></i>
+<b><font color="#0000FF">static</font></b> uint8_t
+<b><font color="#000000"><a name="182">card_command</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> cmd<font color="#990000">,</font> <font color="#008080">uint32_t</font> arg<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// WARNING: CMD8 is a special case.  Send command and argument and return</font></i>
+  <i><font color="#9A1900">// error code, or zero for OK.  If cmd is SD_CARD_CMD8, then arg is required</font></i>
+  <i><font color="#9A1900">// to be SD_CARD_CMD8_SUPPORTED_ARGUMENT_VALUE.</font></i>
+
+  <i><font color="#9A1900">// Ensure read is done (in case we're in partial_block_read_mode mode)</font></i>
+  <b><font color="#000000"><a href="sd_card.c.html#164">read_end</a></font></b> <font color="#990000">();</font>
+
+  <i><font color="#9A1900">// Select card</font></i>
+  <b><font color="#000000"><a href="sd_card.c.html#38">SD_CARD_SPI_SLAVE_SELECT_SET_LOW</a></font></b> <font color="#990000">();</font>
+
+  <i><font color="#9A1900">// Wait for a bit if the card is busy.  Presumably some subsequent command</font></i>
+  <i><font color="#9A1900">// will fail and we'll get an error of some sort if this wait is ever</font></i>
+  <i><font color="#9A1900">// actually required and the card doesn't ever go non-busy.</font></i>
+<b><font color="#000080">#ifdef</font></b> SD_CARD_USE_TIMER0_FOR_TIMEOUTS
+  <b><font color="#000000"><a href="sd_card.c.html#129">wait_not_busy</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#114">SD_CARD_PRECMD_TIMEOUT</a><font color="#990000">);</font>
+<b><font color="#000080">#else</font></b>
+  <b><font color="#000000"><a href="sd_card.c.html#129">wait_not_busy</a></font></b> <font color="#990000">(</font><a href="sd_card.c.html#74">SD_CARD_PRECMD_TIMEOUT_ITERATIONS</a><font color="#990000">);</font>
+<b><font color="#000080">#endif</font></b>
+
+  <i><font color="#9A1900">// Send command</font></i>
+  <b><font color="#000000"><a href="sd_card.c.html#98">send_byte</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#95">SD_CARD_COMMAND_PREFIX_MASK</a> <font color="#990000">|</font> cmd<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Send argument bytes</font></i>
+  uint8_t <font color="#008080">const</font> bpp <font color="#990000">=</font> <font color="#993399">8</font><font color="#990000">;</font>   <i><font color="#9A1900">// Bits per byte</font></i>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">int8_t</font> shift <font color="#990000">=</font> <font color="#990000">(</font><a href="sd_card_private.h.html#98">SD_CARD_COMMAND_ARGUMENT_BYTES</a> <font color="#990000">-</font> <font color="#993399">1</font><font color="#990000">)</font> <font color="#990000">*</font> bpp <font color="#990000">;</font>
+        shift <font color="#990000">&gt;=</font> <font color="#993399">0</font> <font color="#990000">;</font>
+        shift <font color="#990000">-=</font> bpp <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="sd_card.c.html#98">send_byte</a></font></b> <font color="#990000">(</font>arg <font color="#990000">&gt;&gt;</font> shift<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Due to CRC requirements and the fact that CMD8 is a funny beast that</font></i>
+  <i><font color="#9A1900">// only needs a single particular argument, this function requires exactly</font></i>
+  <i><font color="#9A1900">// that argument to be supplied.</font></i>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> cmd <font color="#990000">==</font> <a href="sd_card_private.h.html#59">SD_CARD_CMD8</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font>arg <font color="#990000">==</font> <a href="sd_card_private.h.html#121">SD_CARD_CMD8_SUPPORTED_ARGUMENT_VALUE</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Send CRC bytes.  Normally we don't bother to send real CRC values (we</font></i>
+  <i><font color="#9A1900">// assume reliable SPI bus operation).  However the SD Physical Layer</font></i>
+  <i><font color="#9A1900">// Simplified Specification section 7.2.2 says that correct CRC values</font></i>
+  <i><font color="#9A1900">// must always be sent for CMD0 and CMD8.</font></i>
+  <font color="#008080">uint8_t</font> crc <font color="#990000">=</font> <a href="sd_card_private.h.html#112">SD_CARD_DUMMY_BYTE_VALUE</a><font color="#990000">;</font>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> cmd <font color="#990000">==</font> <a href="sd_card_private.h.html#57">SD_CARD_CMD0</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    crc <font color="#990000">=</font> <a href="sd_card_private.h.html#116">SD_CARD_CMD0_CRC</a><font color="#990000">;</font>  <i><font color="#9A1900">// Correct CRC for CMD0 with arg 0</font></i>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> cmd <font color="#990000">==</font> <a href="sd_card_private.h.html#59">SD_CARD_CMD8</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    crc <font color="#990000">=</font> <a href="sd_card_private.h.html#123">SD_CARD_CMD8_CRC_FOR_SUPPORTED_ARGUMENT_VALUE</a><font color="#990000">;</font>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000"><a href="sd_card.c.html#98">send_byte</a></font></b> <font color="#990000">(</font>crc<font color="#990000">);</font>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+
+  <i><font color="#9A1900">// Wait for response (checking a maximum of Maximum Response Checks times)</font></i>
+  uint8_t <font color="#008080">const</font> mrc <font color="#990000">=</font> UINT8_MAX<font color="#990000">;</font>   <i><font color="#9A1900">// Maximum Response Checks</font></i>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font>
+        <font color="#990000">((</font><a href="sd_card.c.html#92">status</a> <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#106">receive_byte</a></font></b> <font color="#990000">())</font> <font color="#990000">&amp;</font> <a href="sd_card_private.h.html#161">SD_CARD_NOT_R1_RESPONSE_MASK</a><font color="#990000">)</font> <font color="#990000">&amp;&amp;</font>
+        ii <font color="#990000">!=</font> mrc <font color="#990000">;</font>
+        ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">return</font></b> <a href="sd_card.c.html#92">status</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> uint8_t
+<b><font color="#000000"><a name="247">write_data_private</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> token<font color="#990000">,</font> <font color="#008080">uint16_t</font> cnt<font color="#990000">,</font> <font color="#008080">uint8_t</font> <b><font color="#0000FF">const</font></b> <font color="#990000">*</font>src<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Send one block of data for write block or write multiple blocks.</font></i>
+
+  <b><font color="#000000"><a href="sd_card.c.html#98">send_byte</a></font></b> <font color="#990000">(</font>token<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Send the real data</font></i>
+  <font color="#008080">uint16_t</font> ii<font color="#990000">;</font>   <i><font color="#9A1900">// Byte index</font></i>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> cnt <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="sd_card.c.html#98">send_byte</a></font></b> <font color="#990000">(</font>src<font color="#990000">[</font>ii<font color="#990000">]);</font>
+  <font color="#FF0000">}</font>
+  <i><font color="#9A1900">// Send dummy data for the remainder of the block.  FIXXME: is there really</font></i>
+  <i><font color="#9A1900">// no way with SDHC SPI to specify that the we don't want to send the rest</font></i>
+  <i><font color="#9A1900">// of the block?</font></i>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="sd_card.h.html#98">SD_CARD_BLOCK_SIZE</a> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="sd_card.c.html#98">send_byte</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#112">SD_CARD_DUMMY_BYTE_VALUE</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000"><a href="sd_card.c.html#98">send_byte</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#112">SD_CARD_DUMMY_BYTE_VALUE</a><font color="#990000">);</font>  <i><font color="#9A1900">// Dummy CRC</font></i>
+  <b><font color="#000000"><a href="sd_card.c.html#98">send_byte</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#112">SD_CARD_DUMMY_BYTE_VALUE</a><font color="#990000">);</font>  <i><font color="#9A1900">// Dummy CRC</font></i>
+
+  <a href="sd_card.c.html#92">status</a> <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#106">receive_byte</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">(</font><a href="sd_card.c.html#92">status</a> <font color="#990000">&amp;</font> <a href="sd_card_private.h.html#174">SD_CARD_DATA_RES_MASK</a><font color="#990000">)</font> <font color="#990000">!=</font> <a href="sd_card_private.h.html#176">SD_CARD_DATA_RES_ACCEPTED</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#143">SD_CARD_ERROR_WRITE</a><font color="#990000">);</font>
+    <b><font color="#000000"><a href="sd_card.c.html#40">SD_CARD_SPI_SLAVE_SELECT_SET_HIGH</a></font></b> <font color="#990000">();</font>
+    <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> uint8_t
+<b><font color="#000000"><a name="278">wait_start_block</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Wait for start block token.</font></i>
+<b><font color="#000080">#ifdef</font></b> SD_CARD_USE_TIMER0_FOR_TIMEOUTS
+  <b><font color="#000000"><a href="timer0_stopwatch.c.html#90">timer0_stopwatch_reset</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#990000">(</font><a href="sd_card.c.html#92">status</a> <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#106">receive_byte</a></font></b> <font color="#990000">())</font> <font color="#990000">==</font> <a href="sd_card_private.h.html#106">SD_CARD_NO_TRANSMISSION_BYTE_VALUE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="sd_card.c.html#125">EMILLIS</a></font></b> <font color="#990000">()</font> <font color="#990000">&gt;</font> <a href="sd_card.h.html#117">SD_CARD_READ_TIMEOUT</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#141">SD_CARD_ERROR_READ_TIMEOUT</a><font color="#990000">);</font>
+      <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+<b><font color="#000080">#else</font></b> <i><font color="#9A1900">// The case where SD_CARD_USE_TIMER0_FOR_TIMEOUTS isn't defined</font></i>
+  <font color="#008080">uint32_t</font> iteration_count <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#990000">(</font><a href="sd_card.c.html#92">status</a> <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#106">receive_byte</a></font></b> <font color="#990000">())</font> <font color="#990000">==</font> <a href="sd_card_private.h.html#106">SD_CARD_NO_TRANSMISSION_BYTE_VALUE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> iteration_count <font color="#990000">&gt;=</font> <a href="sd_card.c.html#77">SD_CARD_READ_TIMEOUT_ITERATIONS</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#141">SD_CARD_ERROR_READ_TIMEOUT</a><font color="#990000">);</font>
+      <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    iteration_count<font color="#990000">++;</font>
+  <font color="#FF0000">}</font>
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// SD_CARD_USE_TIMER0_FOR_TIMEOUTS</font></i>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <a href="sd_card.c.html#92">status</a> <font color="#990000">!=</font> <a href="sd_card_private.h.html#171">SD_CARD_DATA_START_BLOCK</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#139">SD_CARD_ERROR_READ</a><font color="#990000">);</font>
+    <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+
+<b><font color="#008080">  fail:</font></b>
+  <b><font color="#000000"><a href="sd_card.c.html#40">SD_CARD_SPI_SLAVE_SELECT_SET_HIGH</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> uint8_t
+<b><font color="#000000"><a name="313">read_register</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> cmd<font color="#990000">,</font> <font color="#009900">void</font><font color="#990000">*</font> buf<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Read CID or CSR register.</font></i>
+
+  uint8_t<font color="#990000">*</font> dst <font color="#990000">=</font> <font color="#990000">(</font>uint8_t <font color="#990000">*)</font> buf<font color="#990000">;</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="sd_card.c.html#182">card_command</a></font></b> <font color="#990000">(</font>cmd<font color="#990000">,</font> <font color="#993399">0</font><font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#140">SD_CARD_ERROR_READ_REG</a><font color="#990000">);</font>
+    <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> <b><font color="#000000"><a href="sd_card.c.html#278">wait_start_block</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Transfer data</font></i>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint16_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font> ii <font color="#990000">&lt;</font> <font color="#993399">16</font><font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    dst<font color="#990000">[</font>ii<font color="#990000">]</font> <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#106">receive_byte</a></font></b> <font color="#990000">();</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000"><a href="sd_card.c.html#106">receive_byte</a></font></b> <font color="#990000">();</font>  <i><font color="#9A1900">// Get first CRC byte</font></i>
+  <b><font color="#000000"><a href="sd_card.c.html#106">receive_byte</a></font></b> <font color="#990000">();</font>  <i><font color="#9A1900">// Get second CRC byte</font></i>
+
+  <b><font color="#000000"><a href="sd_card.c.html#40">SD_CARD_SPI_SLAVE_SELECT_SET_HIGH</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+
+<b><font color="#008080">  fail:</font></b>
+  <b><font color="#000000"><a href="sd_card.c.html#40">SD_CARD_SPI_SLAVE_SELECT_SET_HIGH</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<a href="sd_card.h.html#149">sd_card_error_t</a>
+<b><font color="#000000"><a name="344">sd_card_last_error</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#0000FF">return</font></b> <a href="sd_card.c.html#83">cur_error</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="350">sd_card_last_error_data</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#0000FF">return</font></b> <a href="sd_card.c.html#92">status</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#000080">#ifdef</font></b> SD_CARD_BUILD_ERROR_DESCRIPTION_FUNCTION
+
+<font color="#009900">char</font> <font color="#990000">*</font>
+<b><font color="#000000"><a name="358">sd_card_error_description</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="sd_card.h.html#149">sd_card_error_t</a></font> <a href="sd_card.c.html#114">error</a><font color="#990000">,</font> <font color="#009900">char</font> <font color="#990000">*</font>buf<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#0000FF">switch</font></b> <font color="#990000">(</font> <a href="sd_card.c.html#114">error</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#126">SD_CARD_ERROR_NONE_OR_UNSET</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"No </font><font color="#FF0000"><a href="sd_card.c.html#114">error</a></font><font color="#FF0000"> or </font><font color="#FF0000"><a href="sd_card.c.html#114">error</a></font><font color="#FF0000"> value not set"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#127">SD_CARD_ERROR_CMD0_TIMEOUT</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"CMD0 error: init-related timeout"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#128">SD_CARD_ERROR_CMD8</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"CMD8 error: invalid SD card or voltage"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#129">SD_CARD_ERROR_CMD17</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"CMD17 error: read block error"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#130">SD_CARD_ERROR_CMD24</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"CMD24 error: write block error"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#131">SD_CARD_ERROR_CMD25</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"CMD25 error: write multiple blocks error"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#132">SD_CARD_ERROR_CMD58</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"CMD58 error: OCR read error"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#133">SD_CARD_ERROR_ACMD23</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"ACMD23 error: block pre-erase error"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#134">SD_CARD_ERROR_ACMD41</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"ACMD41 error: initialization process timeout"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#135">SD_CARD_ERROR_BAD_CSD</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"bad CSR version field"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#136">SD_CARD_ERROR_ERASE</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"erase block group </font><font color="#FF0000"><a href="lcd.c.html#112">command</a></font><font color="#FF0000"> failed"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#137">SD_CARD_ERROR_ERASE_SINGLE_BLOCK</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"card not capable of single block erase"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#138">SD_CARD_ERROR_ERASE_TIMEOUT</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"erase timeout"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#139">SD_CARD_ERROR_READ</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"read </font><font color="#FF0000"><a href="sd_card.c.html#114">error</a></font><font color="#FF0000"> (card returned </font><font color="#FF0000"><a href="sd_card.c.html#114">error</a></font><font color="#FF0000"> token not data)"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#140">SD_CARD_ERROR_READ_REG</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"error reading CID or CSD register"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#141">SD_CARD_ERROR_READ_TIMEOUT</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"read timeout"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#142">SD_CARD_ERROR_STOP_TRAN</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"card did not accept STOP_TRAN token"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#143">SD_CARD_ERROR_WRITE</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"write </font><font color="#FF0000"><a href="sd_card.c.html#114">error</a></font><font color="#FF0000"> (card returned </font><font color="#FF0000"><a href="sd_card.c.html#114">error</a></font><font color="#FF0000"> token)"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#144">SD_CARD_ERROR_WRITE_BLOCK_ZERO</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"attempt to write protected block zero"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#145">SD_CARD_ERROR_WRITE_MULTIPLE</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"card did not go ready for multiple block write"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#146">SD_CARD_ERROR_WRITE_PROGRAMMING</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"CMD13 (status check) returned </font><font color="#FF0000"><a href="sd_card.c.html#114">error</a></font><font color="#FF0000"> after write"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#147">SD_CARD_ERROR_WRITE_TIMEOUT</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"write timeout"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#148">SD_CARD_ERROR_SCK_RATE</a><font color="#990000">:</font>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"incorrect rate selected"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+<b><font color="#008080">    default:</font></b>
+      <b><font color="#000000">strcpy_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"unhandled or unknown </font><font color="#FF0000"><a href="sd_card.c.html#114">error</a></font><font color="#FF0000"> value"</font><font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">return</font></b> buf<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// # ifdef SD_CARD_BUILD_ERROR_DESCRIPTION_FUNCTION</font></i>
+
+<a href="sd_card.h.html#224">sd_card_type_t</a>
+<b><font color="#000000"><a name="441">sd_card_type</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#0000FF">return</font></b> <a href="sd_card.c.html#93">card_type</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+uint32_t
+<b><font color="#000000"><a name="447">sd_card_size</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#008080"><a href="sd_card_private.h.html#334">sd_card_csd_t</a></font> csd<font color="#990000">;</font>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> <b><font color="#000000"><a href="sd_card.c.html#857">sd_card_read_csd</a></font></b> <font color="#990000">(&amp;</font>csd<font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">return</font></b> <font color="#993399">0</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font>csd<font color="#990000">.</font><a href="sd_card_private.h.html#332">v1</a><font color="#990000">.</font>csd_ver <font color="#990000">==</font> <font color="#993399">0</font><font color="#990000">)</font> <font color="#FF0000">{</font>
+<a href="sd_card_private.h.html#213">csd_ver -> sd_card_private.h:213</a>
+<a href="sd_card_private.h.html#277">csd_ver -> sd_card_private.h:277</a>
+    <i><font color="#9A1900">// See the <a href="sd_card_private.h.html">sd_card_private.h</a> header and/or the bit field description</font></i>
+    <i><font color="#9A1900">// and SD Physical Layer Simplified Specification Version 4.10 Section</font></i>
+    <i><font color="#9A1900">// 5.3.2 for the meanings of the numeric constants in this section.</font></i>
+    <font color="#008080">uint8_t</font> read_bl_len <font color="#990000">=</font> csd<font color="#990000">.</font><a href="sd_card_private.h.html#332">v1</a><font color="#990000">.</font>read_bl_len<font color="#990000">;</font>
+<a href="sd_card_private.h.html#223">read_bl_len -> sd_card_private.h:223</a>
+<a href="sd_card_private.h.html#287">read_bl_len -> sd_card_private.h:287</a>
+    <font color="#008080">uint16_t</font> c_size <font color="#990000">=</font>
+      <font color="#990000">(</font>csd<font color="#990000">.</font><a href="sd_card_private.h.html#332">v1</a><font color="#990000">.</font>c_size_high <font color="#990000">&lt;&lt;</font> <font color="#993399">10</font><font color="#990000">)</font> <font color="#990000">|</font>
+<a href="sd_card_private.h.html#226">c_size_high -> sd_card_private.h:226</a>
+<a href="sd_card_private.h.html#297">c_size_high -> sd_card_private.h:297</a>
+      <font color="#990000">(</font>csd<font color="#990000">.</font><a href="sd_card_private.h.html#332">v1</a><font color="#990000">.</font>c_size_mid <font color="#990000">&lt;&lt;</font> <font color="#993399">2</font><font color="#990000">)</font> <font color="#990000">|</font>
+<a href="sd_card_private.h.html#233">c_size_mid -> sd_card_private.h:233</a>
+<a href="sd_card_private.h.html#299">c_size_mid -> sd_card_private.h:299</a>
+      csd<font color="#990000">.</font><a href="sd_card_private.h.html#332">v1</a><font color="#990000">.</font>c_size_low<font color="#990000">;</font>
+<a href="sd_card_private.h.html#237">c_size_low -> sd_card_private.h:237</a>
+<a href="sd_card_private.h.html#301">c_size_low -> sd_card_private.h:301</a>
+    <font color="#008080">uint8_t</font> c_size_mult <font color="#990000">=</font>
+      <font color="#990000">(</font>csd<font color="#990000">.</font><a href="sd_card_private.h.html#332">v1</a><font color="#990000">.</font><a href="sd_card_private.h.html#239">c_size_mult_high</a> <font color="#990000">&lt;&lt;</font> <font color="#993399">1</font><font color="#990000">)</font> <font color="#990000">|</font>
+      csd<font color="#990000">.</font><a href="sd_card_private.h.html#332">v1</a><font color="#990000">.</font><a href="sd_card_private.h.html#245">c_size_mult_low</a><font color="#990000">;</font>
+    <b><font color="#0000FF">return</font></b> <font color="#990000">(</font>uint32_t<font color="#990000">)</font> <font color="#990000">(</font>c_size <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">)</font> <font color="#990000">&lt;&lt;</font> <font color="#990000">(</font>c_size_mult <font color="#990000">+</font> read_bl_len <font color="#990000">-</font> <font color="#993399">7</font><font color="#990000">);</font>
+<a href="sd_card_private.h.html#223">read_bl_len -> sd_card_private.h:223</a>
+<a href="sd_card_private.h.html#287">read_bl_len -> sd_card_private.h:287</a>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">else</font></b> <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> csd<font color="#990000">.</font><a href="sd_card_private.h.html#333">v2</a><font color="#990000">.</font>csd_ver <font color="#990000">==</font> <font color="#993399">1</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+<a href="sd_card_private.h.html#213">csd_ver -> sd_card_private.h:213</a>
+<a href="sd_card_private.h.html#277">csd_ver -> sd_card_private.h:277</a>
+    <i><font color="#9A1900">// See the <a href="sd_card_private.h.html">sd_card_private.h</a> header and/or the bit field description</font></i>
+    <i><font color="#9A1900">// and SD Physical Layer Simplified Specification Version 4.10 Section</font></i>
+    <i><font color="#9A1900">// 5.3.3 for the meanings of the numeric constants in this section.</font></i>
+    <font color="#008080">uint32_t</font> c_size <font color="#990000">=</font>
+      <font color="#990000">((</font>uint32_t<font color="#990000">)</font> csd<font color="#990000">.</font><a href="sd_card_private.h.html#333">v2</a><font color="#990000">.</font>c_size_high <font color="#990000">&lt;&lt;</font> <font color="#993399">16</font><font color="#990000">)</font> <font color="#990000">|</font>
+<a href="sd_card_private.h.html#226">c_size_high -> sd_card_private.h:226</a>
+<a href="sd_card_private.h.html#297">c_size_high -> sd_card_private.h:297</a>
+      <font color="#990000">(</font>csd<font color="#990000">.</font><a href="sd_card_private.h.html#333">v2</a><font color="#990000">.</font>c_size_mid <font color="#990000">&lt;&lt;</font> <font color="#993399">8</font><font color="#990000">)</font> <font color="#990000">|</font> csd<font color="#990000">.</font><a href="sd_card_private.h.html#333">v2</a><font color="#990000">.</font>c_size_low<font color="#990000">;</font>
+<a href="sd_card_private.h.html#233">c_size_mid -> sd_card_private.h:233</a>
+<a href="sd_card_private.h.html#237">c_size_low -> sd_card_private.h:237</a>
+<a href="sd_card_private.h.html#299">c_size_mid -> sd_card_private.h:299</a>
+<a href="sd_card_private.h.html#301">c_size_low -> sd_card_private.h:301</a>
+    <b><font color="#0000FF">return</font></b> <font color="#990000">(</font>c_size <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">)</font> <font color="#990000">&lt;&lt;</font> <font color="#993399">10</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#135">SD_CARD_ERROR_BAD_CSD</a><font color="#990000">);</font>
+    <b><font color="#0000FF">return</font></b> <font color="#993399">0</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="485">sd_card_single_block_erase_supported</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#008080"><a href="sd_card_private.h.html#334">sd_card_csd_t</a></font> csd<font color="#990000">;</font>
+  <b><font color="#0000FF">return</font></b> <b><font color="#000000"><a href="sd_card.c.html#857">sd_card_read_csd</a></font></b> <font color="#990000">(&amp;</font>csd<font color="#990000">)</font> <font color="#990000">?</font> csd<font color="#990000">.</font><a href="sd_card_private.h.html#332">v1</a><font color="#990000">.</font>erase_blk_en <font color="#990000">:</font> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+<a href="sd_card_private.h.html#244">erase_blk_en -> sd_card_private.h:244</a>
+<a href="sd_card_private.h.html#304">erase_blk_en -> sd_card_private.h:304</a>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="492">sd_card_erase_blocks</a></font></b> <font color="#990000">(</font><font color="#008080">uint32_t</font> first_block<font color="#990000">,</font> <font color="#008080">uint32_t</font> last_block<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> <b><font color="#000000"><a href="sd_card.c.html#485">sd_card_single_block_erase_supported</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#137">SD_CARD_ERROR_ERASE_SINGLE_BLOCK</a><font color="#990000">);</font>
+    <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <a href="sd_card.c.html#93">card_type</a> <font color="#990000">!=</font> <a href="sd_card.h.html#223">SD_CARD_TYPE_SDHC</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    first_block <font color="#990000">&lt;&lt;=</font> <font color="#993399">9</font><font color="#990000">;</font>
+    last_block <font color="#990000">&lt;&lt;=</font> <font color="#993399">9</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="sd_card.c.html#182">card_command</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#73">SD_CARD_CMD32</a><font color="#990000">,</font> first_block<font color="#990000">)</font> <font color="#990000">||</font>
+       <b><font color="#000000"><a href="sd_card.c.html#182">card_command</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#76">SD_CARD_CMD33</a><font color="#990000">,</font> last_block<font color="#990000">)</font> <font color="#990000">||</font>
+       <b><font color="#000000"><a href="sd_card.c.html#182">card_command</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#78">SD_CARD_CMD38</a><font color="#990000">,</font> <font color="#993399">0</font><font color="#990000">))</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#136">SD_CARD_ERROR_ERASE</a><font color="#990000">);</font>
+      <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+<b><font color="#000080">#ifdef</font></b> SD_CARD_USE_TIMER0_FOR_TIMEOUTS
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> <b><font color="#000000"><a href="sd_card.c.html#129">wait_not_busy</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#116">SD_CARD_ERASE_TIMEOUT</a><font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+<b><font color="#000080">#else</font></b>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> <b><font color="#000000"><a href="sd_card.c.html#129">wait_not_busy</a></font></b> <font color="#990000">(</font><a href="sd_card.c.html#76">SD_CARD_ERASE_TIMEOUT_ITERATIONS</a><font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+<b><font color="#000080">#endif</font></b>
+    <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#138">SD_CARD_ERROR_ERASE_TIMEOUT</a><font color="#990000">);</font>
+    <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000"><a href="sd_card.c.html#40">SD_CARD_SPI_SLAVE_SELECT_SET_HIGH</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+
+<b><font color="#008080">  fail:</font></b>
+  <b><font color="#000000"><a href="sd_card.c.html#40">SD_CARD_SPI_SLAVE_SELECT_SET_HIGH</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> uint8_t
+<b><font color="#000000"><a name="529">card_application_command</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> cmd<font color="#990000">,</font> <font color="#008080">uint32_t</font> arg<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// There is a class of so-call "application commands" that require an</font></i>
+  <i><font color="#9A1900">// escape command to be sent first.</font></i>
+
+  <b><font color="#000000"><a href="sd_card.c.html#182">card_command</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#80">SD_CARD_CMD55</a><font color="#990000">,</font> <font color="#993399">0</font><font color="#990000">);</font>
+  <b><font color="#0000FF">return</font></b> <b><font color="#000000"><a href="sd_card.c.html#182">card_command</a></font></b> <font color="#990000">(</font>cmd<font color="#990000">,</font> arg<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="539">sd_card_init</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="sd_card.h.html#192">sd_card_spi_speed_t</a></font> <a href="sd_card.c.html#95">speed</a><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+<b><font color="#000080">#ifdef</font></b> SD_CARD_USE_TIMER0_FOR_TIMEOUTS
+  <b><font color="#000000"><a href="timer0_stopwatch.c.html#50">timer0_stopwatch_init</a></font></b> <font color="#990000">();</font>
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// SD_CARD_USE_TIMER0_FOR_TIMEOUTS</font></i>
+
+  <a href="sd_card.c.html#83">cur_error</a> <font color="#990000">=</font> <a href="sd_card.h.html#126">SD_CARD_ERROR_NONE_OR_UNSET</a><font color="#990000">;</font>
+  <a href="sd_card.c.html#93">card_type</a> <font color="#990000">=</font> <a href="sd_card.h.html#220">SD_CARD_TYPE_INDETERMINATE</a><font color="#990000">;</font>
+  <a href="sd_card.c.html#84">in_block</a> <font color="#990000">=</font> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+  <a href="sd_card.c.html#91">partial_block_read_mode</a> <font color="#990000">=</font> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+
+  <i><font color="#9A1900">// Initialize SPI interface to the SD card controller.</font></i>
+  <b><font color="#000000"><a href="sd_card.c.html#35">SD_CARD_SPI_SLAVE_SELECT_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#184">DIO_OUTPUT</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">,</font> <a href="util.h.html#15">HIGH</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="spi.c.html#22">spi_init</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="spi.c.html#62">spi_set_data_order</a></font></b> <font color="#990000">(</font><a href="spi.h.html#110">SPI_DATA_ORDER_MSB_FIRST</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="spi.c.html#80">spi_set_data_mode</a></font></b> <font color="#990000">(</font><a href="spi.h.html#130">SPI_DATA_MODE_0</a><font color="#990000">);</font>
+  <i><font color="#9A1900">// We start out talking slow to the SD card.  I'm not sure if we need to,</font></i>
+  <i><font color="#9A1900">// but thats what the Arduino libs do and it seems like a safe choice.</font></i>
+  <b><font color="#000000"><a href="spi.c.html#89">spi_set_clock_divider</a></font></b> <font color="#990000">(</font><a href="spi.h.html#118">SPI_CLOCK_DIVIDER_DIV128</a><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// We must supply a minimum of 74 clock cycles with CS high as per SD</font></i>
+  <i><font color="#9A1900">// Physical Layer Simplified Specification Version 4.10 section 6.4.1.1.</font></i>
+  uint8_t <font color="#008080">const</font> dbts <font color="#990000">=</font> <font color="#993399">10</font><font color="#990000">;</font>   <i><font color="#9A1900">// Dummy Bytes To Send (for &gt;74 cycles, see above)</font></i>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> dbts <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="sd_card.c.html#98">send_byte</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#112">SD_CARD_DUMMY_BYTE_VALUE</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000"><a href="sd_card.c.html#38">SD_CARD_SPI_SLAVE_SELECT_SET_LOW</a></font></b> <font color="#990000">();</font>
+
+  <i><font color="#9A1900">// Command to go idle in SPI mode.  SD cards go into SPI mode when their</font></i>
+  <i><font color="#9A1900">// CS line is low while CMD0 is performed, and remain in SPI mode until</font></i>
+  <i><font color="#9A1900">// power cycled.</font></i>
+<b><font color="#000080">#ifdef</font></b> SD_CARD_USE_TIMER0_FOR_TIMEOUTS
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#990000">(</font><a href="sd_card.c.html#92">status</a> <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#182">card_command</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#57">SD_CARD_CMD0</a><font color="#990000">,</font> <font color="#993399">0</font><font color="#990000">))</font> <font color="#990000">!=</font> <a href="sd_card_private.h.html#166">SD_CARD_R1_IDLE_STATE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="sd_card.c.html#125">EMILLIS</a></font></b> <font color="#990000">()</font> <font color="#990000">&gt;</font> <a href="sd_card.h.html#115">SD_CARD_INIT_TIMEOUT</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#127">SD_CARD_ERROR_CMD0_TIMEOUT</a><font color="#990000">);</font>
+      <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+<b><font color="#000080">#else</font></b> <i><font color="#9A1900">// The case where SD_CARD_USE_TIMER0_FOR_TIMEOUTS isn't defined</font></i>
+  <font color="#008080">uint32_t</font> iteration_count <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#990000">(</font><a href="sd_card.c.html#92">status</a> <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#182">card_command</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#57">SD_CARD_CMD0</a><font color="#990000">,</font> <font color="#993399">0</font><font color="#990000">))</font> <font color="#990000">!=</font> <a href="sd_card_private.h.html#166">SD_CARD_R1_IDLE_STATE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> iteration_count <font color="#990000">&gt;=</font> <a href="sd_card.c.html#75">SD_CARD_INIT_TIMEOUT_ITERATIONS</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#127">SD_CARD_ERROR_CMD0_TIMEOUT</a><font color="#990000">);</font>
+      <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    iteration_count<font color="#990000">++;</font>
+  <font color="#FF0000">}</font>
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// SD_CARD_USE_TIMER0_FOR_TIMEOUTS</font></i>
+
+  <i><font color="#9A1900">// Check SD version</font></i>
+  <a href="sd_card.c.html#92">status</a> <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#182">card_command</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#59">SD_CARD_CMD8</a><font color="#990000">,</font> <a href="sd_card_private.h.html#121">SD_CARD_CMD8_SUPPORTED_ARGUMENT_VALUE</a><font color="#990000">);</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <a href="sd_card.c.html#92">status</a> <font color="#990000">&amp;</font> <a href="sd_card_private.h.html#168">SD_CARD_R1_ILLEGAL_COMMAND</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <a href="sd_card.c.html#93">card_type</a> <font color="#990000">=</font> <a href="sd_card.h.html#221">SD_CARD_TYPE_SD1</a><font color="#990000">;</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+    <i><font color="#9A1900">// FIXXME: I think we could get only R1 back if we get a CRC error after</font></i>
+    <i><font color="#9A1900">// CMD8, but since we generally assume those don't happen, and the bit</font></i>
+    <i><font color="#9A1900">// pattern below would probably blow up anyway we probably dont care.</font></i>
+    <i><font color="#9A1900">// And the client should use the watchdog if they are scared of</font></i>
+    <i><font color="#9A1900">// lock-ups :)</font></i>
+    <i><font color="#9A1900">//</font></i>
+    <i><font color="#9A1900">// CMD8 results in a 5 byte R7 response.  The first byte of the response</font></i>
+    <i><font color="#9A1900">// is identical to response type R1 and is consumed by the card_command()</font></i>
+    <i><font color="#9A1900">// function, so we start at byte 1 here.  See table 7.3.1.4 and section</font></i>
+    <i><font color="#9A1900">// 7.3.2.6 from the SD Physical Layer Simplified Specification Version</font></i>
+    <i><font color="#9A1900">// 4.10 for details.</font></i>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">1</font><font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="sd_card_private.h.html#127">SD_CARD_R7_BYTES</a><font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <a href="sd_card.c.html#92">status</a> <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#106">receive_byte</a></font></b> <font color="#990000">();</font>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> ii <font color="#990000">==</font> <a href="sd_card_private.h.html#131">SD_CARD_CMD8_VOLTAGE_OK_BYTE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> <font color="#990000">(</font><a href="sd_card.c.html#92">status</a> <font color="#990000">&amp;&amp;</font> <a href="sd_card_private.h.html#134">SD_CARD_SUPPLIED_VOLTAGE_OK_MASK</a><font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+          <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#128">SD_CARD_ERROR_CMD8</a><font color="#990000">);</font>
+          <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+        <font color="#FF0000">}</font>
+      <font color="#FF0000">}</font>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> ii <font color="#990000">==</font> <a href="sd_card_private.h.html#138">SD_CARD_CMD8_PATTERN_ECHO_BACK_BYTE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <a href="sd_card.c.html#92">status</a> <font color="#990000">!=</font> <a href="sd_card_private.h.html#140">SD_CARD_CMD8_ECHOED_PATTERN</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+          <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#128">SD_CARD_ERROR_CMD8</a><font color="#990000">);</font>
+          <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+        <font color="#FF0000">}</font>
+      <font color="#FF0000">}</font>
+    <font color="#FF0000">}</font>
+    <a href="sd_card.c.html#93">card_type</a> <font color="#990000">=</font> <a href="sd_card.h.html#222">SD_CARD_TYPE_SD2</a><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <font color="#008080">uint32_t</font> arg<font color="#990000">;</font>   <i><font color="#9A1900">// Argument to pass to card commands</font></i>
+
+  <i><font color="#9A1900">// We will initialize the card with ACMD41.  If we have an SD2 card, we want</font></i>
+  <i><font color="#9A1900">// to set a bit in the ACMD41 argument to determine if we have SDHC support.</font></i>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="sd_card.c.html#441">sd_card_type</a></font></b> <font color="#990000">()</font> <font color="#990000">==</font> <a href="sd_card.h.html#222">SD_CARD_TYPE_SD2</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    arg <font color="#990000">=</font> <a href="sd_card_private.h.html#145">SD_CARD_ACMD41_HCS_MASK</a><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+    arg <font color="#990000">=</font> <a href="sd_card_private.h.html#146">SD_CARD_ACMD41_NOTHING_MASK</a><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Wait for card to say it's ready FIXXME: section 7.2.2 of the SD</font></i>
+  <i><font color="#9A1900">// Physical Layer Simplified Specification Version 4.10 says we should</font></i>
+  <i><font color="#9A1900">// ensure that CRC is on (using CMD59 CRC_ON_OFF) before issuing ACMD41.</font></i>
+  <i><font color="#9A1900">// We don't.  I suppose this makes it possible or more likely that we</font></i>
+  <i><font color="#9A1900">// get an early false ready which somehow ends up locking up the card.</font></i>
+  <i><font color="#9A1900">// But if we're getting noise on the line we're going to have problems</font></i>
+  <i><font color="#9A1900">// anyway, since there isn't any other error checking going on anywhere</font></i>
+  <i><font color="#9A1900">// (unless the client is doing it themselves, in which case they should</font></i>
+  <i><font color="#9A1900">// also be using the hardware watchdog :).</font></i>
+<b><font color="#000080">#ifdef</font></b> SD_CARD_USE_TIMER0_FOR_TIMEOUTS
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#990000">(</font><a href="sd_card.c.html#92">status</a> <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#529">card_application_command</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#88">SD_CARD_ACMD41</a><font color="#990000">,</font> arg<font color="#990000">))</font>
+          <font color="#990000">!=</font> <a href="sd_card_private.h.html#164">SD_CARD_R1_READY_STATE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="sd_card.c.html#125">EMILLIS</a></font></b> <font color="#990000">()</font> <font color="#990000">&gt;</font> <a href="sd_card.h.html#115">SD_CARD_INIT_TIMEOUT</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#134">SD_CARD_ERROR_ACMD41</a><font color="#990000">);</font>
+      <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+<b><font color="#000080">#else</font></b> <i><font color="#9A1900">// The case where SD_CARD_USE_TIMER0_FOR_TIMEOUTS isn't defined</font></i>
+  iteration_count <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#990000">(</font><a href="sd_card.c.html#92">status</a> <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#529">card_application_command</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#88">SD_CARD_ACMD41</a><font color="#990000">,</font> arg<font color="#990000">))</font>
+          <font color="#990000">!=</font> <a href="sd_card_private.h.html#164">SD_CARD_R1_READY_STATE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> iteration_count <font color="#990000">&gt;=</font> <a href="sd_card.c.html#75">SD_CARD_INIT_TIMEOUT_ITERATIONS</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#134">SD_CARD_ERROR_ACMD41</a><font color="#990000">);</font>
+      <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    iteration_count<font color="#990000">++;</font>
+  <font color="#FF0000">}</font>
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// SD_CARD_USE_TIMER0_FOR_TIMEOUTS</font></i>
+
+  <i><font color="#9A1900">// If SD2, read OCR register to check for SDHC card</font></i>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="sd_card.c.html#441">sd_card_type</a></font></b> <font color="#990000">()</font> <font color="#990000">==</font> <a href="sd_card.h.html#222">SD_CARD_TYPE_SD2</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="sd_card.c.html#182">card_command</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#82">SD_CARD_CMD58</a><font color="#990000">,</font> <font color="#993399">0</font><font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#132">SD_CARD_ERROR_CMD58</a><font color="#990000">);</font>
+      <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <i><font color="#9A1900">// NOTE: The card_command() functions consumes the first byte</font></i>
+    <i><font color="#9A1900">// of the R3 response, so the next byte recieved will be the</font></i>
+    <i><font color="#9A1900">// SD_CARD_R3_OCR_START_BYTE.</font></i>
+    uint8_t <font color="#008080">const</font> expected_high_bits
+      <font color="#990000">=</font> <a href="sd_card_private.h.html#156">SD_CARD_OCR_POWERED_UP_MASK</a> <font color="#990000">|</font> <a href="sd_card_private.h.html#157">SD_CARD_OCR_CCS_MASK</a><font color="#990000">;</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">(</font><b><font color="#000000"><a href="sd_card.c.html#106">receive_byte</a></font></b> <font color="#990000">()</font> <font color="#990000">&amp;</font> expected_high_bits<font color="#990000">)</font> <font color="#990000">==</font> expected_high_bits <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <a href="sd_card.c.html#93">card_type</a> <font color="#990000">=</font> <a href="sd_card.h.html#223">SD_CARD_TYPE_SDHC</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <i><font color="#9A1900">// Discard rest of OCR - contains allowed voltage range.  Either we've</font></i>
+    <i><font color="#9A1900">// already checked this in the CMD8 response, or we've got a legacy card</font></i>
+    <i><font color="#9A1900">// and we don't support checking it.  We don't support switching to 1.8</font></i>
+    <i><font color="#9A1900">// volt operation.</font></i>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <a href="sd_card_private.h.html#153">SD_CARD_R3_OCR_START_BYTE</a> <font color="#990000">+</font> <font color="#993399">1</font> <font color="#990000">;</font>
+          ii <font color="#990000">&lt;</font> <a href="sd_card_private.h.html#150">SD_CARD_R3_BYTES</a> <font color="#990000">;</font>
+          ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="sd_card.c.html#106">receive_byte</a></font></b> <font color="#990000">();</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000"><a href="sd_card.c.html#40">SD_CARD_SPI_SLAVE_SELECT_SET_HIGH</a></font></b> <font color="#990000">();</font>
+
+  <b><font color="#0000FF">switch</font></b> <font color="#990000">(</font> <a href="sd_card.c.html#95">speed</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#189">SD_CARD_SPI_SPEED_FULL</a><font color="#990000">:</font>
+      <b><font color="#000000"><a href="spi.c.html#89">spi_set_clock_divider</a></font></b> <font color="#990000">(</font><a href="spi.h.html#119">SPI_CLOCK_DIVIDER_DIV2</a><font color="#990000">);</font>
+      <a href="sd_card.c.html#95">speed</a> <font color="#990000">=</font> <a href="spi.h.html#119">SPI_CLOCK_DIVIDER_DIV2</a><font color="#990000">;</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#190">SD_CARD_SPI_SPEED_HALF</a><font color="#990000">:</font>
+      <b><font color="#000000"><a href="spi.c.html#89">spi_set_clock_divider</a></font></b> <font color="#990000">(</font><a href="spi.h.html#115">SPI_CLOCK_DIVIDER_DIV4</a><font color="#990000">);</font>
+      <a href="sd_card.c.html#95">speed</a> <font color="#990000">=</font> <a href="spi.h.html#115">SPI_CLOCK_DIVIDER_DIV4</a><font color="#990000">;</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="sd_card.h.html#191">SD_CARD_SPI_SPEED_QUARTER</a><font color="#990000">:</font>
+      <b><font color="#000000"><a href="spi.c.html#89">spi_set_clock_divider</a></font></b> <font color="#990000">(</font><a href="spi.h.html#120">SPI_CLOCK_DIVIDER_DIV8</a><font color="#990000">);</font>
+      <a href="sd_card.c.html#95">speed</a> <font color="#990000">=</font> <a href="spi.h.html#120">SPI_CLOCK_DIVIDER_DIV8</a><font color="#990000">;</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+<b><font color="#008080">    default:</font></b>
+      <i><font color="#9A1900">// This is really a client error and not an SD card problem, but since</font></i>
+      <i><font color="#9A1900">// this interface doesn't use assert() yet it seems like a shame to start</font></i>
+      <i><font color="#9A1900">// doing so.</font></i>
+      <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#148">SD_CARD_ERROR_SCK_RATE</a><font color="#990000">);</font>
+      <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+
+<b><font color="#008080">  fail:</font></b>
+  <b><font color="#000000"><a href="sd_card.c.html#40">SD_CARD_SPI_SLAVE_SELECT_SET_HIGH</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> uint8_t
+<b><font color="#000000"><a name="720">read_data</a></font></b> <font color="#990000">(</font><font color="#008080">uint32_t</font> block<font color="#990000">,</font> <font color="#008080">uint16_t</font> offset<font color="#990000">,</font> <font color="#008080">uint16_t</font> cnt<font color="#990000">,</font> <font color="#008080">uint8_t</font> <font color="#990000">*</font>dst<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Read part of a block from an SD card.  Parameters:</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">//   * block    Logical block to be read.</font></i>
+  <i><font color="#9A1900">//   * offset   Number of bytes to skip at start of block</font></i>
+  <i><font color="#9A1900">//   * dst      Pointer to the location that will receive the data</font></i>
+  <i><font color="#9A1900">//   * cnt    Number of bytes to read</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">//  Return value: TRUE for success, FALSE for failure.</font></i>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> cnt <font color="#990000">==</font> <font color="#993399">0</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">(</font>cnt <font color="#990000">+</font> offset<font color="#990000">)</font> <font color="#990000">&gt;</font> <a href="sd_card.h.html#98">SD_CARD_BLOCK_SIZE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> <a href="sd_card.c.html#84">in_block</a> <font color="#990000">||</font> block <font color="#990000">!=</font> <a href="sd_card.c.html#82">cur_block</a> <font color="#990000">||</font> offset <font color="#990000">&lt;</font> <a href="sd_card.c.html#85">cur_offset</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <a href="sd_card.c.html#82">cur_block</a> <font color="#990000">=</font> block<font color="#990000">;</font>
+    <i><font color="#9A1900">// Use address if not SDHC card</font></i>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="sd_card.c.html#441">sd_card_type</a></font></b> <font color="#990000">()</font> <font color="#990000">!=</font> <a href="sd_card.h.html#223">SD_CARD_TYPE_SDHC</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      block <font color="#990000">&lt;&lt;=</font> <font color="#993399">9</font><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="sd_card.c.html#182">card_command</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#67">SD_CARD_CMD17</a><font color="#990000">,</font> block<font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#129">SD_CARD_ERROR_CMD17</a><font color="#990000">);</font>
+      <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> <b><font color="#000000"><a href="sd_card.c.html#278">wait_start_block</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <a href="sd_card.c.html#85">cur_offset</a> <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+    <a href="sd_card.c.html#84">in_block</a> <font color="#990000">=</font> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Skip data before offset</font></i>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#990000">;</font> <a href="sd_card.c.html#85">cur_offset</a> <font color="#990000">&lt;</font> offset <font color="#990000">;</font> <a href="sd_card.c.html#85">cur_offset</a><font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="sd_card.c.html#106">receive_byte</a></font></b> <font color="#990000">();</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Transfer data</font></i>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint16_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font> ii <font color="#990000">&lt;</font> cnt<font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    dst<font color="#990000">[</font>ii<font color="#990000">]</font> <font color="#990000">=</font> <b><font color="#000000"><a href="sd_card.c.html#106">receive_byte</a></font></b> <font color="#990000">();</font>
+  <font color="#FF0000">}</font>
+
+  <a href="sd_card.c.html#85">cur_offset</a> <font color="#990000">+=</font> cnt<font color="#990000">;</font>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> <a href="sd_card.c.html#91">partial_block_read_mode</a> <font color="#990000">||</font> <a href="sd_card.c.html#85">cur_offset</a> <font color="#990000">&gt;=</font> <a href="sd_card.h.html#98">SD_CARD_BLOCK_SIZE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="sd_card.c.html#164">read_end</a></font></b> <font color="#990000">();</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+
+<b><font color="#008080">  fail:</font></b>
+  <b><font color="#000000"><a href="sd_card.c.html#40">SD_CARD_SPI_SLAVE_SELECT_SET_HIGH</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="780">sd_card_read_block</a></font></b> <font color="#990000">(</font><font color="#008080">uint32_t</font> block<font color="#990000">,</font> <font color="#008080">uint8_t</font> <font color="#990000">*</font>dst<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#0000FF">return</font></b> <b><font color="#000000"><a href="sd_card.c.html#720">read_data</a></font></b> <font color="#990000">(</font>block<font color="#990000">,</font> <font color="#993399">0</font><font color="#990000">,</font> <a href="sd_card.h.html#98">SD_CARD_BLOCK_SIZE</a><font color="#990000">,</font> dst<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="786">sd_card_write_block</a></font></b> <font color="#990000">(</font><font color="#008080">uint32_t</font> block<font color="#990000">,</font> <font color="#008080">uint8_t</font> <b><font color="#0000FF">const</font></b> <font color="#990000">*</font>src<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#0000FF">return</font></b> <b><font color="#000000"><a href="sd_card.c.html#798">sd_card_write_partial_block</a></font></b> <font color="#990000">(</font>block<font color="#990000">,</font> <a href="sd_card.h.html#98">SD_CARD_BLOCK_SIZE</a><font color="#990000">,</font> src<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="792">sd_card_read_partial_block</a></font></b> <font color="#990000">(</font><font color="#008080">uint32_t</font> block<font color="#990000">,</font> <font color="#008080">uint16_t</font> cnt<font color="#990000">,</font> <font color="#008080">uint8_t</font> <font color="#990000">*</font>dst<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#0000FF">return</font></b> <b><font color="#000000"><a href="sd_card.c.html#720">read_data</a></font></b> <font color="#990000">(</font>block<font color="#990000">,</font> <font color="#993399">0</font><font color="#990000">,</font> cnt<font color="#990000">,</font> dst<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="798">sd_card_write_partial_block</a></font></b> <font color="#990000">(</font><font color="#008080">uint32_t</font> block<font color="#990000">,</font> <font color="#008080">uint16_t</font> cnt<font color="#990000">,</font> <font color="#008080">uint8_t</font> <b><font color="#0000FF">const</font></b> <font color="#990000">*</font>src<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// NOTE: if cnt is SD_CARD_BLOCK_SIZE the entire block is written.</font></i>
+
+<b><font color="#000080">#if</font></b> <a href="sd_card.h.html#101">SD_CARD_PROTECT_BLOCK_ZERO</a>
+  <i><font color="#9A1900">// Don't allow write to first block</font></i>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> block <font color="#990000">==</font> <font color="#993399">0</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#144">SD_CARD_ERROR_WRITE_BLOCK_ZERO</a><font color="#990000">);</font>
+    <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+<b><font color="#000080">#endif</font></b>  <i><font color="#9A1900">// SD_CARD_PROTECT_BLOCK_ZERO</font></i>
+
+  <i><font color="#9A1900">// Use address if not SDHC card</font></i>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="sd_card.c.html#441">sd_card_type</a></font></b> <font color="#990000">()</font> <font color="#990000">!=</font> <a href="sd_card.h.html#223">SD_CARD_TYPE_SDHC</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    block <font color="#990000">&lt;&lt;=</font> <font color="#993399">9</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="sd_card.c.html#182">card_command</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#69">SD_CARD_CMD24</a><font color="#990000">,</font> block<font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#130">SD_CARD_ERROR_CMD24</a><font color="#990000">);</font>
+    <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> <b><font color="#000000"><a href="sd_card.c.html#247">write_data_private</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#171">SD_CARD_DATA_START_BLOCK</a><font color="#990000">,</font> cnt<font color="#990000">,</font> src<font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Wait for flash programming to complete</font></i>
+<b><font color="#000080">#ifdef</font></b> SD_CARD_USE_TIMER0_FOR_TIMEOUTS
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> <b><font color="#000000"><a href="sd_card.c.html#129">wait_not_busy</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#118">SD_CARD_WRITE_TIMEOUT</a><font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+<b><font color="#000080">#else</font></b>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> <b><font color="#000000"><a href="sd_card.c.html#129">wait_not_busy</a></font></b> <font color="#990000">(</font><a href="sd_card.c.html#78">SD_CARD_WRITE_TIMEOUT_ITERATIONS</a><font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+<b><font color="#000080">#endif</font></b>
+    <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#147">SD_CARD_ERROR_WRITE_TIMEOUT</a><font color="#990000">);</font>
+    <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Read the status register to verify that the write worked.  The response</font></i>
+  <i><font color="#9A1900">// to this command is in format R2, so get and check two bytes for nonzero.</font></i>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="sd_card.c.html#182">card_command</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#65">SD_CARD_CMD13</a><font color="#990000">,</font> <font color="#993399">0</font><font color="#990000">)</font> <font color="#990000">||</font> <b><font color="#000000"><a href="sd_card.c.html#106">receive_byte</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="sd_card.c.html#114">error</a></font></b> <font color="#990000">(</font><a href="sd_card.h.html#146">SD_CARD_ERROR_WRITE_PROGRAMMING</a><font color="#990000">);</font>
+    <b><font color="#0000FF">goto</font></b> fail<font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000"><a href="sd_card.c.html#40">SD_CARD_SPI_SLAVE_SELECT_SET_HIGH</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+
+<b><font color="#008080">  fail:</font></b>
+  <b><font color="#000000"><a href="sd_card.c.html#40">SD_CARD_SPI_SLAVE_SELECT_SET_HIGH</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="848">sd_card_read_cid</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="sd_card_private.h.html#204">sd_card_cid_t</a></font> <font color="#990000">*</font>cid<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Read the SD card CID register into *cid.  Return TRUE on success,</font></i>
+  <i><font color="#9A1900">// FALSE otherwise.</font></i>
+
+  <b><font color="#0000FF">return</font></b> <b><font color="#000000"><a href="sd_card.c.html#313">read_register</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#63">SD_CARD_CMD10</a><font color="#990000">,</font> cid<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="857">sd_card_read_csd</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="sd_card_private.h.html#334">sd_card_csd_t</a></font> <font color="#990000">*</font>csd<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Read the SD card CSD register into *cid.  Return TRUE on success,</font></i>
+  <i><font color="#9A1900">// FALSE otherwise.</font></i>
+
+  <b><font color="#0000FF">return</font></b> <b><font color="#000000"><a href="sd_card.c.html#313">read_register</a></font></b> <font color="#990000">(</font><a href="sd_card_private.h.html#61">SD_CARD_CMD9</a><font color="#990000">,</font> csd<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+</tt></pre>

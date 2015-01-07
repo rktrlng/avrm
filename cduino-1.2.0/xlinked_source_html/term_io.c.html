@@ -1,0 +1,219 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Implementation of the interface described in <a href="term_io.h.html">term_io.h</a>.</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdio.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="term_io.h.html">term_io.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="uart.h.html">uart.h</a>"</font>
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">int</font>
+<b><font color="#000000"><a name="9">term_io_putchar</a></font></b> <font color="#990000">(</font><font color="#009900">char</font> ch<font color="#990000">,</font> <font color="#008080">FILE</font> <font color="#990000">*</font>stream<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Wierdo routine.  Satisfies avrlibc's requirements for a stream</font></i>
+  <i><font color="#9A1900">// implementation function.  This routine first substitutes any given</font></i>
+  <i><font color="#9A1900">// newline with a carriage return (i.e changes '\n' to '\r') then puts</font></i>
+  <i><font color="#9A1900">// the resulting character out on the serial port using UART_PUT_BYTE().</font></i>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> ch <font color="#990000">==</font> <font color="#FF0000">'</font><font color="#CC33CC">\n</font><font color="#FF0000">'</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <i><font color="#9A1900">// I think we could just be putting this byte out directly (our steam</font></i>
+    <i><font color="#9A1900">// in this case is tied inevitably to the serial port).</font></i>
+    <b><font color="#000000"><a href="term_io.c.html#9">term_io_putchar</a></font></b> <font color="#990000">(</font><font color="#FF0000">'</font><font color="#CC33CC">\r</font><font color="#FF0000">'</font><font color="#990000">,</font> stream<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000"><a href="uart.h.html#32">UART_PUT_BYTE</a></font></b> <font color="#990000">(</font>ch<font color="#990000">);</font>
+
+  <b><font color="#0000FF">return</font></b> <font color="#993399">0</font><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">int</font>
+<b><font color="#000000"><a name="28">term_io_getchar</a></font></b> <font color="#990000">(</font><font color="#008080">FILE</font> <font color="#990000">*</font>stream<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Wierdo routine.  Satisfies avrlibc's requirements for a stream</font></i>
+  <i><font color="#9A1900">// implementation function.  It's actually line buffered, might propagate</font></i>
+  <i><font color="#9A1900">// errors upwards when trying to receive bytes from the serial port,</font></i>
+  <i><font color="#9A1900">// and might term_io_putchar() bytes in response to the byte it reads.</font></i>
+  <i><font color="#9A1900">// It's doing all this crazy stuff in order to help us get somewhat</font></i>
+  <i><font color="#9A1900">// terminal-like command line editing.  In more detail:</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">// This features a simple line-editor that allows to delete and re-edit the</font></i>
+  <i><font color="#9A1900">// characters entered, until either CR or NL is entered.  Printable characters</font></i>
+  <i><font color="#9A1900">// entered will be echoed using uart_putchar().</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">// Editing characters:</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">//   \b (BS) or \177 (DEL)    delete the previous character</font></i>
+  <i><font color="#9A1900">//   ^u                       kills the entire input buffer</font></i>
+  <i><font color="#9A1900">//   ^w                       deletes the previous word</font></i>
+  <i><font color="#9A1900">//   ^r                       sends a CR, and then reprints the buffer</font></i>
+  <i><font color="#9A1900">//   \t                       will be replaced by a single space</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">// All other control characters will be ignored.</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">// The internal line buffer is TERM_IO_RX_BUFSIZE characters long, which</font></i>
+  <i><font color="#9A1900">// includes the terminating \n (but no terminating \0).  If the buffer</font></i>
+  <i><font color="#9A1900">// is full (i. e., at TERM_IO_RX_BUFSIZE - 1 characters in order to keep</font></i>
+  <i><font color="#9A1900">// space for the trailing \n), any further input attempts will send a \a to</font></i>
+  <i><font color="#9A1900">// uart_putchar() (BEL character), although line editing is still allowed.</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">// Input errors while talking to the UART will cause an immediate return of</font></i>
+  <i><font color="#9A1900">// -1 (error indication).  Notably, this will be caused by a framing error</font></i>
+  <i><font color="#9A1900">// (e. g.  serial line "break" condition), by an input overrun, and by a</font></i>
+  <i><font color="#9A1900">// parity error (if parity was enabled and automatic parity recognition</font></i>
+  <i><font color="#9A1900">// is supported by hardware).</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">// Successive calls to uart_getchar() will be satisfied from the internal</font></i>
+  <i><font color="#9A1900">// buffer until that buffer is emptied again.</font></i>
+
+  <font color="#008080">uint8_t</font> ch<font color="#990000">;</font>
+  <font color="#009900">char</font> <font color="#990000">*</font>cp<font color="#990000">,</font> <font color="#990000">*</font>cp2<font color="#990000">;</font>
+  <b><font color="#0000FF">static</font></b> <font color="#009900">char</font> buf<font color="#990000">[</font><a href="term_io.h.html#36">TERM_IO_RX_BUFSIZE</a><font color="#990000">];</font>
+  <b><font color="#0000FF">static</font></b> <font color="#009900">char</font> <font color="#990000">*</font>rxp<font color="#990000">;</font>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> rxp <font color="#990000">==</font> <font color="#993399">0</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> cp <font color="#990000">=</font> buf <font color="#990000">;</font> <font color="#990000">;</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="uart.h.html#45">UART_WAIT_FOR_BYTE</a></font></b> <font color="#990000">();</font>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="uart.h.html#62">UART_RX_FRAME_ERROR</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#0000FF">return</font></b> _FDEV_EOF<font color="#990000">;</font>
+      <font color="#FF0000">}</font>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="uart.h.html#67">UART_RX_DATA_OVERRUN_ERROR</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#0000FF">return</font></b> _FDEV_ERR<font color="#990000">;</font>
+      <font color="#FF0000">}</font>
+      ch <font color="#990000">=</font> <b><font color="#000000"><a href="uart.h.html#74">UART_GET_BYTE</a></font></b> <font color="#990000">();</font>
+
+      <i><font color="#9A1900">// Behaviour similar to Unix stty ICRNL.</font></i>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> ch <font color="#990000">==</font> <font color="#FF0000">'</font><font color="#CC33CC">\r</font><font color="#FF0000">'</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        ch <font color="#990000">=</font> <font color="#FF0000">'</font><font color="#CC33CC">\n</font><font color="#FF0000">'</font><font color="#990000">;</font>
+      <font color="#FF0000">}</font>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> ch <font color="#990000">==</font> <font color="#FF0000">'</font><font color="#CC33CC">\n</font><font color="#FF0000">'</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <font color="#990000">*</font>cp <font color="#990000">=</font> ch<font color="#990000">;</font>
+        <b><font color="#000000"><a href="term_io.c.html#9">term_io_putchar</a></font></b> <font color="#990000">(</font>ch<font color="#990000">,</font> stream<font color="#990000">);</font>
+        rxp <font color="#990000">=</font> buf<font color="#990000">;</font>
+        <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+      <font color="#FF0000">}</font>
+      <b><font color="#0000FF">else</font></b> <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> ch <font color="#990000">==</font> <font color="#FF0000">'</font><font color="#CC33CC">\t</font><font color="#FF0000">'</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        ch <font color="#990000">=</font> <font color="#FF0000">' '</font><font color="#990000">;</font>
+      <font color="#FF0000">}</font>
+
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">(</font>ch <font color="#990000">&gt;=</font> <font color="#990000">(</font>uint8_t<font color="#990000">)</font><font color="#FF0000">' '</font> <font color="#990000">&amp;&amp;</font> ch <font color="#990000">&lt;=</font> <font color="#990000">(</font>uint8_t<font color="#990000">)</font><font color="#FF0000">'</font><font color="#CC33CC">\x</font><font color="#FF0000">7e'</font><font color="#990000">)</font> <font color="#990000">||</font>
+           ch <font color="#990000">&gt;=</font> <font color="#990000">(</font>uint8_t<font color="#990000">)</font><font color="#FF0000">'</font><font color="#CC33CC">\x</font><font color="#FF0000">a0'</font><font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> cp <font color="#990000">==</font> buf <font color="#990000">+</font> <a href="term_io.h.html#36">TERM_IO_RX_BUFSIZE</a> <font color="#990000">-</font> <font color="#993399">1</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+          <b><font color="#000000"><a href="term_io.c.html#9">term_io_putchar</a></font></b> <font color="#990000">(</font><font color="#FF0000">'</font><font color="#CC33CC">\a</font><font color="#FF0000">'</font><font color="#990000">,</font> stream<font color="#990000">);</font>
+        <font color="#FF0000">}</font>
+        <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+          <font color="#990000">*</font>cp<font color="#990000">++</font> <font color="#990000">=</font> ch<font color="#990000">;</font>
+          <b><font color="#000000"><a href="term_io.c.html#9">term_io_putchar</a></font></b> <font color="#990000">(</font>ch<font color="#990000">,</font> stream<font color="#990000">);</font>
+        <font color="#FF0000">}</font>
+        <b><font color="#0000FF">continue</font></b><font color="#990000">;</font>
+      <font color="#FF0000">}</font>
+
+      <b><font color="#0000FF">switch</font></b> <font color="#990000">(</font> ch <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#0000FF">case</font></b> <font color="#FF0000">'c'</font> <font color="#990000">&amp;</font> <font color="#993399">0x1f</font><font color="#990000">:</font>
+          <b><font color="#0000FF">return</font></b> <font color="#990000">-</font><font color="#993399">1</font><font color="#990000">;</font>
+
+        <i><font color="#9A1900">// FIXXME: it would be nice to say a few words about these magic</font></i>
+        <i><font color="#9A1900">// values (e.g. '\x7f').</font></i>
+
+        <b><font color="#0000FF">case</font></b> <font color="#FF0000">'</font><font color="#CC33CC">\b</font><font color="#FF0000">'</font><font color="#990000">:</font>
+        <b><font color="#0000FF">case</font></b> <font color="#FF0000">'</font><font color="#CC33CC">\x</font><font color="#FF0000">7f'</font><font color="#990000">:</font>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font>cp <font color="#990000">&gt;</font> buf<font color="#990000">)</font> <font color="#FF0000">{</font>
+            <b><font color="#000000"><a href="term_io.c.html#9">term_io_putchar</a></font></b> <font color="#990000">(</font><font color="#FF0000">'</font><font color="#CC33CC">\b</font><font color="#FF0000">'</font><font color="#990000">,</font> stream<font color="#990000">);</font>
+            <b><font color="#000000"><a href="term_io.c.html#9">term_io_putchar</a></font></b> <font color="#990000">(</font><font color="#FF0000">' '</font><font color="#990000">,</font> stream<font color="#990000">);</font>
+            <b><font color="#000000"><a href="term_io.c.html#9">term_io_putchar</a></font></b> <font color="#990000">(</font><font color="#FF0000">'</font><font color="#CC33CC">\b</font><font color="#FF0000">'</font><font color="#990000">,</font> stream<font color="#990000">);</font>
+            cp<font color="#990000">--;</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+        <b><font color="#0000FF">case</font></b> <font color="#FF0000">'r'</font> <font color="#990000">&amp;</font> <font color="#993399">0x1f</font><font color="#990000">:</font>
+          <b><font color="#000000"><a href="term_io.c.html#9">term_io_putchar</a></font></b> <font color="#990000">(</font><font color="#FF0000">'</font><font color="#CC33CC">\r</font><font color="#FF0000">'</font><font color="#990000">,</font> stream<font color="#990000">);</font>
+          <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> cp2 <font color="#990000">=</font> buf<font color="#990000">;</font> cp2 <font color="#990000">&lt;</font> cp<font color="#990000">;</font> cp2<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+            <b><font color="#000000"><a href="term_io.c.html#9">term_io_putchar</a></font></b> <font color="#990000">(</font> <font color="#990000">*</font>cp2<font color="#990000">,</font> stream<font color="#990000">);</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+        <b><font color="#0000FF">case</font></b> <font color="#FF0000">'u'</font> <font color="#990000">&amp;</font> <font color="#993399">0x1f</font><font color="#990000">:</font>
+          <b><font color="#0000FF">while</font></b> <font color="#990000">(</font>cp <font color="#990000">&gt;</font> buf<font color="#990000">)</font> <font color="#FF0000">{</font>
+            <b><font color="#000000"><a href="term_io.c.html#9">term_io_putchar</a></font></b> <font color="#990000">(</font><font color="#FF0000">'</font><font color="#CC33CC">\b</font><font color="#FF0000">'</font><font color="#990000">,</font> stream<font color="#990000">);</font>
+            <b><font color="#000000"><a href="term_io.c.html#9">term_io_putchar</a></font></b> <font color="#990000">(</font><font color="#FF0000">' '</font><font color="#990000">,</font> stream<font color="#990000">);</font>
+            <b><font color="#000000"><a href="term_io.c.html#9">term_io_putchar</a></font></b> <font color="#990000">(</font><font color="#FF0000">'</font><font color="#CC33CC">\b</font><font color="#FF0000">'</font><font color="#990000">,</font> stream<font color="#990000">);</font>
+            cp<font color="#990000">--;</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+        <b><font color="#0000FF">case</font></b> <font color="#FF0000">'w'</font> <font color="#990000">&amp;</font> <font color="#993399">0x1f</font><font color="#990000">:</font>
+          <b><font color="#0000FF">while</font></b> <font color="#990000">(</font>cp <font color="#990000">&gt;</font> buf <font color="#990000">&amp;&amp;</font> cp<font color="#990000">[-</font><font color="#993399">1</font><font color="#990000">]</font> <font color="#990000">!=</font> <font color="#FF0000">' '</font><font color="#990000">)</font> <font color="#FF0000">{</font>
+            <b><font color="#000000"><a href="term_io.c.html#9">term_io_putchar</a></font></b> <font color="#990000">(</font><font color="#FF0000">'</font><font color="#CC33CC">\b</font><font color="#FF0000">'</font><font color="#990000">,</font> stream<font color="#990000">);</font>
+            <b><font color="#000000"><a href="term_io.c.html#9">term_io_putchar</a></font></b> <font color="#990000">(</font><font color="#FF0000">' '</font><font color="#990000">,</font> stream<font color="#990000">);</font>
+            <b><font color="#000000"><a href="term_io.c.html#9">term_io_putchar</a></font></b> <font color="#990000">(</font><font color="#FF0000">'</font><font color="#CC33CC">\b</font><font color="#FF0000">'</font><font color="#990000">,</font> stream<font color="#990000">);</font>
+            cp<font color="#990000">--;</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+      <font color="#FF0000">}</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+
+  ch <font color="#990000">=</font> <font color="#990000">*</font>rxp<font color="#990000">++;</font>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> ch <font color="#990000">==</font> <font color="#FF0000">'</font><font color="#CC33CC">\n</font><font color="#FF0000">'</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    rxp <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">return</font></b> ch<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> <font color="#008080">FILE</font> <a name="162">term_io_str</a>
+  <font color="#990000">=</font> <b><font color="#000000">FDEV_SETUP_STREAM</font></b> <font color="#990000">(</font><a href="term_io.c.html#9">term_io_putchar</a><font color="#990000">,</font> <a href="term_io.c.html#28">term_io_getchar</a><font color="#990000">,</font> _FDEV_SETUP_RW<font color="#990000">);</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="166">term_io_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="uart.c.html#21">uart_init</a></font></b> <font color="#990000">();</font>
+
+  stdout <font color="#990000">=</font> stdin <font color="#990000">=</font> <font color="#990000">&amp;</font><a href="term_io.c.html#162">term_io_str</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="174">term_io_getline</a></font></b> <font color="#990000">(</font><font color="#009900">char</font> <font color="#990000">*</font>linebuf<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#009900">char</font> <font color="#990000">*</font>lbp <font color="#990000">=</font> linebuf<font color="#990000">;</font>
+
+  <font color="#008080">size_t</font> char_count <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#990000">;</font> <font color="#990000">;</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+
+    <font color="#009900">int</font> ch <font color="#990000">=</font> <b><font color="#000000"><a href="term_io.c.html#28">term_io_getchar</a></font></b> <font color="#990000">(</font>stdin<font color="#990000">);</font>
+
+    <b><font color="#0000FF">switch</font></b> <font color="#990000">(</font> ch <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#0000FF">case</font></b> <font color="#990000">-</font><font color="#993399">1</font><font color="#990000">:</font>
+        <b><font color="#0000FF">return</font></b> <font color="#990000">-</font><font color="#993399">1</font><font color="#990000">;</font>
+        <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+      <b><font color="#0000FF">case</font></b> _FDEV_EOF<font color="#990000">:</font>
+        <i><font color="#9A1900">// FIXME: is there something intelligent we should do here?</font></i>
+      <b><font color="#0000FF">case</font></b> <font color="#FF0000">'</font><font color="#CC33CC">\n</font><font color="#FF0000">'</font><font color="#990000">:</font>
+        <i><font color="#9A1900">// FIXME: we should do something intelligent when we're about to</font></i>
+        <i><font color="#9A1900">// overflow the buffer.  For now we just return -1, maybe we should</font></i>
+        <i><font color="#9A1900">// stuff an error message in the returned string?</font></i>
+        <font color="#990000">*</font>lbp <font color="#990000">=</font> ch<font color="#990000">;</font>
+        lbp<font color="#990000">++;</font>
+        char_count<font color="#990000">++;</font>
+        <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> char_count <font color="#990000">==</font> <a href="term_io.h.html#39">TERM_IO_LINE_BUFFER_MIN_SIZE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+          <b><font color="#0000FF">return</font></b> <font color="#990000">-</font><font color="#993399">1</font><font color="#990000">;</font>
+        <font color="#FF0000">}</font>
+        <font color="#990000">*</font>lbp <font color="#990000">=</font> <font color="#FF0000">'</font><font color="#CC33CC">\0</font><font color="#FF0000">'</font><font color="#990000">;</font>
+        <b><font color="#0000FF">return</font></b> char_count<font color="#990000">;</font>
+        <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+<b><font color="#008080">      default:</font></b>
+        <font color="#990000">*</font>lbp <font color="#990000">=</font> ch<font color="#990000">;</font>
+        lbp<font color="#990000">++;</font>
+        char_count<font color="#990000">++;</font>
+        <i><font color="#9A1900">// FIXME: see other fixme</font></i>
+        <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> char_count <font color="#990000">==</font> <a href="term_io.h.html#39">TERM_IO_LINE_BUFFER_MIN_SIZE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+          <b><font color="#0000FF">return</font></b> <font color="#990000">-</font><font color="#993399">1</font><font color="#990000">;</font>
+        <font color="#FF0000">}</font>
+        <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+</tt></pre>

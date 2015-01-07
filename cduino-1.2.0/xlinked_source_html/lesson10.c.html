@@ -1,0 +1,83 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">/* $Id: <a href="lesson10.c.html">lesson10.c</a>,v 1.2 2009/02/08 15:55:47 ckuethe Exp $ */</font></i>
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900"> * Copyright (c) 2009 Chris Kuethe </font></i><u><font color="#0000FF">&lt;chris.kuethe@gmail.com&gt;</font></u>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * Permission to use, copy, modify, and distribute this software for any</font></i>
+<i><font color="#9A1900"> * purpose with or without fee is hereby granted, provided that the above</font></i>
+<i><font color="#9A1900"> * copyright notice and this permission notice appear in all copies.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES</font></i>
+<i><font color="#9A1900"> * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF</font></i>
+<i><font color="#9A1900"> * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR</font></i>
+<i><font color="#9A1900"> * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES</font></i>
+<i><font color="#9A1900"> * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN</font></i>
+<i><font color="#9A1900"> * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF</font></i>
+<i><font color="#9A1900"> * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Assumptions:</font></i>
+<i><font color="#9A1900">// 	- LED connected to PORTB.5 (arduino boards have LED L onboard)</font></i>
+<i><font color="#9A1900">// 	- F_CPU is defined to be your cpu speed (preprocessor define)</font></i>
+<i><font color="#9A1900">//</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/interrupt.h&gt;</font>
+
+<b><font color="#0000FF">volatile</font></b> <font color="#008080">uint8_t</font> <a name="27">intrs</a><font color="#990000">;</font>
+
+<b><font color="#000000"><a name="29">ISR</a></font></b> <font color="#990000">(</font>TIMER0_OVF_vect<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// This ISR is called when TIMER0 overflows.</font></i>
+  <a href="lesson10.c.html#27">intrs</a><font color="#990000">++;</font>
+
+<b><font color="#000080">#if</font></b> <font color="#993399">1</font>
+  <i><font color="#9A1900">// Strobe PORTB.5 - the LED on arduino boards.</font></i>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <a href="lesson10.c.html#27">intrs</a> <font color="#990000">&gt;=</font> <font color="#993399">61</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    PORTB <font color="#990000">^=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font><font color="#993399">5</font><font color="#990000">);</font>
+    <a href="lesson10.c.html#27">intrs</a> <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+<b><font color="#000080">#else</font></b>
+  <i><font color="#9A1900">// Color cycle RGB LED connected to pins 9,10,11.  WARNING: untested.</font></i>
+  PORTB <font color="#990000">=</font> <font color="#990000">((</font><a href="lesson10.c.html#27">intrs</a> <font color="#990000">&gt;&gt;</font> <font color="#993399">2</font><font color="#990000">)</font> <font color="#990000">&amp;</font> <font color="#993399">0x0e</font><font color="#990000">);</font>
+<b><font color="#000080">#endif</font></b>
+<font color="#FF0000">}</font>
+
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="48">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font> <font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Set up cpu clock divider.  The TIMER0 overflow ISR toggles the output port</font></i>
+  <i><font color="#9A1900">// after enough interrupts have happened.</font></i>
+  <i><font color="#9A1900">//    </font></i>
+  <i><font color="#9A1900">//   16MHz (FCPU) / 1024 (CS0 = 5)</font></i>
+  <i><font color="#9A1900">//   -&gt; 15625 incr/sec </font></i>
+  <i><font color="#9A1900">//   -&gt; 15625 / 256 (number of values in TCNT0)</font></i>
+  <i><font color="#9A1900">//   -&gt; 61 overflows/sec</font></i>
+  <i><font color="#9A1900">//</font></i>
+  TCCR0B <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b><font color="#990000">(</font>CS02<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b><font color="#990000">(</font>CS00<font color="#990000">);</font>   <i><font color="#9A1900">// Set timer to click at F_CPU / 1024.</font></i>
+
+  <i><font color="#9A1900">// Enable timer overflow interrupts.</font></i>
+  TIMSK0 <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b><font color="#990000">(</font>TOIE0<font color="#990000">);</font>
+
+  DDRB <font color="#990000">=</font> <font color="#993399">0xff</font><font color="#990000">;</font>   <i><font color="#9A1900">// Set LED port for output.</font></i>
+
+  TCNT0 <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>   <i><font color="#9A1900">// Reset timer/counter zero.</font></i>
+
+  <a href="lesson10.c.html#27">intrs</a> <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>   <i><font color="#9A1900">// Zero our interupt counter variable.</font></i>
+
+  <i><font color="#9A1900">// Enable interrupts.</font></i>
+  <b><font color="#000000">sei</font></b><font color="#990000">();</font>
+
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font><font color="#993399">1</font><font color="#990000">)</font> <font color="#FF0000">{</font>
+    <i><font color="#9A1900">// Here we do nothing while waiting for an interrupt.  So in effect we're</font></i>
+    <i><font color="#9A1900">// still performing a busy wait still in this example.  But note that we</font></i>
+    <i><font color="#9A1900">// could be doing real work here instead -- we aren't dependent on this</font></i>
+    <i><font color="#9A1900">// busy wait for the LED blink timing.</font></i>
+    <font color="#990000">;</font> 
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+</tt></pre>

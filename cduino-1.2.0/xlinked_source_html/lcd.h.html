@@ -1,0 +1,133 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Interface to a 16x2 character HD44780 compatible display.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Test driver: <a href="lcd_test.c.html">lcd_test.c</a>    Implementation: <a href="lcd.c.html">lcd.c</a></font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This interface always uses four bit control.  Only ASCII characters in</font></i>
+<i><font color="#9A1900">// left-to-right text mode are supported.</font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="lcd.h.html#9">LCD_H</a>
+<b><font color="#000080">#define</font></b> <a name="9">LCD_H</a>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;inttypes.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stddef.h&gt;</font>
+
+<i><font color="#9A1900">// We require clients to set some macros at compile time to specify which pins</font></i>
+<i><font color="#9A1900">// are being used to control the LCD.  The Makefile in the dio module direcory</font></i>
+<i><font color="#9A1900">// shows one way to do this.</font></i>
+<b><font color="#000080">#if</font></b> <font color="#990000">!</font> <font color="#990000">(</font><b><font color="#000000">defined</font></b> <font color="#990000">(</font>LCD_RS_INIT<font color="#990000">)</font> <font color="#990000">&amp;&amp;</font> <font color="#990000">\</font>
+       <b><font color="#000000">defined</font></b> <font color="#990000">(</font>LCD_RS_SET<font color="#990000">)</font> <font color="#990000">&amp;&amp;</font> <font color="#990000">\</font>
+       <b><font color="#000000">defined</font></b> <font color="#990000">(</font>LCD_RS_SET_HIGH<font color="#990000">)</font> <font color="#990000">&amp;&amp;</font> <font color="#990000">\</font>
+       <b><font color="#000000">defined</font></b> <font color="#990000">(</font>LCD_RS_SET_LOW<font color="#990000">)</font> <font color="#990000">&amp;&amp;</font> <font color="#990000">\</font>
+       <font color="#990000">\</font>
+       <b><font color="#000000">defined</font></b> <font color="#990000">(</font>LCD_ENABLE_INIT<font color="#990000">)</font> <font color="#990000">&amp;&amp;</font> <font color="#990000">\</font>
+       <b><font color="#000000">defined</font></b> <font color="#990000">(</font>LCD_ENABLE_SET_HIGH<font color="#990000">)</font> <font color="#990000">&amp;&amp;</font> <font color="#990000">\</font>
+       <b><font color="#000000">defined</font></b> <font color="#990000">(</font>LCD_ENABLE_SET_LOW<font color="#990000">)</font> <font color="#990000">&amp;&amp;</font> <font color="#990000">\</font>
+       <font color="#990000">\</font>
+       <b><font color="#000000">defined</font></b> <font color="#990000">(</font>LCD_DB4_INIT<font color="#990000">)</font> <font color="#990000">&amp;&amp;</font> <font color="#990000">\</font>
+       <font color="#990000">\</font>
+       <b><font color="#000000">defined</font></b> <font color="#990000">(</font>LCD_DB5_INIT<font color="#990000">)</font> <font color="#990000">&amp;&amp;</font> <font color="#990000">\</font>
+       <font color="#990000">\</font>
+       <b><font color="#000000">defined</font></b> <font color="#990000">(</font>LCD_DB6_INIT<font color="#990000">)</font> <font color="#990000">&amp;&amp;</font> <font color="#990000">\</font>
+       <font color="#990000">\</font>
+       <b><font color="#000000">defined</font></b> <font color="#990000">(</font>LCD_DB7_INIT<font color="#990000">))</font>
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> The macros which specify which pins the LCD should use are <font color="#008080">not</font> set<font color="#990000">.</font> <font color="#990000">\</font>
+         See the example in the Makefile in the dio <font color="#008080">module</font> directory<font color="#990000">.</font>
+<b><font color="#000080">#endif</font></b>
+
+<i><font color="#9A1900">// Initialize display.  This routine takes about 50 milliseconds (to ensure</font></i>
+<i><font color="#9A1900">// that the input voltage has risen sufficiently for corret display operation,</font></i>
+<i><font color="#9A1900">// in case we are called near power-on).  Note also that some macros must</font></i>
+<i><font color="#9A1900">// be defined at compile-time to control which IO pins the LCD will use</font></i>
+<i><font color="#9A1900">// (see comments above).  The display is cleared and the cursor set to home</font></i>
+<i><font color="#9A1900">// (row 0 column 0).</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="lcd.c.html#118">lcd_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Clear the display (the underlying content of the LCD is removed).</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="lcd.c.html#189">lcd_clear</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Move the cursor to the column 0, line 0 of the display, and remove any</font></i>
+<i><font color="#9A1900">// scrolling that is in effect.  Note that by default no visual indication</font></i>
+<i><font color="#9A1900">// of the cursor position is given.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="lcd.c.html#196">lcd_home</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Move the cursor to the given (zero-based) column and row.  Note that by</font></i>
+<i><font color="#9A1900">// default no visual indication of the cursor position is given.  FIXME:</font></i>
+<i><font color="#9A1900">// this is subject to current scolling I think, verify and document.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="lcd.c.html#204">lcd_set_cursor_position</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> column<font color="#990000">,</font> <font color="#008080">uint8_t</font> row<font color="#990000">);</font> 
+
+<i><font color="#9A1900">// Turn the display off/on (leaving its contents intact but not displayed).</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="lcd.c.html#218">lcd_display_off</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="lcd.c.html#225">lcd_display_on</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Turn different styles of cursor marks off/on.  By default cursors are off.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="lcd.c.html#232">lcd_blinking_cursor_off</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="lcd.c.html#239">lcd_blinking_cursor_on</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="lcd.c.html#247">lcd_underline_cursor_off</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="lcd.c.html#254">lcd_underline_cursor_on</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Scroll the display window left/right (leaving the contents of undisplayed</font></i>
+<i><font color="#9A1900">// areas unchanged).</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="lcd.c.html#261">lcd_scroll_left</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="lcd.c.html#266">lcd_scroll_right</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// There are at least a couple potentially useful characters that aren't</font></i>
+<i><font color="#9A1900">// normal ASCII characters that we can output with lcd_write, assuming we</font></i>
+<i><font color="#9A1900">// have an LCD with ROM code A00, which determines the mapping between some</font></i>
+<i><font color="#9A1900">// non-ASCII bytes and corresponding LCD characters.  Unfortunately, this</font></i>
+<i><font color="#9A1900">// implementation probably can't verify the ROM code of a connected LCD,</font></i>
+<i><font color="#9A1900">// since we don't support reading from the LCD.</font></i>
+<b><font color="#000080">#define</font></b> <a name="91">LCD_CHARACTER_RIGHT_ARROW</a> <font color="#993399">0x7E</font>
+<b><font color="#000080">#define</font></b> <a name="92">LCD_CHARACTER_LEFT_ARROW</a> <font color="#993399">0x7F</font>
+
+<i><font color="#9A1900">// Messages that are longer than this will probably be truncated.  The HD4470</font></i>
+<i><font color="#9A1900">// spec guarantees only 80 eight bit characters of RAM.  I'm not sure</font></i>
+<i><font color="#9A1900">// if you can put them all on one line or not, so we allow half of that.</font></i>
+<i><font color="#9A1900">// There may be some even tighter limitation of which I'm not aware.</font></i>
+<b><font color="#000080">#define</font></b> <a name="98">LCD_MAX_MESSAGE_LENGTH</a> <font color="#993399">40</font>
+
+<i><font color="#9A1900">// Write a single character to the LCD at the current cursor position.</font></i>
+<i><font color="#9A1900">// NOTE: newline characters ('\n') don't do anything useful.  This function</font></i>
+<i><font color="#9A1900">// always returns 1 to indicate that 1 character has been written.  Hopefully.</font></i>
+size_t
+<b><font color="#000000"><a href="lcd.c.html#271">lcd_write</a></font></b> <font color="#990000">(</font><font color="#009900">char</font> character<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Write a fixed string to the LCD at the current cursor position, and</font></i>
+<i><font color="#9A1900">// return the number of characters written.  NOTE: newline characters ('\n')</font></i>
+<i><font color="#9A1900">// don't do anything useful.</font></i>
+size_t
+<b><font color="#000000"><a href="lcd.c.html#310">lcd_write_string</a></font></b> <font color="#990000">(</font><b><font color="#0000FF">const</font></b> <font color="#009900">char</font> <font color="#990000">*</font>buffer<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Print a printf-style formatted string at the current cursor position.</font></i>
+<i><font color="#9A1900">// NOTE: newline characters ('\n') don't do anything useful.</font></i>
+<font color="#009900">int</font>
+<b><font color="#000000"><a href="lcd.c.html#278">lcd_printf</a></font></b> <font color="#990000">(</font><b><font color="#0000FF">const</font></b> <font color="#009900">char</font> <font color="#990000">*</font>format<font color="#990000">,</font> <font color="#990000">...)</font>
+  <b><font color="#000000">__attribute__</font></b> <font color="#990000">((</font><b><font color="#000000">format</font></b> <font color="#990000">(</font>printf<font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">,</font> <font color="#993399">2</font><font color="#990000">)));</font>
+
+<i><font color="#9A1900">// Like lcd_printf, but expects a format string that resides in program</font></i>
+<i><font color="#9A1900">// memory space (probably declared using the AVR libc PSTR macro, for example</font></i>
+<i><font color="#9A1900">// 'lcd_printf_P (PSTR ("foo: %d"), some_int)').  This saves some RAM,</font></i>
+<i><font color="#9A1900">// but note that the expanded version of format still gets stored in RAM</font></i>
+<i><font color="#9A1900">// before being sent to the LCD.</font></i>
+<font color="#009900">int</font>
+<b><font color="#000000"><a href="lcd.c.html#294">lcd_printf_P</a></font></b> <font color="#990000">(</font><b><font color="#0000FF">const</font></b> <font color="#009900">char</font> <font color="#990000">*</font>format<font color="#990000">,</font> <font color="#990000">...)</font>
+  <b><font color="#000000">__attribute__</font></b> <font color="#990000">((</font><b><font color="#000000">format</font></b> <font color="#990000">(</font>printf<font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">,</font> <font color="#993399">2</font><font color="#990000">)));</font>
+
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// LCD_H</font></i>
+</tt></pre>

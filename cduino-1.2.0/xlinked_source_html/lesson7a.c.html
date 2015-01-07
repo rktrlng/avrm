@@ -1,0 +1,71 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">/* $CSK: lesson7.c,v 1.4 2009/02/08 09:00:43 ckuethe Exp $ */</font></i>
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900"> * Copyright (c) 2009 Chris Kuethe </font></i><u><font color="#0000FF">&lt;chris.kuethe@gmail.com&gt;</font></u>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * Permission to use, copy, modify, and distribute this software for any</font></i>
+<i><font color="#9A1900"> * purpose with or without fee is hereby granted, provided that the above</font></i>
+<i><font color="#9A1900"> * copyright notice and this permission notice appear in all copies.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES</font></i>
+<i><font color="#9A1900"> * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF</font></i>
+<i><font color="#9A1900"> * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR</font></i>
+<i><font color="#9A1900"> * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES</font></i>
+<i><font color="#9A1900"> * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN</font></i>
+<i><font color="#9A1900"> * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF</font></i>
+<i><font color="#9A1900"> * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/interrupt.h&gt;</font>
+
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900"> * This lesson will use software PWM to gradually brighten the onboard led L.</font></i>
+<i><font color="#9A1900"> * Of course, if you have hardware PWM available (as we do on the arduino, you</font></i>
+<i><font color="#9A1900"> * want that instead (see lesson7b).</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * The area filled with '#' is the time when the output is driven high. From</font></i>
+<i><font color="#9A1900"> * this, we can see that we need a timer (oscillator) whose period is as short</font></i>
+<i><font color="#9A1900"> * as each of the modulation steps.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * 0%   20%  20%  40%  40%  60%  60%  80%  80%  100% 100% |    |    |    |    |</font></i>
+<i><font color="#9A1900"> * |    |    |    |    |    |    | #    #    ##   ##   ###  ###  #### ####</font></i>
+<i><font color="#9A1900"> * ########## - 1 #    #    ##   ##   ###  ###  #### #### ##########</font></i>
+<i><font color="#9A1900"> * _____#____#____##___##___###__###__####_####_########## _ 0</font></i>
+<i><font color="#9A1900"> * +----+----+----+----+----+----+----+----+----+----+----+ 0    1    2    3 4</font></i>
+<i><font color="#9A1900"> * 5    6    7    8    9    10   11</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * Speed is just an extra knob to control the speed of the fade up.  Ctr, when</font></i>
+<i><font color="#9A1900"> * graphed, forms a ramp wave. It counts from 0 to some maximum value and then</font></i>
+<i><font color="#9A1900"> * it resets to 0. To generate a pwm output, the brightness knob is compared</font></i>
+<i><font color="#9A1900"> * against the current counter value.  If counter is less than brightness,</font></i>
+<i><font color="#9A1900"> * drive the output high. if the brightness knob is small, the counter can only</font></i>
+<i><font color="#9A1900"> * grow a small amount before it crosses the threshold and the output is driven</font></i>
+<i><font color="#9A1900"> * low.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * Later tutorials will use the hardware PWM facilities.</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<font color="#009900">int</font> <b><font color="#000000"><a name="48">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+	<font color="#009900">unsigned</font> <font color="#009900">char</font> ctr<font color="#990000">,</font> brightness<font color="#990000">,</font> <a href="sd_card.c.html#95">speed</a><font color="#990000">;</font>
+	<i><font color="#9A1900">/* set PORTB for output*/</font></i>
+	DDRB <font color="#990000">=</font> <font color="#993399">0xFF</font><font color="#990000">;</font>
+
+	ctr <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+	<b><font color="#0000FF">for</font></b><font color="#990000">(</font>brightness <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font> <font color="#990000">;</font> brightness<font color="#990000">++)</font><font color="#FF0000">{</font> <i><font color="#9A1900">// brightness</font></i>
+		<b><font color="#0000FF">for</font></b><font color="#990000">(</font>ctr <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font> ctr <font color="#990000">&lt;</font> <font color="#993399">255</font><font color="#990000">;</font> ctr<font color="#990000">++)</font><font color="#FF0000">{</font>
+			<b><font color="#0000FF">for</font></b><font color="#990000">(</font><a href="sd_card.c.html#95">speed</a> <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font> <a href="sd_card.c.html#95">speed</a> <font color="#990000">&lt;</font> <font color="#993399">128</font><font color="#990000">;</font> <a href="sd_card.c.html#95">speed</a><font color="#990000">++)</font><font color="#FF0000">{</font> <i><font color="#9A1900">// ramp-up speed</font></i>
+				<b><font color="#0000FF">if</font></b> <font color="#990000">(</font>ctr <font color="#990000">&lt;</font> brightness<font color="#990000">)</font>
+					PORTB <font color="#990000">=</font> <font color="#993399">0xff</font><font color="#990000">;</font>
+				<b><font color="#0000FF">else</font></b>
+					PORTB <font color="#990000">=</font> <font color="#993399">0x00</font><font color="#990000">;</font>
+			<font color="#FF0000">}</font>
+		<font color="#FF0000">}</font>
+	<font color="#FF0000">}</font>
+	<b><font color="#0000FF">return</font></b> <font color="#993399">0</font><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+</tt></pre>

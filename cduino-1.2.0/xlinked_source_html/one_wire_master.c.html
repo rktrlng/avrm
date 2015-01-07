@@ -1,0 +1,455 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Implementation of the interface described in <a href="one_wire_master.h.html">one_wire_master.h</a>.</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdlib.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;string.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/crc16.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="dio.h.html">dio.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="one_wire_master.h.html">one_wire_master.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="util.h.html">util.h</a>"</font>
+
+<i><font color="#9A1900">///////////////////////////////////////////////////////////////////////////////</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Line Drive, Sample, and Delay Routines</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// These macros correspond to the uses of the inp and outp and tickDelay</font></i>
+<i><font color="#9A1900">// functions of Maxim application note AN126.  We use macros to avoid</font></i>
+<i><font color="#9A1900">// function call time overhead, which can be significant: Maxim application</font></i>
+<i><font color="#9A1900">// note AN148 states that the most common programming error in 1-wire</font></i>
+<i><font color="#9A1900">// programmin involves late sampling, which given that some samples occur</font></i>
+<i><font color="#9A1900">// after proscribed waits of only 9 us requires some care, especially at</font></i>
+<i><font color="#9A1900">// slower processor frequencies.</font></i>
+
+<i><font color="#9A1900">// Release (tri-state) the one wire master pin.  Note that this does</font></i>
+<i><font color="#9A1900">// not enable the internal pullup.  See the commends near omw_init()</font></i>
+<i><font color="#9A1900">// in <a href="one_wire_master.h.html">one_wire_master.h</a>.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="27">RELEASE_LINE</a></font></b><font color="#990000">()</font>    <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font>              <font color="#990000">\</font>
+      OWM_PIN<font color="#990000">,</font>            <font color="#990000">\</font>
+      <a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font>          <font color="#990000">\</font>
+      <a href="dio.h.html#186">DIO_DISABLE_PULLUP</a><font color="#990000">,</font> <font color="#990000">\</font>
+      <a href="dio.h.html#187">DIO_DONT_CARE</a> <font color="#990000">)</font>
+
+<i><font color="#9A1900">// Drive the line of the one wire master pin low.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="35">DRIVE_LINE_LOW</a></font></b><font color="#990000">()</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font>             <font color="#990000">\</font>
+      OWM_PIN<font color="#990000">,</font>           <font color="#990000">\</font>
+      <a href="dio.h.html#184">DIO_OUTPUT</a><font color="#990000">,</font>        <font color="#990000">\</font>
+      <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">,</font>     <font color="#990000">\</font>
+      <a href="util.h.html#16">LOW</a> <font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="42">SAMPLE_LINE</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#533">DIO_READ</a></font></b> <font color="#990000">(</font>OWM_PIN<font color="#990000">)</font>
+
+<i><font color="#9A1900">// We support only standard speed, not overdrive speed, so we make our tick</font></i>
+<i><font color="#9A1900">// 1 us.</font></i>
+<b><font color="#000080">#define</font></b> <a name="46">TICK_TIME_IN_US</a> <font color="#993399">1.0</font>
+
+<i><font color="#9A1900">// WARNING: the argument to this macro must be a double expression that the</font></i>
+<i><font color="#9A1900">// compiler knows is constant at compile time.  Pause for exactly ticks ticks.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="50">TICK_DELAY</a></font></b><font color="#990000">(</font>ticks<font color="#990000">)</font> <b><font color="#000000">_delay_us</font></b> <font color="#990000">(</font><a href="one_wire_master.c.html#46">TICK_TIME_IN_US</a> <font color="#990000">*</font> ticks<font color="#990000">)</font>
+
+<i><font color="#9A1900">///////////////////////////////////////////////////////////////////////////////</font></i>
+
+<i><font color="#9A1900">// Tick delays for various parts of the standard speed one-wire protocol,</font></i>
+<i><font color="#9A1900">// as described in Table 2 in Maxim application note AN126.</font></i>
+<b><font color="#000080">#define</font></b> <a name="56">TICK_DELAY_A</a>   <font color="#993399">6.0</font>
+<b><font color="#000080">#define</font></b> <a name="57">TICK_DELAY_B</a>  <font color="#993399">64.0</font>
+<b><font color="#000080">#define</font></b> <a name="58">TICK_DELAY_C</a>  <font color="#993399">60.0</font>
+<b><font color="#000080">#define</font></b> <a name="59">TICK_DELAY_D</a>  <font color="#993399">10.0</font>
+<b><font color="#000080">#define</font></b> <a name="60">TICK_DELAY_E</a>   <font color="#993399">9.0</font>
+<b><font color="#000080">#define</font></b> <a name="61">TICK_DELAY_F</a>  <font color="#993399">55.0</font>
+<b><font color="#000080">#define</font></b> <a name="62">TICK_DELAY_G</a>   <font color="#993399">0.0</font>
+<b><font color="#000080">#define</font></b> <a name="63">TICK_DELAY_H</a> <font color="#993399">480.0</font>
+<b><font color="#000080">#define</font></b> <a name="64">TICK_DELAY_I</a>  <font color="#993399">70.0</font>
+<b><font color="#000080">#define</font></b> <a name="65">TICK_DELAY_J</a> <font color="#993399">410.0</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="68">owm_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="one_wire_master.c.html#27">RELEASE_LINE</a></font></b> <font color="#990000">();</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="74">owm_touch_reset</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="one_wire_master.c.html#50">TICK_DELAY</a></font></b> <font color="#990000">(</font><a href="one_wire_master.c.html#62">TICK_DELAY_G</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="one_wire_master.c.html#35">DRIVE_LINE_LOW</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="one_wire_master.c.html#50">TICK_DELAY</a></font></b> <font color="#990000">(</font><a href="one_wire_master.c.html#63">TICK_DELAY_H</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="one_wire_master.c.html#27">RELEASE_LINE</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="one_wire_master.c.html#50">TICK_DELAY</a></font></b> <font color="#990000">(</font><a href="one_wire_master.c.html#64">TICK_DELAY_I</a><font color="#990000">);</font>
+  <i><font color="#9A1900">// Look for presence pulse from slave</font></i>
+  <font color="#008080">uint8_t</font> result <font color="#990000">=</font> <font color="#990000">!</font> <b><font color="#000000"><a href="one_wire_master.c.html#42">SAMPLE_LINE</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="one_wire_master.c.html#50">TICK_DELAY</a></font></b> <font color="#990000">(</font><a href="one_wire_master.c.html#65">TICK_DELAY_J</a><font color="#990000">);</font> <i><font color="#9A1900">// Complete the reset sequence recovery</font></i>
+
+  <b><font color="#0000FF">return</font></b> result<font color="#990000">;</font> <i><font color="#9A1900">// Return sample presence pulse result</font></i>
+<font color="#FF0000">}</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="89">owm_write_bit</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> value<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Send a 1-Wire write bit. Provide 10us recovery time.</font></i>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> value <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <i><font color="#9A1900">// Write '1' bit</font></i>
+    <b><font color="#000000"><a href="one_wire_master.c.html#35">DRIVE_LINE_LOW</a></font></b> <font color="#990000">();</font>
+    <b><font color="#000000"><a href="one_wire_master.c.html#50">TICK_DELAY</a></font></b> <font color="#990000">(</font><a href="one_wire_master.c.html#56">TICK_DELAY_A</a><font color="#990000">);</font>
+    <b><font color="#000000"><a href="one_wire_master.c.html#27">RELEASE_LINE</a></font></b> <font color="#990000">();</font>
+    <b><font color="#000000"><a href="one_wire_master.c.html#50">TICK_DELAY</a></font></b> <font color="#990000">(</font><a href="one_wire_master.c.html#57">TICK_DELAY_B</a><font color="#990000">);</font> <i><font color="#9A1900">// Complete the time slot and 10us recovery</font></i>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+    <i><font color="#9A1900">// Write '0' bit</font></i>
+    <b><font color="#000000"><a href="one_wire_master.c.html#35">DRIVE_LINE_LOW</a></font></b> <font color="#990000">();</font>
+    <b><font color="#000000"><a href="one_wire_master.c.html#50">TICK_DELAY</a></font></b> <font color="#990000">(</font><a href="one_wire_master.c.html#58">TICK_DELAY_C</a><font color="#990000">);</font>
+    <b><font color="#000000"><a href="one_wire_master.c.html#27">RELEASE_LINE</a></font></b> <font color="#990000">();</font>
+    <b><font color="#000000"><a href="one_wire_master.c.html#50">TICK_DELAY</a></font></b> <font color="#990000">(</font><a href="one_wire_master.c.html#59">TICK_DELAY_D</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="110">owm_read_bit</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Read a bit from the 1-Wire bus and return it. Provide 10us recovery time.</font></i>
+
+  <b><font color="#000000"><a href="one_wire_master.c.html#35">DRIVE_LINE_LOW</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="one_wire_master.c.html#50">TICK_DELAY</a></font></b> <font color="#990000">(</font><a href="one_wire_master.c.html#56">TICK_DELAY_A</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="one_wire_master.c.html#27">RELEASE_LINE</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="one_wire_master.c.html#50">TICK_DELAY</a></font></b> <font color="#990000">(</font><a href="one_wire_master.c.html#60">TICK_DELAY_E</a><font color="#990000">);</font>
+  <font color="#008080">uint8_t</font> result <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#42">SAMPLE_LINE</a></font></b> <font color="#990000">();</font>   <i><font color="#9A1900">// Sample bit value from slave</font></i>
+  <b><font color="#000000"><a href="one_wire_master.c.html#50">TICK_DELAY</a></font></b> <font color="#990000">(</font><a href="one_wire_master.c.html#61">TICK_DELAY_F</a><font color="#990000">);</font> <i><font color="#9A1900">// Complete the time slot and 10us recovery</font></i>
+
+  <b><font color="#0000FF">return</font></b> result<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="125">owm_read_id</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> <font color="#990000">*</font>id_buf<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#008080">uint8_t</font> slave_presence <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#74">owm_touch_reset</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> slave_presence <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  uint8_t <font color="#008080">const</font> read_rom_command <font color="#990000">=</font> <a href="one_wire_master.h.html#65">OWM_READ_ROM_COMMAND</a><font color="#990000">;</font>
+  <b><font color="#000000"><a href="one_wire_master.c.html#374">owm_write_byte</a></font></b> <font color="#990000">(</font>read_rom_command<font color="#990000">);</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="one_wire_master.h.html#69">OWM_ID_BYTE_COUNT</a> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    id_buf<font color="#990000">[</font>ii<font color="#990000">]</font> <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#416">owm_read_byte</a></font></b> <font color="#990000">();</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">// Global search state</font></i>
+<b><font color="#0000FF">static</font></b> <font color="#008080">uint8_t</font> <a name="142">rom_id</a><font color="#990000">[</font><a href="one_wire_master.h.html#69">OWM_ID_BYTE_COUNT</a><font color="#990000">];</font>   <i><font color="#9A1900">// Current ROM device ID</font></i>
+<b><font color="#0000FF">static</font></b> <font color="#008080">uint8_t</font> <a name="143">last_discrep</a><font color="#990000">;</font>                <i><font color="#9A1900">// Bit position of last discrepancy</font></i>
+<b><font color="#0000FF">static</font></b> <font color="#008080">uint8_t</font> <a name="144">last_family_discrep</a><font color="#990000">;</font>
+<b><font color="#0000FF">static</font></b> <font color="#008080">uint8_t</font> <a name="145">last_device_flag</a><font color="#990000">;</font>            <i><font color="#9A1900">// True iff we got last slave</font></i>
+<b><font color="#0000FF">static</font></b> <font color="#008080">uint8_t</font> <a name="146">crc8</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// Length of slave ROM IDs, in bits</font></i>
+<b><font color="#000080">#define</font></b> <a name="149">ID_BIT_COUNT</a> <font color="#993399">64</font>
+
+<i><font color="#9A1900">// This many bits of each slave ROM ID form a so-called family code.</font></i>
+<b><font color="#000080">#define</font></b> <a name="152">FAMILY_ID_BIT_COUNT</a> <font color="#993399">8</font>
+
+<i><font color="#9A1900">// Perform the 1-Wire Search Algorithm on the 1-Wire bus using the existing</font></i>
+<i><font color="#9A1900">// search state.</font></i>
+<i><font color="#9A1900">// Return TRUE : device found, ROM number in rom_id buffer</font></i>
+<i><font color="#9A1900">//        FALSE : device not found, end of search</font></i>
+<i><font color="#9A1900">//</font></i>
+<b><font color="#0000FF">static</font></b> uint8_t
+<b><font color="#000000"><a name="160">search</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#008080">uint8_t</font> id_bit_number<font color="#990000">;</font>
+  <font color="#008080">uint8_t</font> last_zero<font color="#990000">,</font> rom_byte_number<font color="#990000">,</font> search_result<font color="#990000">;</font>
+  <font color="#008080">uint8_t</font> id_bit<font color="#990000">,</font> cmp_id_bit<font color="#990000">;</font>
+  <font color="#008080">uint8_t</font> rom_byte_mask<font color="#990000">,</font> search_direction<font color="#990000">;</font>
+
+  <i><font color="#9A1900">// Initialize for search</font></i>
+  id_bit_number <font color="#990000">=</font> <font color="#993399">1</font><font color="#990000">;</font>
+  last_zero <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  rom_byte_number <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  rom_byte_mask <font color="#990000">=</font> <font color="#993399">1</font><font color="#990000">;</font>
+  search_result <font color="#990000">=</font> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+  <a href="one_wire_master.c.html#146">crc8</a> <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+
+  <i><font color="#9A1900">// If the last call was not the last one</font></i>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font><a href="one_wire_master.c.html#145">last_device_flag</a> <font color="#990000">)</font>
+  <font color="#FF0000">{</font>
+    <i><font color="#9A1900">// 1-Wire reset</font></i>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000"><a href="one_wire_master.c.html#74">owm_touch_reset</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <i><font color="#9A1900">// Reset the search</font></i>
+      <a href="one_wire_master.c.html#143">last_discrep</a> <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+      <a href="one_wire_master.c.html#145">last_device_flag</a> <font color="#990000">=</font> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+      <a href="one_wire_master.c.html#144">last_family_discrep</a> <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+      <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <i><font color="#9A1900">// Issue the search command</font></i>
+    <b><font color="#000000"><a href="one_wire_master.c.html#374">owm_write_byte</a></font></b> <font color="#990000">(</font><a href="one_wire_master.h.html#66">OWM_SEARCH_ROM_COMMAND</a><font color="#990000">);</font>   <i><font color="#9A1900">// Issue the search command</font></i>
+    <i><font color="#9A1900">// Loop to do the search</font></i>
+    <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font>
+      <i><font color="#9A1900">// Read a bit and its complement</font></i>
+      id_bit <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#110">owm_read_bit</a></font></b> <font color="#990000">();</font>
+      cmp_id_bit <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#110">owm_read_bit</a></font></b> <font color="#990000">();</font>
+      <i><font color="#9A1900">// Check for no devices on 1-wire</font></i>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">(</font>id_bit <font color="#990000">==</font> <font color="#993399">1</font><font color="#990000">)</font> <font color="#990000">&amp;&amp;</font> <font color="#990000">(</font>cmp_id_bit <font color="#990000">==</font> <font color="#993399">1</font><font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+      <font color="#FF0000">}</font>
+      <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+        <i><font color="#9A1900">// All devices coupled have 0 or 1</font></i>
+        <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> id_bit <font color="#990000">!=</font> cmp_id_bit <font color="#990000">)</font> <font color="#FF0000">{</font>
+           search_direction <font color="#990000">=</font> id_bit<font color="#990000">;</font>   <i><font color="#9A1900">// Bit write value for search</font></i>
+        <font color="#FF0000">}</font>
+        <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+          <i><font color="#9A1900">// If this discrepancy is before the Last Discrepancy</font></i>
+          <i><font color="#9A1900">// on a previous next then pick the same as last time</font></i>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> id_bit_number <font color="#990000">&lt;</font> <a href="one_wire_master.c.html#143">last_discrep</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+            search_direction <font color="#990000">=</font> <font color="#990000">((</font><a href="one_wire_master.c.html#142">rom_id</a><font color="#990000">[</font>rom_byte_number<font color="#990000">]</font> <font color="#990000">&amp;</font> rom_byte_mask<font color="#990000">)</font> <font color="#990000">&gt;</font> <font color="#993399">0</font><font color="#990000">);</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+            <i><font color="#9A1900">// If equal to last pick 1, otherwire pick 0</font></i>
+            search_direction <font color="#990000">=</font> <font color="#990000">(</font>id_bit_number <font color="#990000">==</font> <a href="one_wire_master.c.html#143">last_discrep</a><font color="#990000">);</font>
+          <font color="#FF0000">}</font>
+          <i><font color="#9A1900">// If 0 was picked then record its position in LastZero</font></i>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> search_direction <font color="#990000">==</font> <font color="#993399">0</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+            last_zero <font color="#990000">=</font> id_bit_number<font color="#990000">;</font>
+            <i><font color="#9A1900">// Check for Last discrepancy in family</font></i>
+            <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> last_zero <font color="#990000">&lt;=</font> <a href="one_wire_master.c.html#152">FAMILY_ID_BIT_COUNT</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+              <a href="one_wire_master.c.html#144">last_family_discrep</a> <font color="#990000">=</font> last_zero<font color="#990000">;</font>
+            <font color="#FF0000">}</font>
+          <font color="#FF0000">}</font>
+        <font color="#FF0000">}</font>
+        <i><font color="#9A1900">// Set or clear the bit in the ROM byte rom_byte_number with mask</font></i>
+        <i><font color="#9A1900">// rom_byte_mask</font></i>
+        <b><font color="#0000FF">if</font></b> <font color="#990000">(</font>search_direction <font color="#990000">==</font> <font color="#993399">1</font><font color="#990000">)</font> <font color="#FF0000">{</font>
+          <a href="one_wire_master.c.html#142">rom_id</a><font color="#990000">[</font>rom_byte_number<font color="#990000">]</font> <font color="#990000">|=</font> rom_byte_mask<font color="#990000">;</font>
+        <font color="#FF0000">}</font>
+        <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+          <a href="one_wire_master.c.html#142">rom_id</a><font color="#990000">[</font>rom_byte_number<font color="#990000">]</font> <font color="#990000">&amp;=</font> <font color="#990000">~</font>rom_byte_mask<font color="#990000">;</font>
+        <font color="#FF0000">}</font>
+        <i><font color="#9A1900">// Serial number search direction write bit</font></i>
+        <b><font color="#000000"><a href="one_wire_master.c.html#89">owm_write_bit</a></font></b> <font color="#990000">(</font>search_direction<font color="#990000">);</font>
+        <i><font color="#9A1900">// Increment the byte counter id_bit_number and shift the mask</font></i>
+        <i><font color="#9A1900">// rom_byte_mask</font></i>
+        id_bit_number<font color="#990000">++;</font>
+        rom_byte_mask <font color="#990000">&lt;&lt;=</font> <font color="#993399">1</font><font color="#990000">;</font>
+        <i><font color="#9A1900">// If the mask is 0 then go to new SerialNum byte rom_byte_number</font></i>
+        <i><font color="#9A1900">// and reset mask</font></i>
+        <b><font color="#0000FF">if</font></b> <font color="#990000">(</font>rom_byte_mask <font color="#990000">==</font> <font color="#993399">0</font><font color="#990000">)</font> <font color="#FF0000">{</font>
+             <i><font color="#9A1900">// Incrementally update CRC</font></i>
+             <a href="one_wire_master.c.html#146">crc8</a> <font color="#990000">=</font> <b><font color="#000000">_crc_ibutton_update</font></b> <font color="#990000">(</font><a href="one_wire_master.c.html#146">crc8</a><font color="#990000">,</font> <a href="one_wire_master.c.html#142">rom_id</a><font color="#990000">[</font>rom_byte_number<font color="#990000">]);</font>
+             rom_byte_number<font color="#990000">++;</font>
+             rom_byte_mask <font color="#990000">=</font> <font color="#993399">1</font><font color="#990000">;</font>
+        <font color="#FF0000">}</font>
+      <font color="#FF0000">}</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> rom_byte_number <font color="#990000">&lt;</font> <a href="one_wire_master.h.html#69">OWM_ID_BYTE_COUNT</a> <font color="#990000">);</font>
+
+    <i><font color="#9A1900">// If the search was successful...</font></i>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> <font color="#990000">((</font>id_bit_number <font color="#990000">&lt;=</font> <a href="one_wire_master.c.html#149">ID_BIT_COUNT</a><font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">(</font><a href="one_wire_master.c.html#146">crc8</a> <font color="#990000">!=</font> <font color="#993399">0</font><font color="#990000">))</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <a href="one_wire_master.c.html#143">last_discrep</a> <font color="#990000">=</font> last_zero<font color="#990000">;</font>
+      <i><font color="#9A1900">// If this was the last device...</font></i>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <a href="one_wire_master.c.html#143">last_discrep</a> <font color="#990000">==</font> <font color="#993399">0</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+         <a href="one_wire_master.c.html#145">last_device_flag</a> <font color="#990000">=</font> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+      <font color="#FF0000">}</font>
+      search_result <font color="#990000">=</font> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// If no device found, then reset counters so next 'search' will be like</font></i>
+  <i><font color="#9A1900">// a first</font></i>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">(!</font> search_result<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">(!</font> <font color="#990000">(</font><a href="one_wire_master.c.html#142">rom_id</a><font color="#990000">[</font><font color="#993399">0</font><font color="#990000">]))</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <a href="one_wire_master.c.html#143">last_discrep</a> <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+    <a href="one_wire_master.c.html#145">last_device_flag</a> <font color="#990000">=</font> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+    <a href="one_wire_master.c.html#144">last_family_discrep</a> <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+    search_result <font color="#990000">=</font> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">return</font></b> search_result<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> uint8_t
+<b><font color="#000000"><a name="271">first</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Reset the search state</font></i>
+  <a href="one_wire_master.c.html#143">last_discrep</a> <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <a href="one_wire_master.c.html#145">last_device_flag</a> <font color="#990000">=</font> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+  <a href="one_wire_master.c.html#144">last_family_discrep</a> <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+
+  <b><font color="#0000FF">return</font></b> <b><font color="#000000"><a href="one_wire_master.c.html#160">search</a></font></b><font color="#990000">();</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">// Find the 'next' devices on the 1-Wire bus</font></i>
+<i><font color="#9A1900">// Return TRUE : device found, ROM number in rom_id buffer</font></i>
+<i><font color="#9A1900">//        FALSE : device not found, end of search</font></i>
+<i><font color="#9A1900">//</font></i>
+<b><font color="#0000FF">static</font></b> uint8_t
+<b><font color="#000000"><a name="287">next</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#0000FF">return</font></b> <b><font color="#000000"><a href="one_wire_master.c.html#160">search</a></font></b><font color="#990000">();</font>
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">// Verify that the device with the ROM number in rom_id buffer is present.</font></i>
+<i><font color="#9A1900">// Return TRUE : device verified present</font></i>
+<i><font color="#9A1900">//        FALSE : device not present</font></i>
+<i><font color="#9A1900">//</font></i>
+<b><font color="#0000FF">static</font></b> uint8_t
+<b><font color="#000000"><a name="297">verify</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#009900">unsigned</font> <font color="#009900">char</font> rom_backup<font color="#990000">[</font><a href="one_wire_master.h.html#69">OWM_ID_BYTE_COUNT</a><font color="#990000">];</font>
+  <font color="#008080">uint8_t</font> result<font color="#990000">;</font>
+  <font color="#008080">uint8_t</font> ld_backup<font color="#990000">,</font> ldf_backup<font color="#990000">,</font> lfd_backup<font color="#990000">;</font>
+
+  <i><font color="#9A1900">// Keep a backup copy of the current state</font></i>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="one_wire_master.h.html#69">OWM_ID_BYTE_COUNT</a> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+     rom_backup<font color="#990000">[</font>ii<font color="#990000">]</font> <font color="#990000">=</font> <a href="one_wire_master.c.html#142">rom_id</a><font color="#990000">[</font>ii<font color="#990000">];</font>
+  <font color="#FF0000">}</font>
+  ld_backup <font color="#990000">=</font> <a href="one_wire_master.c.html#143">last_discrep</a><font color="#990000">;</font>
+  ldf_backup <font color="#990000">=</font> <a href="one_wire_master.c.html#145">last_device_flag</a><font color="#990000">;</font>
+  lfd_backup <font color="#990000">=</font> <a href="one_wire_master.c.html#144">last_family_discrep</a><font color="#990000">;</font>
+
+  <i><font color="#9A1900">// Set globals st the next search will look for the device with id in rom_id</font></i>
+  <a href="one_wire_master.c.html#143">last_discrep</a> <font color="#990000">=</font> <a href="one_wire_master.c.html#149">ID_BIT_COUNT</a><font color="#990000">;</font>
+  <a href="one_wire_master.c.html#145">last_device_flag</a> <font color="#990000">=</font> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="one_wire_master.c.html#160">search</a></font></b><font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+     <i><font color="#9A1900">// Check if same device found</font></i>
+     result <font color="#990000">=</font> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+     <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="one_wire_master.h.html#69">OWM_ID_BYTE_COUNT</a> <font color="#990000">;</font> ii<font color="#990000">++)</font>
+     <font color="#FF0000">{</font>
+        <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> rom_backup<font color="#990000">[</font>ii<font color="#990000">]</font> <font color="#990000">!=</font> <a href="one_wire_master.c.html#142">rom_id</a><font color="#990000">[</font>ii<font color="#990000">]</font> <font color="#990000">)</font>
+        <font color="#FF0000">{</font>
+            result <font color="#990000">=</font> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+            <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+        <font color="#FF0000">}</font>
+     <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+    result <font color="#990000">=</font> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Restore the search state</font></i>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="one_wire_master.h.html#69">OWM_ID_BYTE_COUNT</a> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+     <a href="one_wire_master.c.html#142">rom_id</a><font color="#990000">[</font>ii<font color="#990000">]</font> <font color="#990000">=</font> rom_backup<font color="#990000">[</font>ii<font color="#990000">];</font>
+  <font color="#FF0000">}</font>
+  <a href="one_wire_master.c.html#143">last_discrep</a> <font color="#990000">=</font> ld_backup<font color="#990000">;</font>
+  <a href="one_wire_master.c.html#145">last_device_flag</a> <font color="#990000">=</font> ldf_backup<font color="#990000">;</font>
+  <a href="one_wire_master.c.html#144">last_family_discrep</a> <font color="#990000">=</font> lfd_backup<font color="#990000">;</font>
+
+  <b><font color="#0000FF">return</font></b> result<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="343">owm_first</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> <font color="#990000">*</font>id_buf<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#008080">uint8_t</font> result <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#271">first</a></font></b> <font color="#990000">();</font>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> result <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000">memcpy</font></b> <font color="#990000">(</font>id_buf<font color="#990000">,</font> <a href="one_wire_master.c.html#142">rom_id</a><font color="#990000">,</font> <a href="one_wire_master.h.html#69">OWM_ID_BYTE_COUNT</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">return</font></b> result<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="355">owm_next</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> <font color="#990000">*</font>id_buf<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#008080">uint8_t</font> result <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#287">next</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> result <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000">memcpy</font></b> <font color="#990000">(</font>id_buf<font color="#990000">,</font> <a href="one_wire_master.c.html#142">rom_id</a><font color="#990000">,</font> <a href="one_wire_master.h.html#69">OWM_ID_BYTE_COUNT</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">return</font></b> result<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="366">owm_verify</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> <font color="#990000">*</font>id_buf<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000">memcpy</font></b> <font color="#990000">(</font><a href="one_wire_master.c.html#142">rom_id</a><font color="#990000">,</font> id_buf<font color="#990000">,</font> <a href="one_wire_master.h.html#69">OWM_ID_BYTE_COUNT</a><font color="#990000">);</font>
+  <font color="#008080">uint8_t</font> result <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#297">verify</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">return</font></b> result<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="374">owm_write_byte</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> data<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Loop to write each bit in the byte, LS-bit first</font></i>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="util.h.html#262">BITS_PER_BYTE</a><font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font>
+  <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="one_wire_master.c.html#89">owm_write_bit</a></font></b> <font color="#990000">(</font>data <font color="#990000">&amp;</font> <a href="util.h.html#290">B00000001</a><font color="#990000">);</font>
+    data <font color="#990000">&gt;&gt;=</font> <font color="#993399">1</font><font color="#990000">;</font>   <i><font color="#9A1900">// Shift to get to next bit</font></i>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">// Like the other functions, these come from Maxim Application Note AN187.</font></i>
+<i><font color="#9A1900">// But they didn't seem to work right for me, I think just because their</font></i>
+<i><font color="#9A1900">// interaction with owm_first()/owm_next() is weird.  And they seem sort</font></i>
+<i><font color="#9A1900">// of pointless: surely clients can just remember things by family for</font></i>
+<i><font color="#9A1900">// themsleves after the initial scan if the need to?  I guess it could</font></i>
+<i><font color="#9A1900">// make things a tiny bit faster in the presence of hot-plug devices or</font></i>
+<i><font color="#9A1900">// something but I have difficulty imagining caring.</font></i>
+<i><font color="#9A1900">//void</font></i>
+<i><font color="#9A1900">//owm_target_setup (uint8_t family_code)</font></i>
+<i><font color="#9A1900">//{</font></i>
+<i><font color="#9A1900">//  rom_id[0] = family_code;</font></i>
+<i><font color="#9A1900">//  for ( uint8_t ii = 1; ii &lt; FAMILY_ID_BIT_COUNT ; ii++ ) {</font></i>
+<i><font color="#9A1900">//    rom_id[ii] = 0;</font></i>
+<i><font color="#9A1900">//  }</font></i>
+<i><font color="#9A1900">//  last_discrep = ID_BIT_COUNT;</font></i>
+<i><font color="#9A1900">//  last_family_discrep = 0;</font></i>
+<i><font color="#9A1900">//  last_device_flag = FALSE;</font></i>
+<i><font color="#9A1900">//}</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//void</font></i>
+<i><font color="#9A1900">//owm_skip_setup (void)</font></i>
+<i><font color="#9A1900">//{</font></i>
+<i><font color="#9A1900">//  last_discrep = last_family_discrep;</font></i>
+<i><font color="#9A1900">//  last_family_discrep = 0;</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//  // If there are no devices or other families left...</font></i>
+<i><font color="#9A1900">//  if ( last_discrep == 0 ) {</font></i>
+<i><font color="#9A1900">//     last_device_flag = TRUE;</font></i>
+<i><font color="#9A1900">//  }</font></i>
+<i><font color="#9A1900">//}</font></i>
+
+uint8_t
+<b><font color="#000000"><a name="416">owm_read_byte</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#008080">uint8_t</font> result <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="util.h.html#262">BITS_PER_BYTE</a><font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    result <font color="#990000">&gt;&gt;=</font> <font color="#993399">1</font><font color="#990000">;</font>  <i><font color="#9A1900">// Shift the result to get ready for the next bit</font></i>
+    <i><font color="#9A1900">// If result is one, then set MS bit</font></i>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="one_wire_master.c.html#110">owm_read_bit</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      result <font color="#990000">|=</font> <a href="util.h.html#657">B10000000</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">return</font></b> result<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="431">owm_touch_byte</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> data<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#008080">uint8_t</font> result <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="util.h.html#262">BITS_PER_BYTE</a><font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <i><font color="#9A1900">// Shift the result to get it ready for the next bit</font></i>
+    result <font color="#990000">&gt;&gt;=</font> <font color="#993399">1</font><font color="#990000">;</font>
+    <i><font color="#9A1900">// If sending a '1' then read a bit, otherwise write a '0'</font></i>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> data <font color="#990000">&amp;</font> <a href="util.h.html#290">B00000001</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="one_wire_master.c.html#110">owm_read_bit</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        result <font color="#990000">|=</font> <a href="util.h.html#657">B10000000</a><font color="#990000">;</font>
+      <font color="#FF0000">}</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="one_wire_master.c.html#89">owm_write_bit</a></font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>
+    <font color="#FF0000">}</font>
+    <i><font color="#9A1900">// Shift the data byte for the next bit</font></i>
+    data <font color="#990000">&gt;&gt;=</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">return</font></b> result<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+</tt></pre>

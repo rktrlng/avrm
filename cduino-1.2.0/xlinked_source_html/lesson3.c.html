@@ -1,0 +1,47 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">/* $CSK: <a href="lesson3.c.html">lesson3.c</a>,v 1.3 2008/09/29 06:17:10 ckuethe Exp $ */</font></i>
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900"> * Copyright (c) 2008 Chris Kuethe </font></i><u><font color="#0000FF">&lt;chris.kuethe@gmail.com&gt;</font></u>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * Permission to use, copy, modify, and distribute this software for any</font></i>
+<i><font color="#9A1900"> * purpose with or without fee is hereby granted, provided that the above</font></i>
+<i><font color="#9A1900"> * copyright notice and this permission notice appear in all copies.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES</font></i>
+<i><font color="#9A1900"> * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF</font></i>
+<i><font color="#9A1900"> * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR</font></i>
+<i><font color="#9A1900"> * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES</font></i>
+<i><font color="#9A1900"> * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN</font></i>
+<i><font color="#9A1900"> * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF</font></i>
+<i><font color="#9A1900"> * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900"> * Assumptions:</font></i>
+<i><font color="#9A1900"> * 	- LED connected to PORTB.5</font></i>
+<i><font color="#9A1900"> * 	- Switch connected to PORTD.2</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<font color="#009900">int</font> <b><font color="#000000"><a name="27">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+	<i><font color="#9A1900">/* set PORTB for output*/</font></i>
+	DDRB <font color="#990000">=</font> <font color="#993399">0xFF</font><font color="#990000">;</font>
+	<i><font color="#9A1900">/* set PORTD for input*/</font></i>
+	DDRD <font color="#990000">&amp;=</font> <font color="#993399">0xFB</font><font color="#990000">;</font>
+	PORTD <font color="#990000">|=</font> <font color="#993399">0x04</font><font color="#990000">;</font>
+
+	<b><font color="#0000FF">while</font></b> <font color="#990000">(</font><font color="#993399">1</font><font color="#990000">)</font> <font color="#FF0000">{</font>
+		<b><font color="#0000FF">if</font></b> <font color="#990000">(</font>PIND <font color="#990000">&amp;</font> <font color="#993399">0x04</font><font color="#990000">)</font>
+			PORTB <font color="#990000">&amp;=</font> <font color="#990000">~</font><font color="#993399">0x20</font><font color="#990000">;</font>
+		<b><font color="#0000FF">else</font></b>
+			PORTB <font color="#990000">|=</font> <font color="#993399">0x20</font><font color="#990000">;</font>
+	<font color="#FF0000">}</font>
+	<b><font color="#0000FF">return</font></b> <font color="#993399">0</font><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+</tt></pre>

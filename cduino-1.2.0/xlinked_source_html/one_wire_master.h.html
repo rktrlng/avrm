@@ -1,0 +1,141 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// One-wire master interface (software interface -- require one IO pin only)</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Test driver: one_wire_master_test.h    Implementation: <a href="one_wire_master.c.html">one_wire_master.c</a></font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This interface provides most of the lower-level one-wire functionality,</font></i>
+<i><font color="#9A1900">// up to byte-at-a-time communication and device search.</font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="one_wire_master.h.html#9">ONE_WIRE_MASTER_H</a>
+<b><font color="#000080">#define</font></b> <a name="9">ONE_WIRE_MASTER_H</a>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="dio.h.html">dio.h</a>"</font>
+
+<b><font color="#000080">#ifndef</font></b> OWM_PIN
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> OWM_PIN <font color="#008080">not</font> <b><font color="#000000">defined</font></b> <font color="#990000">(</font>it must be explicitly set to <font color="#008080">one</font> of <font color="#990000">\</font>
+         <font color="#008080">the</font> DIO_PIN_<font color="#990000">*</font> tuple macros before <b><font color="#0000FF">this</font></b> header <font color="#008080">is</font> included<font color="#990000">)</font>
+<b><font color="#000080">#endif</font></b>
+
+<i><font color="#9A1900">// Intialize the one wire master interface.  All this does is set up the</font></i>
+<i><font color="#9A1900">// chosen DIO pin.  It starts out set as an input without the internal pull-up</font></i>
+<i><font color="#9A1900">// enabled.  It would probably be possible to use the internal pull-up on</font></i>
+<i><font color="#9A1900">// the AVR microcontroller for short-line communication at least, but the</font></i>
+<i><font color="#9A1900">// datasheet for the part I've used for testing (Maxim DS18B20) calls for a</font></i>
+<i><font color="#9A1900">// much stronger pull-up, so for simplicity the internal pull-up is disabled.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="one_wire_master.c.html#68">owm_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">///////////////////////////////////////////////////////////////////////////////</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Individual Bit Functions</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// These function perform bit-at-a-time operations.  All the fundamental</font></i>
+<i><font color="#9A1900">// timing used in the one-wire protocol is implemented in these functions,</font></i>
+<i><font color="#9A1900">// other functions in this interface are implemented in terms of these.</font></i>
+<i><font color="#9A1900">//</font></i>
+
+<i><font color="#9A1900">// Generate a 1-Wire reset.  Return TRUE if a resulting presence pulse is</font></i>
+<i><font color="#9A1900">// detected, or FALSE otherwise.  NOTE: this is logically different than</font></i>
+<i><font color="#9A1900">// the comments for the OWTouchReset() function from Maxim application</font></i>
+<i><font color="#9A1900">// note AN126 indicate, since those seem backwards and confused.  NOTE:</font></i>
+<i><font color="#9A1900">// does not handle alarm presence from DS2404/DS1994.</font></i>
+uint8_t
+<b><font color="#000000"><a href="one_wire_master.c.html#74">owm_touch_reset</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Write bit</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="one_wire_master.c.html#89">owm_write_bit</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> value<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Read bit</font></i>
+uint8_t
+<b><font color="#000000"><a href="one_wire_master.c.html#110">owm_read_bit</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">///////////////////////////////////////////////////////////////////////////////</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Device Presense Confirmation/Discovery</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// These functions allow the presence of particular slaves to be confirmed,</font></i>
+<i><font color="#9A1900">// or the bus searched for all slaves, slave from or not from of a particular</font></i>
+<i><font color="#9A1900">// family, or slaves with an active alarm condition.</font></i>
+<i><font color="#9A1900">//</font></i>
+
+<i><font color="#9A1900">// When these commands occur after a reset, the slaves interpret them as</font></i>
+<i><font color="#9A1900">// directions to begin participating in various ID search/discovery commands.</font></i>
+<i><font color="#9A1900">// Note that clients don't generally need to use these macros directly.</font></i>
+<i><font color="#9A1900">// See the DS18B20 datasheet and Maxim application note AN187 for details.</font></i>
+<b><font color="#000080">#define</font></b> <a name="65">OWM_READ_ROM_COMMAND</a>   <font color="#993399">0x33</font>
+<b><font color="#000080">#define</font></b> <a name="66">OWM_SEARCH_ROM_COMMAND</a> <font color="#993399">0xF0</font>
+
+<i><font color="#9A1900">// One wire ID size in bytes</font></i>
+<b><font color="#000080">#define</font></b> <a name="69">OWM_ID_BYTE_COUNT</a> <font color="#993399">8</font>
+
+<i><font color="#9A1900">// This function requires that exactly one slave be present on the bus.</font></i>
+<i><font color="#9A1900">// If we discover a slave, its ID is written into id_buf (which pust be</font></i>
+<i><font color="#9A1900">// a pointer to OWM_ID_BYTE_COUNT bytes of space) and TRUE is returned.</font></i>
+<i><font color="#9A1900">// If there is not exactly one slave present, the results of this function</font></i>
+<i><font color="#9A1900">// are undefined (later calls to this interface might behave strangely).</font></i>
+uint8_t
+<b><font color="#000000"><a href="one_wire_master.c.html#125">owm_read_id</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> <font color="#990000">*</font>id_buf<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Find the "first" slave on the one-wire bus (in the sense of the discovery</font></i>
+<i><font color="#9A1900">// order of the one-wire search algorithm described in Maxim application</font></i>
+<i><font color="#9A1900">// note AN187).  If a slave is discovered, its ID is written into id_buf</font></i>
+<i><font color="#9A1900">// (which mucst be a pointer to OWM_ID_BYTE_COUNT bytes of space) and TRUE</font></i>
+<i><font color="#9A1900">// is returned.  If no slave is discovered, FALSE is returned.  Note that</font></i>
+<i><font color="#9A1900">// this resets any search which is already in progress.</font></i>
+uint8_t
+<b><font color="#000000"><a href="one_wire_master.c.html#343">owm_first</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> <font color="#990000">*</font>id_buf<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Require an immediately preceeding call to owm_first() or owm_next() to</font></i>
+<i><font color="#9A1900">// have occurred.  Find the "next" slave on the one-wire bus (in the sense of</font></i>
+<i><font color="#9A1900">// the discovery order of the one-wire search algorithm described in Maxim</font></i>
+<i><font color="#9A1900">// application note AN187).  This continues a search begun by a previous</font></i>
+<i><font color="#9A1900">// call to owm_first().  If another slave is found, its ID is written into</font></i>
+<i><font color="#9A1900">// id_buf (which must be a pointer to OWM_ID_BYTE_COUNT bytes of space and</font></i>
+<i><font color="#9A1900">// TRUE is returned.  If no additional slave is found, FALSE is returned.</font></i>
+uint8_t
+<b><font color="#000000"><a href="one_wire_master.c.html#355">owm_next</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> <font color="#990000">*</font>id_buf<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Return true iff device with ID equal to the value in the OWM_ID_BYTE_COUNT</font></i>
+<i><font color="#9A1900">// bytes pointed to by id_buf is present on the bus, or FALSE otherwise.</font></i>
+<i><font color="#9A1900">// Note that unlike owm_read_id(), this function is safe to use when there</font></i>
+<i><font color="#9A1900">// are multiple devices on the bus.  When this function returns, the global</font></i>
+<i><font color="#9A1900">// search state is restored (so for example the next call to owm_next()</font></i>
+<i><font color="#9A1900">// should behave as if the call to this routine never occurred).</font></i>
+uint8_t
+<b><font color="#000000"><a href="one_wire_master.c.html#366">owm_verify</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> <font color="#990000">*</font>id_buf<font color="#990000">);</font>
+
+<i><font color="#9A1900">// FIXXME: it would be nice to add a filter for alarm search (EC command).</font></i>
+<i><font color="#9A1900">// This command might actually be useful, since it makes it possible to scan</font></i>
+<i><font color="#9A1900">// an entire bus for any devices needing immediate attention.  It wouldn't</font></i>
+<i><font color="#9A1900">// be too hard to add support for this either: I think all that would be</font></i>
+<i><font color="#9A1900">// required would be for the search() function in <a href="one_wire_master.c.html">one_wire_master.c</a> to</font></i>
+<i><font color="#9A1900">// take a alarm_only argument, and then issue an EC command instead of an</font></i>
+<i><font color="#9A1900">// OWM_SEARCH_ROM_COMMAND if that argument was true.  It could be tested</font></i>
+<i><font color="#9A1900">// using the DS18B20 temperature alarm functionality, but setting those</font></i>
+<i><font color="#9A1900">// alarms up is somewhat of a hassle, so we haven't bothered yet.</font></i>
+
+<i><font color="#9A1900">///////////////////////////////////////////////////////////////////////////////</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Byte Write/Read</font></i>
+<i><font color="#9A1900">//</font></i>
+
+<i><font color="#9A1900">// Write byte</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="one_wire_master.c.html#374">owm_write_byte</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> data<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Read byte</font></i>
+uint8_t
+<b><font color="#000000"><a href="one_wire_master.c.html#416">owm_read_byte</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Fancy simultaneous read/write.  Sort of.  I guess, I haven't used it. It's</font></i>
+<i><font color="#9A1900">// supposed to be more efficient.  See Maxim Application Note AN126. WARNING:</font></i>
+<i><font color="#9A1900">// FIXXME: This comes straight from AN126, but I haven't tested it.</font></i>
+uint8_t
+<b><font color="#000000"><a href="one_wire_master.c.html#431">owm_touch_byte</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> data<font color="#990000">);</font>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// ONE_WIRE_MASTER_H</font></i>
+</tt></pre>

@@ -1,0 +1,46 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Test/demo for the <a href="term_io.h.html">term_io.h</a> interface.</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="term_io.h.html">term_io.h</a>"</font>
+
+<i><font color="#9A1900">// This program repeatedly prompts for a line of input, then prints it</font></i>
+<i><font color="#9A1900">// back out.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// There are no external hardware requirements other than an arduino and a USB</font></i>
+<i><font color="#9A1900">// cable to connect it to the computer.  It should be possible to run</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   make -rR run_screen</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// or so from the module directory to see it do its thing.</font></i>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="16">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="term_io.c.html#166">term_io_init</a></font></b> <font color="#990000">();</font>
+
+  <font color="#009900">char</font> buffer<font color="#990000">[</font><a href="term_io.h.html#39">TERM_IO_LINE_BUFFER_MIN_SIZE</a><font color="#990000">];</font>
+
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#990000">;</font> <font color="#990000">;</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000">printf</font></b> <font color="#990000">(</font><font color="#FF0000">"Enter something: "</font><font color="#990000">);</font>
+    <font color="#009900">int</font> line_length <font color="#990000">=</font> <b><font color="#000000"><a href="term_io.c.html#174">term_io_getline</a></font></b> <font color="#990000">(</font>buffer<font color="#990000">);</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> line_length <font color="#990000">==</font> <font color="#990000">-</font><font color="#993399">1</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000">printf</font></b> <font color="#990000">(</font><font color="#FF0000">"Error reading line</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> buffer<font color="#990000">[</font>line_length <font color="#990000">-</font> <font color="#993399">1</font><font color="#990000">]</font> <font color="#990000">==</font> <font color="#FF0000">'</font><font color="#CC33CC">\n</font><font color="#FF0000">'</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        buffer<font color="#990000">[</font>line_length <font color="#990000">-</font> <font color="#993399">1</font><font color="#990000">]</font> <font color="#990000">=</font> <font color="#FF0000">'</font><font color="#CC33CC">\0</font><font color="#FF0000">'</font><font color="#990000">;</font>
+        <b><font color="#000000">printf</font></b> <font color="#990000">(</font>
+            <font color="#FF0000">"You entered %d characters: '%s' (followed by newline)</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font> 
+            line_length<font color="#990000">,</font> buffer<font color="#990000">);</font>
+      <font color="#FF0000">}</font>
+      <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+        <b><font color="#000000">printf</font></b> <font color="#990000">(</font><font color="#FF0000">"BUG: shouldn't be here</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+      <font color="#FF0000">}</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+
+<font color="#FF0000">}</font>
+</tt></pre>

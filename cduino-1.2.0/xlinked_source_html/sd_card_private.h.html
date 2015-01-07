@@ -1,0 +1,343 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// This header contains details of SD Card commands, responses, and registers.</font></i>
+
+<i><font color="#9A1900">/* Arduino Sd2Card Library</font></i>
+<i><font color="#9A1900"> * Copyright (C) 2009 by William Greiman</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * This file is part of the Arduino Sd2Card Library</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * This Library is free software: you can redistribute it and/or modify</font></i>
+<i><font color="#9A1900"> * it under the terms of the GNU General Public License as published by</font></i>
+<i><font color="#9A1900"> * the Free Software Foundation, either version 3 of the License, or</font></i>
+<i><font color="#9A1900"> * (at your option) any later version.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * This Library is distributed in the hope that it will be useful,</font></i>
+<i><font color="#9A1900"> * but WITHOUT ANY WARRANTY; without even the implied warranty of</font></i>
+<i><font color="#9A1900"> * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</font></i>
+<i><font color="#9A1900"> * GNU General Public License for more details.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * You should have received a copy of the GNU General Public License</font></i>
+<i><font color="#9A1900"> * along with the Arduino Sd2Card Library.  If not, see</font></i>
+<i><font color="#9A1900"> * </font></i><u><font color="#0000FF">&lt;http://www.gnu.org/licenses/&gt;</font></u><i><font color="#9A1900">.</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<i><font color="#9A1900">// vim:foldmethod=marker</font></i>
+
+<i><font color="#9A1900">// FIXME: rename this header to <a href="sd_card_private.h.html">sd_card_private.h</a> or so?</font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="sd_card_private.h.html#28">SD_CARD_INFO_H</a>
+<b><font color="#000080">#define</font></b> <a name="28">SD_CARD_INFO_H</a>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdint.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="util.h.html">util.h</a>"</font>
+
+<i><font color="#9A1900">// Based on the document:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// SD Specifications</font></i>
+<i><font color="#9A1900">// Part 1</font></i>
+<i><font color="#9A1900">// Physical Layer</font></i>
+<i><font color="#9A1900">// Simplified Specification</font></i>
+<i><font color="#9A1900">// Version 4.10</font></i>
+<i><font color="#9A1900">// January 22, 2013</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// References to document sections (e.g. "section 7.42.42") in this source</font></i>
+<i><font color="#9A1900">// file refer to this document.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// https://www.sdcard.org/downloads/pls/simplified_specs/part1_410.pdf</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// NOTE: it may be easier to use one of the interface functions in <a href="sd_card.h.html">sd_card.h</a>,</font></i>
+<i><font color="#9A1900">// rather than using sd_card_read_csd() and interpreting its results.</font></i>
+
+<i><font color="#9A1900">// SD card commands {{{1</font></i>
+
+<i><font color="#9A1900">// FIXXME: we don't actually use all of these ourselves.  The unused ones</font></i>
+<i><font color="#9A1900">// are untested.</font></i>
+
+<i><font color="#9A1900">// GO_IDLE_STATE - Init card in spi mode if CS low</font></i>
+<b><font color="#000080">#define</font></b> <a name="57">SD_CARD_CMD0</a> <font color="#993399">0x00</font>
+<i><font color="#9A1900">// SEND_IF_COND - Verify SD card interface operating condition</font></i>
+<b><font color="#000080">#define</font></b> <a name="59">SD_CARD_CMD8</a> <font color="#993399">0x08</font>
+<i><font color="#9A1900">// SEND_CSD - Read the Card Specific Data (CSD register)</font></i>
+<b><font color="#000080">#define</font></b> <a name="61">SD_CARD_CMD9</a> <font color="#993399">0x09</font>
+<i><font color="#9A1900">// SEND_CID - Read the Card Identification Data (CID register)</font></i>
+<b><font color="#000080">#define</font></b> <a name="63">SD_CARD_CMD10</a> <font color="#993399">0x0A</font>
+<i><font color="#9A1900">// SEND_STATUS - Read the card status register</font></i>
+<b><font color="#000080">#define</font></b> <a name="65">SD_CARD_CMD13</a> <font color="#993399">0x0D</font>
+<i><font color="#9A1900">// READ_BLOCK - Read a single data block from the card</font></i>
+<b><font color="#000080">#define</font></b> <a name="67">SD_CARD_CMD17</a> <font color="#993399">0x11</font>
+<i><font color="#9A1900">// WRITE_BLOCK - Write a single data block to the card</font></i>
+<b><font color="#000080">#define</font></b> <a name="69">SD_CARD_CMD24</a> <font color="#993399">0x18</font>
+<i><font color="#9A1900">// WRITE_MULTIPLE_BLOCK - Write blocks of data until a STOP_TRANSMISSION</font></i>
+<b><font color="#000080">#define</font></b> <a name="71">SD_CARD_CMD25</a> <font color="#993399">0x19</font>
+<i><font color="#9A1900">// ERASE_WR_BLK_START - Sets the address of the first block to be erased</font></i>
+<b><font color="#000080">#define</font></b> <a name="73">SD_CARD_CMD32</a> <font color="#993399">0x20</font>
+<i><font color="#9A1900">// ERASE_WR_BLK_END - Sets the address of the last block of the continuous</font></i>
+<i><font color="#9A1900">// range to be erased</font></i>
+<b><font color="#000080">#define</font></b> <a name="76">SD_CARD_CMD33</a> <font color="#993399">0x21</font>
+<i><font color="#9A1900">// ERASE - Erase all previously selected blocks</font></i>
+<b><font color="#000080">#define</font></b> <a name="78">SD_CARD_CMD38</a> <font color="#993399">0x26</font>
+<i><font color="#9A1900">// APP_SD_CARD_CMD - Escape for application specific command</font></i>
+<b><font color="#000080">#define</font></b> <a name="80">SD_CARD_CMD55</a> <font color="#993399">0x37</font>
+<i><font color="#9A1900">// READ_OCR - Read the OCR register of a card</font></i>
+<b><font color="#000080">#define</font></b> <a name="82">SD_CARD_CMD58</a> <font color="#993399">0x3A</font>
+<i><font color="#9A1900">// SET_WR_BLK_ERASE_COUNT - Set the number of write blocks to be pre-erased</font></i>
+<i><font color="#9A1900">// before writing</font></i>
+<b><font color="#000080">#define</font></b> <a name="85">SD_CARD_ACMD23</a> <font color="#993399">0x17</font>
+<i><font color="#9A1900">// SD_SEND_OP_COMD - Sends host capacity support information and activates the</font></i>
+<i><font color="#9A1900">// card's initialization process</font></i>
+<b><font color="#000080">#define</font></b> <a name="88">SD_CARD_ACMD41</a> <font color="#993399">0x29</font>
+
+<i><font color="#9A1900">// }}}1</font></i>
+
+<i><font color="#9A1900">// Card constants, status codes, masks, and other attributes {{{1</font></i>
+
+<i><font color="#9A1900">// All commands begin with bit values 0 followed by 1 (section 7.3.1.1).</font></i>
+<b><font color="#000080">#define</font></b> <a name="95">SD_CARD_COMMAND_PREFIX_MASK</a> <a href="util.h.html#530">B01000000</a>
+
+<i><font color="#9A1900">// Lengh of the argument part of commands (section 7.3.1.1).</font></i>
+<b><font color="#000080">#define</font></b> <a name="98">SD_CARD_COMMAND_ARGUMENT_BYTES</a> <font color="#993399">4</font>
+
+<i><font color="#9A1900">// The SD card will hold its data out line low when busy programming</font></i>
+<i><font color="#9A1900">// (section 7.2.4).</font></i>
+<b><font color="#000080">#define</font></b> <a name="102">SD_CARD_BUSY_SIGNAL_BYTE_VALUE</a> <font color="#993399">0x00</font>
+
+<i><font color="#9A1900">// The SD card will hold its data bus line high when no data is transmitted</font></i>
+<i><font color="#9A1900">// (section 4.3.3).</font></i>
+<b><font color="#000080">#define</font></b> <a name="106">SD_CARD_NO_TRANSMISSION_BYTE_VALUE</a> <font color="#993399">0xFF</font>
+
+<i><font color="#9A1900">// What we send when we aren't sending actual commands or data.  We often</font></i>
+<i><font color="#9A1900">// don't care what the actual data is when this is used, but sometimes we</font></i>
+<i><font color="#9A1900">// might actually need to be sending this value to make it clear that we</font></i>
+<i><font color="#9A1900">// don't care :)</font></i>
+<b><font color="#000080">#define</font></b> <a name="112">SD_CARD_DUMMY_BYTE_VALUE</a> <font color="#993399">0xFF</font>
+
+<i><font color="#9A1900">// The correct CRC value for CMD0 (a constant since CMD0 has no arguments,</font></i>
+<i><font color="#9A1900">// see section 7.2.2).</font></i>
+<b><font color="#000080">#define</font></b> <a name="116">SD_CARD_CMD0_CRC</a> <font color="#993399">0x95</font>
+<i><font color="#9A1900">// We only support one particular argument value for CMD8.  Other argument</font></i>
+<i><font color="#9A1900">// values aren't needed.  See Physical Layer Specification sections 7.3.1.4</font></i>
+<i><font color="#9A1900">// and 4.3.13 for details.  The 0x01 byte indicates 2.7V to 3.6V range,</font></i>
+<i><font color="#9A1900">// and the AA byte is our check pattern.</font></i>
+<b><font color="#000080">#define</font></b> <a name="121">SD_CARD_CMD8_SUPPORTED_ARGUMENT_VALUE</a> <font color="#993399">0x000001AA</font>
+<i><font color="#9A1900">// The correct CRC value for CMD8 with the argument we always use with it</font></i>
+<b><font color="#000080">#define</font></b> <a name="123">SD_CARD_CMD8_CRC_FOR_SUPPORTED_ARGUMENT_VALUE</a> <font color="#993399">0x87</font>
+
+<i><font color="#9A1900">// The response to CMD8 is of format R7, which is this many bytes long</font></i>
+<i><font color="#9A1900">// (section 7.3.2.6).</font></i>
+<b><font color="#000080">#define</font></b> <a name="127">SD_CARD_R7_BYTES</a> <font color="#993399">5</font>
+<i><font color="#9A1900">// This (zero-indexed) byte of the CMD8 response contains a field which if</font></i>
+<i><font color="#9A1900">// not all zeros indicates that the supplied voltage is ok (sections 7.3.2.6,</font></i>
+<i><font color="#9A1900">// 7.3.1.4, 4.9.6).</font></i>
+<b><font color="#000080">#define</font></b> <a name="131">SD_CARD_CMD8_VOLTAGE_OK_BYTE</a> <font color="#993399">3</font>
+<i><font color="#9A1900">// Mask for the bits which must not all be zero if card supports supplied</font></i>
+<i><font color="#9A1900">// voltage (sections 7.3.2.6, 7.3.1.4).</font></i>
+<b><font color="#000080">#define</font></b> <a name="134">SD_CARD_SUPPLIED_VOLTAGE_OK_MASK</a> <font color="#993399">0x0F</font>
+<i><font color="#9A1900">// The responst to CMD8 is R7, which is 5 bytes long.  This (zero-indexed)</font></i>
+<i><font color="#9A1900">// byte contains the bit pattern we supplied in the last byte of the CMD8</font></i>
+<i><font color="#9A1900">// argument, echoed back (sections 7.3.2.6, 7.3.1.4).</font></i>
+<b><font color="#000080">#define</font></b> <a name="138">SD_CARD_CMD8_PATTERN_ECHO_BACK_BYTE</a> <font color="#993399">4</font>
+<i><font color="#9A1900">// This is the actual pattern that we supplied which should be echoed back</font></i>
+<b><font color="#000080">#define</font></b> <a name="140">SD_CARD_CMD8_ECHOED_PATTERN</a> <font color="#993399">0xAA</font>
+
+<i><font color="#9A1900">// The HCS bit of the CMD41 argument is included to query for an SDHC type</font></i>
+<i><font color="#9A1900">// card All other bits of the CMD41 argument are currently reserved (and</font></i>
+<i><font color="#9A1900">// must be set to zero).  See Physical Layer Specification Table 7-3.</font></i>
+<b><font color="#000080">#define</font></b> <a name="145">SD_CARD_ACMD41_HCS_MASK</a> <font color="#993399">0x40000000</font>
+<b><font color="#000080">#define</font></b> <a name="146">SD_CARD_ACMD41_NOTHING_MASK</a> <font color="#993399">0x00000000</font>
+
+<i><font color="#9A1900">// The response to CMD58 is of format R3, which is this many bytes long</font></i>
+<i><font color="#9A1900">// (section 7.3.2.4).</font></i>
+<b><font color="#000080">#define</font></b> <a name="150">SD_CARD_R3_BYTES</a> <font color="#993399">5</font>
+<i><font color="#9A1900">// This (zero-indexed) byte of R3 is the first byte of the OCR (section</font></i>
+<i><font color="#9A1900">// 7.3.2.4).</font></i>
+<b><font color="#000080">#define</font></b> <a name="153">SD_CARD_R3_OCR_START_BYTE</a> <font color="#993399">1</font>
+<i><font color="#9A1900">// These bits of the first byte of the card OCR indicate conditions we care</font></i>
+<i><font color="#9A1900">// about (section 5.1).</font></i>
+<b><font color="#000080">#define</font></b> <a name="156">SD_CARD_OCR_POWERED_UP_MASK</a> <a href="util.h.html#657">B10000000</a>
+<b><font color="#000080">#define</font></b> <a name="157">SD_CARD_OCR_CCS_MASK</a> <a href="util.h.html#530">B01000000</a>
+
+<i><font color="#9A1900">// A valid R1 response token byte always has a 0 MSB (see the SD Physical</font></i>
+<i><font color="#9A1900">// Layer Simplified Specification Version 4.10, section 7.3.2.1).</font></i>
+<b><font color="#000080">#define</font></b> <a name="161">SD_CARD_NOT_R1_RESPONSE_MASK</a> <a href="util.h.html#529">B1000000</a>
+
+<i><font color="#9A1900">// Status for card in the ready state (section 7.3.2.1).</font></i>
+<b><font color="#000080">#define</font></b> <a name="164">SD_CARD_R1_READY_STATE</a> <font color="#993399">0x00</font>
+<i><font color="#9A1900">// Status for card in the idle state (section 7.3.2.1).</font></i>
+<b><font color="#000080">#define</font></b> <a name="166">SD_CARD_R1_IDLE_STATE</a> <font color="#993399">0x01</font>
+<i><font color="#9A1900">// Status bit for illegal command (section 7.3.2.1).</font></i>
+<b><font color="#000080">#define</font></b> <a name="168">SD_CARD_R1_ILLEGAL_COMMAND</a> <font color="#993399">0x04</font>
+
+<i><font color="#9A1900">// Start data token for read or write single bloc (section 7.3.3.2).</font></i>
+<b><font color="#000080">#define</font></b> <a name="171">SD_CARD_DATA_START_BLOCK</a> <font color="#993399">0xFE</font>
+<i><font color="#9A1900">// Mask for data response tokens after a write block operation (section</font></i>
+<i><font color="#9A1900">// 7.3.3.1).</font></i>
+<b><font color="#000080">#define</font></b> <a name="174">SD_CARD_DATA_RES_MASK</a> <font color="#993399">0x1F</font>
+<i><font color="#9A1900">// Write data accepted token (section 7.3.3.1).</font></i>
+<b><font color="#000080">#define</font></b> <a name="176">SD_CARD_DATA_RES_ACCEPTED</a> <font color="#993399">0x05</font>
+
+<i><font color="#9A1900">// }}}1</font></i>
+
+<i><font color="#9A1900">// Card CID and CSD register descriptions {{{1</font></i>
+
+<i><font color="#9A1900">// Card Identification (CID) register (section 5.2).</font></i>
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">struct</font></b> <font color="#008080"><a name="183">sd_card_cid</a></font> <font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Byte 0</font></i>
+  <font color="#008080">uint8_t</font> <a name="185">mid</a><font color="#990000">;</font>  <i><font color="#9A1900">// Manufacturer ID</font></i>
+  <i><font color="#9A1900">// Byte 1-2</font></i>
+  <font color="#009900">char</font> <a name="187">oid</a><font color="#990000">[</font><font color="#993399">2</font><font color="#990000">];</font>  <i><font color="#9A1900">// OEM/Application ID</font></i>
+  <i><font color="#9A1900">// Byte 3-7</font></i>
+  <font color="#009900">char</font> <a name="189">pnm</a><font color="#990000">[</font><font color="#993399">5</font><font color="#990000">];</font>  <i><font color="#9A1900">// Product name</font></i>
+  <i><font color="#9A1900">// Byte 8</font></i>
+  <font color="#009900">unsigned</font> <a name="191">prv_m</a> <font color="#990000">:</font> <font color="#993399">4</font><font color="#990000">;</font>  <i><font color="#9A1900">// Product revision n.m</font></i>
+  <font color="#009900">unsigned</font> <a name="192">prv_n</a> <font color="#990000">:</font> <font color="#993399">4</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 9-12</font></i>
+  <font color="#008080">uint32_t</font> <a name="194">psn</a><font color="#990000">;</font>  <i><font color="#9A1900">// Product serial number</font></i>
+  <i><font color="#9A1900">// Byte 13</font></i>
+  <font color="#009900">unsigned</font> <a name="196">mdt_year_high</a> <font color="#990000">:</font> <font color="#993399">4</font><font color="#990000">;</font>  <i><font color="#9A1900">// Manufacturing date</font></i>
+  <font color="#009900">unsigned</font> <a name="197">reserved</a> <font color="#990000">:</font> <font color="#993399">4</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 14</font></i>
+  <font color="#009900">unsigned</font> <a name="199">mdt_month</a> <font color="#990000">:</font> <font color="#993399">4</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="200">mdt_year_low</a> <font color="#990000">:</font><font color="#993399">4</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 15</font></i>
+  <font color="#009900">unsigned</font> <a name="202">always1</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="203">crc</a> <font color="#990000">:</font> <font color="#993399">7</font><font color="#990000">;</font>
+<font color="#FF0000">}</font> <a name="204">sd_card_cid_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// Card-Specific Data (CSD) register (section 5.3).  see also the higher-level</font></i>
+<i><font color="#9A1900">// (partial) interface functions in <a href="sd_card.h.html">sd_card.h</a>.  Note that there are two</font></i>
+<i><font color="#9A1900">// versions of this structure each used by a different SD card version,</font></i>
+<i><font color="#9A1900">// this is the version 1 form.</font></i>
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">struct</font></b> <font color="#008080"><a name="210">sd_card_csd1</a></font> <font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Byte 0</font></i>
+  <font color="#009900">unsigned</font> <a name="212">reserved1</a> <font color="#990000">:</font> <font color="#993399">6</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="213">csd_ver</a> <font color="#990000">:</font> <font color="#993399">2</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 1</font></i>
+  <font color="#008080">uint8_t</font> <a name="215">taac</a><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 2</font></i>
+  <font color="#008080">uint8_t</font> <a name="217">nsac</a><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 3</font></i>
+  <font color="#008080">uint8_t</font> <a name="219">tran_speed</a><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 4</font></i>
+  <font color="#008080">uint8_t</font> <a name="221">ccc_high</a><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 5</font></i>
+  <font color="#009900">unsigned</font> <a name="223">read_bl_len</a> <font color="#990000">:</font> <font color="#993399">4</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="224">ccc_low</a> <font color="#990000">:</font> <font color="#993399">4</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 6</font></i>
+  <font color="#009900">unsigned</font> <a name="226">c_size_high</a> <font color="#990000">:</font> <font color="#993399">2</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="227">reserved2</a> <font color="#990000">:</font> <font color="#993399">2</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="228">dsr_imp</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="229">read_blk_misalign</a> <font color="#990000">:</font><font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="230">write_blk_misalign</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="231">read_bl_partial</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 7</font></i>
+  <font color="#008080">uint8_t</font> <a name="233">c_size_mid</a><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 8</font></i>
+  <font color="#009900">unsigned</font> <a name="235">vdd_r_curr_max</a> <font color="#990000">:</font> <font color="#993399">3</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="236">vdd_r_curr_min</a> <font color="#990000">:</font> <font color="#993399">3</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="237">c_size_low</a> <font color="#990000">:</font><font color="#993399">2</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 9</font></i>
+  <font color="#009900">unsigned</font> <a name="239">c_size_mult_high</a> <font color="#990000">:</font> <font color="#993399">2</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="240">vdd_w_cur_max</a> <font color="#990000">:</font> <font color="#993399">3</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="241">vdd_w_curr_min</a> <font color="#990000">:</font> <font color="#993399">3</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 10</font></i>
+  <font color="#009900">unsigned</font> <a name="243">sector_size_high</a> <font color="#990000">:</font> <font color="#993399">6</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="244">erase_blk_en</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="245">c_size_mult_low</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 11</font></i>
+  <font color="#009900">unsigned</font> <a name="247">wp_grp_size</a> <font color="#990000">:</font> <font color="#993399">7</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="248">sector_size_low</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 12</font></i>
+  <font color="#009900">unsigned</font> <a name="250">write_bl_len_high</a> <font color="#990000">:</font> <font color="#993399">2</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="251">r2w_factor</a> <font color="#990000">:</font> <font color="#993399">3</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="252">reserved3</a> <font color="#990000">:</font> <font color="#993399">2</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="253">wp_grp_enable</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 13</font></i>
+  <font color="#009900">unsigned</font> <a name="255">reserved4</a> <font color="#990000">:</font> <font color="#993399">5</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="256">write_partial</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="257">write_bl_len_low</a> <font color="#990000">:</font> <font color="#993399">2</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 14</font></i>
+  <font color="#009900">unsigned</font> <a name="259">reserved5</a><font color="#990000">:</font> <font color="#993399">2</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="260">file_format</a> <font color="#990000">:</font> <font color="#993399">2</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="261">tmp_write_protect</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="262">perm_write_protect</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="263">copy</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="264">file_format_grp</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 15</font></i>
+  <font color="#009900">unsigned</font> <a name="266">always1</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="267">crc</a> <font color="#990000">:</font> <font color="#993399">7</font><font color="#990000">;</font>
+<font color="#FF0000">}</font> <a name="268">sd_card_csd1_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// Card-Specific Data (CSD) register (section 5.3).  see also the higher-level</font></i>
+<i><font color="#9A1900">// (partial) interface functions in <a href="sd_card.h.html">sd_card.h</a>.  Note that there are two</font></i>
+<i><font color="#9A1900">// versions of this structure each used by a different SD card version,</font></i>
+<i><font color="#9A1900">// this is the version 2 form.</font></i>
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">struct</font></b> <font color="#008080"><a name="274">sd_card_csd2</a></font> <font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Byte 0</font></i>
+  <font color="#009900">unsigned</font> <a name="276">reserved1</a> <font color="#990000">:</font> <font color="#993399">6</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="277">csd_ver</a> <font color="#990000">:</font> <font color="#993399">2</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 1</font></i>
+  <font color="#008080">uint8_t</font> <a name="279">taac</a><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 2</font></i>
+  <font color="#008080">uint8_t</font> <a name="281">nsac</a><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 3</font></i>
+  <font color="#008080">uint8_t</font> <a name="283">tran_speed</a><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 4</font></i>
+  <font color="#008080">uint8_t</font> <a name="285">ccc_high</a><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 5</font></i>
+  <font color="#009900">unsigned</font> <a name="287">read_bl_len</a> <font color="#990000">:</font> <font color="#993399">4</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="288">ccc_low</a> <font color="#990000">:</font> <font color="#993399">4</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 6</font></i>
+  <font color="#009900">unsigned</font> <a name="290">reserved2</a> <font color="#990000">:</font> <font color="#993399">4</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="291">dsr_imp</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="292">read_blk_misalign</a> <font color="#990000">:</font><font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="293">write_blk_misalign</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="294">read_bl_partial</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 7</font></i>
+  <font color="#009900">unsigned</font> <a name="296">reserved3</a> <font color="#990000">:</font> <font color="#993399">2</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="297">c_size_high</a> <font color="#990000">:</font> <font color="#993399">6</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 8</font></i>
+  <font color="#008080">uint8_t</font> <a name="299">c_size_mid</a><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 9</font></i>
+  <font color="#008080">uint8_t</font> <a name="301">c_size_low</a><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 10</font></i>
+  <font color="#009900">unsigned</font> <a name="303">sector_size_high</a> <font color="#990000">:</font> <font color="#993399">6</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="304">erase_blk_en</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="305">reserved4</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 11</font></i>
+  <font color="#009900">unsigned</font> <a name="307">wp_grp_size</a> <font color="#990000">:</font> <font color="#993399">7</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="308">sector_size_low</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 12</font></i>
+  <font color="#009900">unsigned</font> <a name="310">write_bl_len_high</a> <font color="#990000">:</font> <font color="#993399">2</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="311">r2w_factor</a> <font color="#990000">:</font> <font color="#993399">3</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="312">reserved5</a> <font color="#990000">:</font> <font color="#993399">2</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="313">wp_grp_enable</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 13</font></i>
+  <font color="#009900">unsigned</font> <a name="315">reserved6</a> <font color="#990000">:</font> <font color="#993399">5</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="316">write_partial</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="317">write_bl_len_low</a> <font color="#990000">:</font> <font color="#993399">2</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 14</font></i>
+  <font color="#009900">unsigned</font> <a name="319">reserved7</a><font color="#990000">:</font> <font color="#993399">2</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="320">file_format</a> <font color="#990000">:</font> <font color="#993399">2</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="321">tmp_write_protect</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="322">perm_write_protect</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="323">copy</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="324">file_format_grp</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <i><font color="#9A1900">// Byte 15</font></i>
+  <font color="#009900">unsigned</font> <a name="326">always1</a> <font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#009900">unsigned</font> <a name="327">crc</a> <font color="#990000">:</font> <font color="#993399">7</font><font color="#990000">;</font>
+<font color="#FF0000">}</font> <a name="328">sd_card_csd2_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// Union of old and new style CSD register types.</font></i>
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">union</font></b> <font color="#FF0000">{</font>
+  <font color="#008080"><a href="sd_card_private.h.html#268">sd_card_csd1_t</a></font> <a name="332">v1</a><font color="#990000">;</font>
+  <font color="#008080"><a href="sd_card_private.h.html#328">sd_card_csd2_t</a></font> <a name="333">v2</a><font color="#990000">;</font>
+<font color="#FF0000">}</font> <a name="334">sd_card_csd_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// }}}1</font></i>
+
+<b><font color="#000080">#endif</font></b>  <i><font color="#9A1900">// SD_CARD_INFO_H</font></i>
+</tt></pre>

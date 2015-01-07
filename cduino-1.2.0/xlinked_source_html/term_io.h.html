@@ -1,0 +1,96 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Terminal-style input and output (i.e. basic line editing and formatted</font></i>
+<i><font color="#9A1900">// output functionality) for the Arduino serial port.</font></i>
+
+<i><font color="#9A1900">// Test driver: <a href="term_io_test.c.html">term_io_test.c</a>    Implementation: <a href="term_io.c.html">term_io.c</a></font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="term_io.h.html#7">TERM_IO_H</a>
+<b><font color="#000080">#define</font></b> <a name="7">TERM_IO_H</a>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/pgmspace.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdio.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdlib.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="uart.h.html">uart.h</a>"</font>
+
+<i><font color="#9A1900">// Set up USART0 and AVR libc stdio interface such that printf() (and</font></i>
+<i><font color="#9A1900">// friends) can be used for output, and term_io_getline() used for input</font></i>
+<i><font color="#9A1900">// via a GNU screen session (with default settings) or something similar.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Things to consider:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Calling term_io_init() sets up the PD0 (RXD) and PD1 (TXD) pins such</font></i>
+<i><font color="#9A1900">//     that they cannot be used for normal digital IO.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * The AVR libc input functions (scanf() and friends) do not by</font></i>
+<i><font color="#9A1900">//     themselves provide provide any screen echo or command-line editing</font></i>
+<i><font color="#9A1900">//     capability (hence the term_io_getline() function).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Some of the AVR libc output functions (printf() and friends) provide</font></i>
+<i><font color="#9A1900">//     different levels of functionality and libc-ishness depending on</font></i>
+<i><font color="#9A1900">//     the linker flags used; see AVRLIBC_PRINTF_LDFLAGS in generic.mk</font></i>
+<i><font color="#9A1900">//     for details.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="term_io.c.html#166">term_io_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// The term_io_getline() function uses an internal buffer this big</font></i>
+<b><font color="#000080">#define</font></b> <a name="36">TERM_IO_RX_BUFSIZE</a> <font color="#993399">81</font>
+
+<i><font color="#9A1900">// The buffer supplied to the term_io_getline() must be at least this big</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="39">TERM_IO_LINE_BUFFER_MIN_SIZE</a></font></b> <font color="#990000">(</font><a href="term_io.h.html#36">TERM_IO_RX_BUFSIZE</a> <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">)</font>
+
+<i><font color="#9A1900">// Get a line of input from the terminal, and save it in linebuf (which</font></i>
+<i><font color="#9A1900">// must be at least TERM_IO_LINE_BUFFER_MIN_SIZE bytes long).  Basic command</font></i>
+<i><font color="#9A1900">// line editing is available for the user entering the line; see <a href="uart.h.html">uart.h</a> for</font></i>
+<i><font color="#9A1900">// details.  Returns the number of characters retrieved (including trailing</font></i>
+<i><font color="#9A1900">// newline but not including trailing null), or -1 if an error occurs.</font></i>
+<font color="#009900">int</font>
+<b><font color="#000000"><a href="term_io.c.html#174">term_io_getline</a></font></b> <font color="#990000">(</font><font color="#009900">char</font> <font color="#990000">*</font>linebuf<font color="#990000">);</font>
+
+<i><font color="#9A1900">// PrintF using Program memory.  This macro makes it easier to store the</font></i>
+<i><font color="#9A1900">// format arguments to printf_P calls in program space.</font></i>
+<b><font color="#000080">#ifndef</font></b> __GNUC__
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> GNU C is required by a <font color="#008080">nearby</font> comma<font color="#990000">-</font>swallowing macro
+<b><font color="#000080">#endif</font></b>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="54">TERM_IO_PFP</a></font></b><font color="#990000">(</font>format<font color="#990000">,</font> <font color="#990000">...)</font> <b><font color="#000000">printf_P</font></b> <font color="#990000">(</font><b><font color="#000000">PSTR</font></b> <font color="#990000">(</font>format<font color="#990000">),</font> ## __VA_ARGS__<font color="#990000">)</font>
+
+<i><font color="#9A1900">// Print Trace Point message.  Useful for debugging.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="57">TERM_IO_PTP</a></font></b><font color="#990000">()</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="term_io.h.html#54">TERM_IO_PFP</a></font></b> <font color="#990000">(</font> <font color="#990000">\</font>
+      <font color="#FF0000">"trace point: file %s, line %d, function %s()</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font> <font color="#990000">\</font>
+      __FILE__<font color="#990000">,</font> __LINE__<font color="#990000">,</font> __func__ <font color="#990000">)</font>
+
+<i><font color="#9A1900">// Print Halt Point message and call exit(1).  Note that exit will disable</font></i>
+<i><font color="#9A1900">// all interrupts before entering an infinite loop.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="64">TERM_IO_PHP</a></font></b><font color="#990000">()</font> <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+    <b><font color="#000000"><a href="term_io.h.html#54">TERM_IO_PFP</a></font></b> <font color="#990000">(</font> <font color="#990000">\</font>
+        <font color="#FF0000">"halt point: file %s, line %d, function %s()</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font> <font color="#990000">\</font>
+        __FILE__<font color="#990000">,</font> __LINE__<font color="#990000">,</font> __func__<font color="#990000">);</font> <font color="#990000">\</font>
+    <b><font color="#000000">exit</font></b> <font color="#990000">(</font><font color="#993399">1</font><font color="#990000">);</font> <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">);</font>
+
+<i><font color="#9A1900">// The whole point of the above macros is that they take some typing out of</font></i>
+<i><font color="#9A1900">// the edit-compile-debug cycle, so you may like to stick something like</font></i>
+<i><font color="#9A1900">// 'CPPFLAGS += -DTERM_IO_POLLUTE_NAMESPACE_WITH_DEBUGGING_GOOP' at the</font></i>
+<i><font color="#9A1900">// bottom of the Makefile for your module to make things even easier :)</font></i>
+<b><font color="#000080">#ifdef</font></b> TERM_IO_POLLUTE_NAMESPACE_WITH_DEBUGGING_GOOP
+<a href="accelerometer_test.c.html#8">TERM_IO_POLLUTE_NAMESPACE_WITH_DEBUGGING_GOOP -> accelerometer_test.c:8</a>
+<a href="adc_test.c.html#27">TERM_IO_POLLUTE_NAMESPACE_WITH_DEBUGGING_GOOP -> adc_test.c:27</a>
+<a href="dc_motor_test.c.html#27">TERM_IO_POLLUTE_NAMESPACE_WITH_DEBUGGING_GOOP -> dc_motor_test.c:27</a>
+<a href="one_wire_master_test.c.html#34">TERM_IO_POLLUTE_NAMESPACE_WITH_DEBUGGING_GOOP -> one_wire_master_test.c:34</a>
+<a href="sd_card_test.c.html#25">TERM_IO_POLLUTE_NAMESPACE_WITH_DEBUGGING_GOOP -> sd_card_test.c:25</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a name="77">PFP</a></font> <a href="term_io.h.html#54">TERM_IO_PFP</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a name="78">PTP</a></font> <a href="term_io.h.html#57">TERM_IO_PTP</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a name="79">PHP</a></font> <a href="term_io.h.html#64">TERM_IO_PHP</a>
+<i><font color="#9A1900">// Perhaps you even like to use lower case :)</font></i>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a name="81">pfp</a></font> <a href="term_io.h.html#54">TERM_IO_PFP</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a name="82">ptp</a></font> <a href="term_io.h.html#57">TERM_IO_PTP</a>
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a name="83">php</a></font> <a href="term_io.h.html#64">TERM_IO_PHP</a>
+<b><font color="#000080">#endif</font></b>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// TERM_IO_H</font></i>
+</tt></pre>

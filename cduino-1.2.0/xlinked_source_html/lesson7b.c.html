@@ -1,0 +1,74 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">/* $Id: <a href="lesson7b.c.html">lesson7b.c</a>,v 1.2 2009/02/09 03:30:03 ckuethe Exp $ */</font></i>
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900"> * Copyright (c) 2009 Chris Kuethe </font></i><u><font color="#0000FF">&lt;chris.kuethe@gmail.com&gt;</font></u>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * Permission to use, copy, modify, and distribute this software for any</font></i>
+<i><font color="#9A1900"> * purpose with or without fee is hereby granted, provided that the above</font></i>
+<i><font color="#9A1900"> * copyright notice and this permission notice appear in all copies.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES</font></i>
+<i><font color="#9A1900"> * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF</font></i>
+<i><font color="#9A1900"> * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR</font></i>
+<i><font color="#9A1900"> * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES</font></i>
+<i><font color="#9A1900"> * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN</font></i>
+<i><font color="#9A1900"> * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF</font></i>
+<i><font color="#9A1900"> * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900"> * Assumptions:</font></i>
+<i><font color="#9A1900"> * 	- LEDs connected to PORTD.5 and PORTD.6</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<font color="#009900">int</font> <b><font color="#000000"><a name="26">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+	<i><font color="#9A1900">/* Waveform Generation Mode 3 - Fast PWM */</font></i>
+	TCCR0A <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b><font color="#990000">(</font>WGM01<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b><font color="#990000">(</font>WGM00<font color="#990000">);</font>
+
+	<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900">	 * Compare Output Mode - fast PWM</font></i>
+<i><font color="#9A1900">	 * Non-inverting mode drives the output high while the counter</font></i>
+<i><font color="#9A1900">	 * is greater than OCRNx. Inverting mode drives the output low</font></i>
+<i><font color="#9A1900">	 * while the counter is greater than OCRNx.</font></i>
+<i><font color="#9A1900">	 */</font></i>
+	TCCR0A <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b><font color="#990000">(</font>COM0A1<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b><font color="#990000">(</font>COM0A0<font color="#990000">);</font> <i><font color="#9A1900">/* inverting: fade down */</font></i>
+	TCCR0A <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b><font color="#990000">(</font>COM0B1<font color="#990000">);</font> <i><font color="#9A1900">/* non-inverting: fade up */</font></i>
+
+	<i><font color="#9A1900">/* reset all the timers and comparators */</font></i>
+	OCR0A <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+	OCR0B <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+	TCNT0 <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+
+	<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900">	 * Clock Source 1 - CLK. Setting this bit late allows us to</font></i>
+<i><font color="#9A1900">	 * initialize the registers before the clocks start ticking</font></i>
+<i><font color="#9A1900">	 */</font></i>
+	TCCR0B <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b><font color="#990000">(</font>CS00<font color="#990000">);</font>
+
+	<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900">	 * Arduino pins 5 &amp; 6 (PORTD.5 and PORTD.6) are PWM driven by TIMER0</font></i>
+<i><font color="#9A1900">	 * "The setup of the OC0x should be performed before setting the Data</font></i>
+<i><font color="#9A1900">	 * Direction Register for the port pin to output." -- S14.5.3</font></i>
+<i><font color="#9A1900">	 */</font></i>
+	DDRD <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b><font color="#990000">(</font>PORTD5<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b><font color="#990000">(</font>PORTD6<font color="#990000">);</font>
+
+	<b><font color="#0000FF">while</font></b> <font color="#990000">(</font><font color="#993399">1</font><font color="#990000">)</font><font color="#FF0000">{</font>
+		<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900">		 * slowly crank up the compare register. since one output</font></i>
+<i><font color="#9A1900">		 * is inverting, the net result is to fade from one channel</font></i>
+<i><font color="#9A1900">		 * to the other.</font></i>
+<i><font color="#9A1900">		 */</font></i>
+		OCR0A<font color="#990000">++;</font>
+		OCR0B<font color="#990000">++;</font>
+		<b><font color="#000000">_delay_ms</font></b><font color="#990000">(</font><font color="#993399">10</font><font color="#990000">);</font> <i><font color="#9A1900">/* busy wait. could be done with timers too. */</font></i>
+	<font color="#FF0000">}</font>
+	<b><font color="#0000FF">return</font></b> <font color="#993399">0</font><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+</tt></pre>

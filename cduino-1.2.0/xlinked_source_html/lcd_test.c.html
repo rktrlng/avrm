@@ -1,0 +1,126 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Test/demo for the <a href="lcd.h.html">lcd.h</a> interface.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// NOTE: all the testing I've done has been done with the DFRobot DFR0009</font></i>
+<i><font color="#9A1900">// LCD Shield for Arduino.  This is a very convenient LCD to connect and</font></i>
+<i><font color="#9A1900">// also features some pushbuttons (not used in this module).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This test program requires an Hitachi HD44780 LCD display to be connected</font></i>
+<i><font color="#9A1900">// using the pin connections defined in the Makefile, and a couple of other</font></i>
+<i><font color="#9A1900">// LCD pins to be connected in particular ways to make the LCD usable.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Unless something has changed in the Makefile, the LCD pin connections</font></i>
+<i><font color="#9A1900">// should be:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * LCD RS pin to digital pin 8</font></i>
+<i><font color="#9A1900">//   * LCD Enable pin to digital pin 9</font></i>
+<i><font color="#9A1900">//   * LCD D4 pin to digital pin 11</font></i>
+<i><font color="#9A1900">//   * LCD D5 pin to digital pin 12</font></i>
+<i><font color="#9A1900">//   * LCD D6 pin to digital pin 13</font></i>
+<i><font color="#9A1900">//   * LCD D7 pin to digital pin 14</font></i>
+<i><font color="#9A1900">//   * LCD R/W pin to ground</font></i>
+<i><font color="#9A1900">//   * 10K potentiometer:</font></i>
+<i><font color="#9A1900">//     * Ends to +5V and ground</font></i>
+<i><font color="#9A1900">//     * Wiper to LCD VO pin (pin 3).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Note that the results just sort of print things on top of each other.</font></i>
+<i><font color="#9A1900">// The final screen after the tests are done doesn't look particularly</font></i>
+<i><font color="#9A1900">// organized.  You have to match what you see going on with this test code</font></i>
+<i><font color="#9A1900">// to verify correct LCD operation.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This example code is in the public domain.  It was created by</font></i>
+<i><font color="#9A1900">// David A. Mellis.  It was subsequently modified by Limor Fried</font></i>
+<i><font color="#9A1900">// (http://www.ladyada.net), then by Tom Igoe, and finally by Britton Kerin.</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/pgmspace.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;string.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+
+<i><font color="#9A1900">// include the library code:</font></i>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="lcd.h.html">lcd.h</a>"</font>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="42">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="lcd.c.html#118">lcd_init</a></font></b> <font color="#990000">();</font>
+
+  <i><font color="#9A1900">// Print a message to the LCD.</font></i>
+  <b><font color="#000000"><a href="lcd.c.html#310">lcd_write_string</a></font></b> <font color="#990000">(</font><font color="#FF0000">"hello, world!"</font><font color="#990000">);</font>
+
+  <font color="#009900">double</font> magic_number <font color="#990000">=</font> <font color="#993399">42.65</font><font color="#990000">;</font>   <i><font color="#9A1900">// Something to output.</font></i>
+
+  <font color="#009900">double</font> time_per_test_ms <font color="#990000">=</font> <font color="#993399">1000.0</font><font color="#990000">;</font>   <i><font color="#9A1900">// Time we spend on most tests, in ms.</font></i>
+
+  <i><font color="#9A1900">// Set the cursor to column 0, line 1.  Note: line 1 is the second row,</font></i>
+  <i><font color="#9A1900">// since counting begins with 0.</font></i>
+  <b><font color="#000000"><a href="lcd.c.html#204">lcd_set_cursor_position</a></font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Test lcd_printf().</font></i>
+  <b><font color="#000000"><a href="lcd.c.html#278">lcd_printf</a></font></b> <font color="#990000">(</font><font color="#FF0000">"%.2f "</font><font color="#990000">,</font> magic_number<font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>time_per_test_ms<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Test lcd_printf_P().</font></i>
+  <b><font color="#000000"><a href="lcd.c.html#294">lcd_printf_P</a></font></b> <font color="#990000">(</font><b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"%.2f "</font><font color="#990000">),</font> magic_number<font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>time_per_test_ms<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Test the underline cursor on/off routines. </font></i>
+  <b><font color="#000000"><a href="lcd.c.html#254">lcd_underline_cursor_on</a></font></b> <font color="#990000">();</font>   
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>time_per_test_ms<font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd.c.html#247">lcd_underline_cursor_off</a></font></b> <font color="#990000">();</font>
+
+  <i><font color="#9A1900">// Test blinking cursor on/off routines.</font></i>
+  <b><font color="#000000"><a href="lcd.c.html#239">lcd_blinking_cursor_on</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>time_per_test_ms<font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd.c.html#232">lcd_blinking_cursor_off</a></font></b> <font color="#990000">();</font>
+
+  <i><font color="#9A1900">// Test turning display off and on again.</font></i>
+  <b><font color="#000000"><a href="lcd.c.html#218">lcd_display_off</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>time_per_test_ms<font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd.c.html#225">lcd_display_on</a></font></b> <font color="#990000">();</font>
+
+  <i><font color="#9A1900">// Test setting the cursor somewhere exotic.</font></i>
+  <font color="#008080">uint8_t</font> test_start_col <font color="#990000">=</font> <font color="#993399">12</font><font color="#990000">,</font> test_start_row <font color="#990000">=</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <b><font color="#0000FF">const</font></b> <font color="#009900">char</font> test_char <font color="#990000">=</font> <font color="#FF0000">'X'</font><font color="#990000">;</font>
+  <b><font color="#000000"><a href="lcd.c.html#204">lcd_set_cursor_position</a></font></b> <font color="#990000">(</font>test_start_col<font color="#990000">,</font> test_start_row<font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd.c.html#271">lcd_write</a></font></b> <font color="#990000">(</font>test_char<font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>time_per_test_ms<font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="lcd.c.html#189">lcd_clear</a></font></b> <font color="#990000">();</font>
+
+  <i><font color="#9A1900">// Test display scrolling. </font></i>
+  test_start_col <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">,</font> test_start_row <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <b><font color="#000000"><a href="lcd.c.html#204">lcd_set_cursor_position</a></font></b><font color="#990000">(</font>test_start_col<font color="#990000">,</font> test_start_row<font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd.c.html#278">lcd_printf</a></font></b> <font color="#990000">(</font><font color="#FF0000">"hello, big world!"</font><font color="#990000">);</font> 
+  <b><font color="#0000FF">const</font></b> <font color="#009900">int</font> chars_to_scroll <font color="#990000">=</font> <font color="#993399">3</font><font color="#990000">;</font>
+  <b><font color="#0000FF">const</font></b> <font color="#009900">float</font> ms_per_scroll_step <font color="#990000">=</font> <font color="#993399">500.0</font><font color="#990000">;</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#009900">int</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> chars_to_scroll <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="lcd.c.html#261">lcd_scroll_left</a></font></b> <font color="#990000">();</font>
+    <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>ms_per_scroll_step<font color="#990000">);</font>
+  <font color="#FF0000">}</font> 
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#009900">int</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> chars_to_scroll <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="lcd.c.html#266">lcd_scroll_right</a></font></b> <font color="#990000">();</font>
+    <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>ms_per_scroll_step<font color="#990000">);</font>
+  <font color="#FF0000">}</font> 
+
+  <i><font color="#9A1900">// Test setting cursor position and writing while scrolled.  This test</font></i>
+  <i><font color="#9A1900">// illustrated the fact that the cursor position refers to a location in</font></i>
+  <i><font color="#9A1900">// the underlying text area, not a current physical screen coordinate.</font></i>
+  <i><font color="#9A1900">// When the screen is scrolled, the lcd_set_cursor_position() function</font></i>
+  <i><font color="#9A1900">// behavior changes accordingly.</font></i>
+  <b><font color="#000000"><a href="lcd.c.html#261">lcd_scroll_left</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="lcd.c.html#261">lcd_scroll_left</a></font></b> <font color="#990000">();</font>
+  test_start_col <font color="#990000">=</font> <font color="#993399">4</font><font color="#990000">,</font> test_start_row <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <b><font color="#000000"><a href="lcd.c.html#204">lcd_set_cursor_position</a></font></b><font color="#990000">(</font>test_start_col<font color="#990000">,</font> test_start_row<font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd.c.html#278">lcd_printf</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Foo!"</font><font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>time_per_test_ms<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Test output of a couple of useful non-ASCII characters.  These may fail</font></i>
+  <i><font color="#9A1900">// depending on LCD model; see notes in the header file.</font></i>
+  <b><font color="#000000"><a href="lcd.c.html#196">lcd_home</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="lcd.c.html#271">lcd_write</a></font></b> <font color="#990000">(</font><a href="lcd.h.html#91">LCD_CHARACTER_RIGHT_ARROW</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd.c.html#271">lcd_write</a></font></b> <font color="#990000">(</font><a href="lcd.h.html#92">LCD_CHARACTER_LEFT_ARROW</a><font color="#990000">);</font>
+<font color="#FF0000">}</font>
+</tt></pre>

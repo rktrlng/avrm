@@ -1,0 +1,270 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Test/demo for the <a href="timer0_stopwatch.h.html">timer0_stopwatch.h</a> interface.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This program first performs a number of internal tests with no visible</font></i>
+<i><font color="#9A1900">// output.  If all these pass, it get around to tripple-blinking the onboard</font></i>
+<i><font color="#9A1900">// LED on the Arduino PB5 pin three times (note that the normal Arduino</font></i>
+<i><font color="#9A1900">// boot sequence might blink it a time or two itself), with approximately</font></i>
+<i><font color="#9A1900">// 3 seconds between each tripple-blink, then do nothing.</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;assert.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/sfr_defs.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;limits.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+<i><font color="#9A1900">// FIXME: we shouldn't need to include this once avrlibc has a correct</font></i>
+<i><font color="#9A1900">// assert.h (we only use it for assert as of this writing).</font></i>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdlib.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="timer0_stopwatch.h.html">timer0_stopwatch.h</a>"</font>
+
+<i><font color="#9A1900">// See the Makefile for this module for a convenient way to set all the</font></i>
+<i><font color="#9A1900">// compiler and linker flags required for debug logging to work.</font></i>
+<b><font color="#000080">#ifdef</font></b> TIMER0_STOPWATCH_DEBUG
+<b><font color="#000080">#  include</font></b> <font color="#FF0000">"<a href="term_io.h.html">term_io.h</a>"</font>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="24">DEBUG_LOG</a></font></b><font color="#990000">(...)</font> <b><font color="#000000">printf</font></b> <font color="#990000">(</font>__VA_ARGS__<font color="#990000">)</font>
+<b><font color="#000080">#else</font></b>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="26">DEBUG_LOG</a></font></b><font color="#990000">(...)</font>
+<b><font color="#000080">#endif</font></b>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="30">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+
+<b><font color="#000080">#ifdef</font></b> TIMER0_STOPWATCH_DEBUG
+  <b><font color="#000000"><a href="term_io.c.html#166">term_io_init</a></font></b> <font color="#990000">();</font>   <i><font color="#9A1900">// For debugging</font></i>
+<b><font color="#000080">#endif</font></b>
+
+  <b><font color="#000000">DEBUG_LOG</font></b> <font color="#990000">(</font><font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+<a href="timer0_stopwatch_test.c.html#24">DEBUG_LOG -> timer0_stopwatch_test.c:24</a>
+<a href="timer0_stopwatch_test.c.html#26">DEBUG_LOG -> timer0_stopwatch_test.c:26</a>
+
+  <b><font color="#000000">DEBUG_LOG</font></b> <font color="#990000">(</font><font color="#FF0000">"CPU Frequency: %lu</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font> F_CPU<font color="#990000">);</font>
+<a href="timer0_stopwatch_test.c.html#24">DEBUG_LOG -> timer0_stopwatch_test.c:24</a>
+<a href="timer0_stopwatch_test.c.html#26">DEBUG_LOG -> timer0_stopwatch_test.c:26</a>
+
+  <i><font color="#9A1900">// Set up pin PB5 for output so we can blink the LED onboard the Arduino.</font></i>
+  <i><font color="#9A1900">// We don't use the dio interface here to avoid an unnecessary dependency.</font></i>
+  DDRB <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>DDB5<font color="#990000">);</font>
+  <b><font color="#000000">loop_until_bit_is_set</font></b> <font color="#990000">(</font>DDRB<font color="#990000">,</font> DDB5<font color="#990000">);</font>
+  PORTB <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PORTB5<font color="#990000">));</font>
+
+  <b><font color="#000000"><a href="timer0_stopwatch.c.html#50">timer0_stopwatch_init</a></font></b> <font color="#990000">();</font>
+
+  <i><font color="#9A1900">// Time between tripple-blinks, in us.</font></i>
+  <b><font color="#0000FF">const</font></b> <font color="#008080">uint32_t</font> tbtbus <font color="#990000">=</font> <font color="#993399">3</font> <font color="#990000">*</font> <font color="#993399">1000000</font><font color="#990000">;</font>
+
+  <font color="#008080">uint8_t</font> trippleblinks <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+
+  <i><font color="#9A1900">// Test timer monotonicity: time should always increase.</font></i>
+  <font color="#008080">uint16_t</font> mtc <font color="#990000">=</font> UINT16_MAX <font color="#990000">-</font> <font color="#993399">1</font><font color="#990000">;</font>   <i><font color="#9A1900">// These tests are fast, we will do lots.</font></i>
+  <font color="#008080">uint16_t</font> ii<font color="#990000">;</font>
+  <font color="#008080">uint32_t</font> old_ticks <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> mtc <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <font color="#008080">uint32_t</font> new_ticks <font color="#990000">=</font> <b><font color="#000000"><a href="timer0_stopwatch.c.html#107">timer0_stopwatch_ticks</a></font></b> <font color="#990000">();</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font>new_ticks <font color="#990000">&gt;=</font> old_ticks<font color="#990000">);</font>
+    old_ticks <font color="#990000">=</font> new_ticks<font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// See other calls where we make some effort to verify that this function</font></i>
+  <i><font color="#9A1900">// actually resets the stopwatch to zero (though there isn't much to go</font></i>
+  <i><font color="#9A1900">// wrong here).</font></i>
+  <b><font color="#000000"><a href="timer0_stopwatch.c.html#90">timer0_stopwatch_reset</a></font></b> <font color="#990000">();</font>
+
+  <i><font color="#9A1900">// Test that the timer is monotonic and always counts at least as fast as</font></i>
+  <i><font color="#9A1900">// _delay_us() using some small out-of-phase delays thrown in.</font></i>
+  <font color="#008080">uint8_t</font> max_delay_us <font color="#990000">=</font> <font color="#993399">242</font><font color="#990000">;</font>   <i><font color="#9A1900">// Because it's not 256, and ends in 42 :)</font></i>
+  mtc <font color="#990000">=</font> <font color="#993399">1042</font><font color="#990000">;</font>   <i><font color="#9A1900">// These tests are not so fast, we'll do fewer.</font></i>
+  old_ticks <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <font color="#009900">double</font> delay_us <font color="#990000">=</font> <font color="#993399">0.0</font><font color="#990000">;</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> mtc <font color="#990000">/</font> <font color="#993399">1000</font> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <font color="#008080">uint32_t</font> new_ticks <font color="#990000">=</font> <b><font color="#000000"><a href="timer0_stopwatch.c.html#107">timer0_stopwatch_ticks</a></font></b> <font color="#990000">();</font>
+    <b><font color="#0000FF">const</font></b> <font color="#009900">int</font> uspt <font color="#990000">=</font> <a href="timer0_stopwatch.h.html#47">TIMER0_STOPWATCH_MICROSECONDS_PER_TIMER_TICK</a> <font color="#990000">;</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font>new_ticks <font color="#990000">&gt;=</font> old_ticks <font color="#990000">+</font> delay_us <font color="#990000">/</font> uspt<font color="#990000">);</font>
+    old_ticks <font color="#990000">=</font> new_ticks<font color="#990000">;</font>
+    delay_us <font color="#990000">=</font> ii <font color="#990000">%</font> <font color="#990000">(</font>max_delay_us <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">);</font>
+    <b><font color="#000000">_delay_us</font></b> <font color="#990000">(</font>delay_us<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Now that we think we have a working counter, lets measure</font></i>
+  <i><font color="#9A1900">// our read overhead.  First we'll measure the overhead for the</font></i>
+  <i><font color="#9A1900">// TIMER0_STOPWATCH_TICKS() macro.</font></i>
+  <b><font color="#0000FF">const</font></b> <font color="#008080">uint16_t</font> omrc <font color="#990000">=</font> <font color="#993399">5042</font><font color="#990000">;</font>  <i><font color="#9A1900">// Overhead Measurement Read Count</font></i>
+  <i><font color="#9A1900">// The overhead_ticks is the number of ticks used in a loop that does</font></i>
+  <i><font color="#9A1900">// nothing but read.  Not declaring this volatile sometimes result in</font></i>
+  <i><font color="#9A1900">// slightly faster code, but it doesn't necessarily, since what the</font></i>
+  <i><font color="#9A1900">// optimizer does depends on how the value is referenced elsewhere.  Since</font></i>
+  <i><font color="#9A1900">// we want consistent worst-case behavior, we declare this value volatile.</font></i>
+  <b><font color="#0000FF">volatile</font></b> <font color="#008080">uint32_t</font> overhead_ticks<font color="#990000">;</font>
+  <b><font color="#000000"><a href="timer0_stopwatch.c.html#90">timer0_stopwatch_reset</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> omrc <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="timer0_stopwatch.h.html#109">TIMER0_STOPWATCH_TICKS</a></font></b> <font color="#990000">(</font>overhead_ticks<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <font color="#009900">int</font> mot <font color="#990000">=</font> <a href="timer0_stopwatch.h.html#101">TIMER0_STOPWATCH_TICKS_MACRO_MAX_OVERHEAD_TICKS</a><font color="#990000">;</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">((</font><font color="#009900">double</font><font color="#990000">)</font> overhead_ticks <font color="#990000">/</font> omrc <font color="#990000">&lt;=</font>  mot<font color="#990000">);</font>
+  <b><font color="#000000">DEBUG_LOG</font></b> <font color="#990000">(</font>
+<a href="timer0_stopwatch_test.c.html#24">DEBUG_LOG -> timer0_stopwatch_test.c:24</a>
+<a href="timer0_stopwatch_test.c.html#26">DEBUG_LOG -> timer0_stopwatch_test.c:26</a>
+      <font color="#FF0000">"TIMER0_STOPWATCH_TICKS() macro approx. overhead ticks per read: "</font>
+      <font color="#FF0000">"%f</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font>
+      <font color="#990000">(</font><font color="#009900">double</font><font color="#990000">)</font> overhead_ticks <font color="#990000">/</font> omrc <font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Now we'll measure the overhead of the timer0_stopwatch_ticks() function.</font></i>
+  <b><font color="#000000"><a href="timer0_stopwatch.c.html#90">timer0_stopwatch_reset</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> omrc <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    overhead_ticks <font color="#990000">=</font> <b><font color="#000000"><a href="timer0_stopwatch.c.html#107">timer0_stopwatch_ticks</a></font></b> <font color="#990000">();</font>
+  <font color="#FF0000">}</font>
+  mot <font color="#990000">=</font> <a href="timer0_stopwatch.h.html#130">TIMER0_STOPWATCH_TICKS_FUNCTION_MAX_OVERHEAD_TICKS</a><font color="#990000">;</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">((</font><font color="#009900">double</font><font color="#990000">)</font> overhead_ticks <font color="#990000">/</font> omrc <font color="#990000">&lt;=</font> mot<font color="#990000">);</font>
+  <b><font color="#000000">DEBUG_LOG</font></b> <font color="#990000">(</font>
+<a href="timer0_stopwatch_test.c.html#24">DEBUG_LOG -> timer0_stopwatch_test.c:24</a>
+<a href="timer0_stopwatch_test.c.html#26">DEBUG_LOG -> timer0_stopwatch_test.c:26</a>
+      <font color="#FF0000">"timer0_stopwatch_ticks() function approx. overhead ticks per read: "</font>
+      <font color="#FF0000">"%f</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font>
+      <font color="#990000">(</font><font color="#009900">double</font><font color="#990000">)</font> overhead_ticks <font color="#990000">/</font> omrc <font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Now we'll measure the overhead of the timer0_stopwatch_microseconds()</font></i>
+  <i><font color="#9A1900">// function.</font></i>
+  <b><font color="#0000FF">volatile</font></b> <font color="#008080">uint32_t</font> overhead_microseconds<font color="#990000">;</font>
+  <b><font color="#000000"><a href="timer0_stopwatch.c.html#90">timer0_stopwatch_reset</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> omrc <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    overhead_microseconds <font color="#990000">=</font> <b><font color="#000000"><a href="timer0_stopwatch.c.html#136">timer0_stopwatch_microseconds</a></font></b> <font color="#990000">();</font>
+  <font color="#FF0000">}</font>
+  <font color="#009900">int</font> mous <font color="#990000">=</font> <a href="timer0_stopwatch.h.html#148">TIMER0_STOPWATCH_MICROSECONDS_FUNCTION_MAX_READ_OVERHEAD_US</a><font color="#990000">;</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">((</font><font color="#009900">double</font><font color="#990000">)</font> overhead_microseconds <font color="#990000">/</font> omrc <font color="#990000">&lt;=</font> mous<font color="#990000">);</font>
+  <b><font color="#000000">DEBUG_LOG</font></b> <font color="#990000">(</font>
+<a href="timer0_stopwatch_test.c.html#24">DEBUG_LOG -> timer0_stopwatch_test.c:24</a>
+<a href="timer0_stopwatch_test.c.html#26">DEBUG_LOG -> timer0_stopwatch_test.c:26</a>
+      <font color="#FF0000">"timer0_stopwatch_microseconds() function approx. overhead us per read: "</font>
+      <font color="#FF0000">"%f</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font>
+      <font color="#990000">(</font><font color="#009900">double</font><font color="#990000">)</font> overhead_microseconds <font color="#990000">/</font> omrc <font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Test the latency performance of the TIMER0_STOPWATCH_RESET_TCNT0()</font></i>
+  <i><font color="#9A1900">// and TIMER0_STOPWATCH_TCNT0() macros.</font></i>
+  <b><font color="#000000"><a href="timer0_stopwatch.h.html#169">TIMER0_STOPWATCH_RESET_TCNT0</a></font></b><font color="#990000">();</font>
+  <font color="#008080">uint8_t</font> tcnt0_reading1 <font color="#990000">=</font> <b><font color="#000000"><a href="timer0_stopwatch.h.html#182">TIMER0_STOPWATCH_TCNT0</a></font></b><font color="#990000">();</font>
+  <font color="#008080">uint8_t</font> tcnt0_reading2 <font color="#990000">=</font> <b><font color="#000000"><a href="timer0_stopwatch.h.html#182">TIMER0_STOPWATCH_TCNT0</a></font></b><font color="#990000">();</font>
+  <b><font color="#000000">_delay_us</font></b> <font color="#990000">(</font><font color="#993399">1</font><font color="#990000">);</font>
+  <font color="#008080">uint8_t</font> tcnt0_reading3 <font color="#990000">=</font> <b><font color="#000000"><a href="timer0_stopwatch.h.html#182">TIMER0_STOPWATCH_TCNT0</a></font></b><font color="#990000">();</font>
+  <b><font color="#000000">_delay_us</font></b> <font color="#990000">(</font><font color="#993399">2</font> <font color="#990000">*</font> <a href="timer0_stopwatch.h.html#47">TIMER0_STOPWATCH_MICROSECONDS_PER_TIMER_TICK</a><font color="#990000">);</font>
+  <font color="#008080">uint8_t</font> tcnt0_reading4 <font color="#990000">=</font> <b><font color="#000000"><a href="timer0_stopwatch.h.html#182">TIMER0_STOPWATCH_TCNT0</a></font></b><font color="#990000">();</font>
+  <b><font color="#000000">DEBUG_LOG</font></b> <font color="#990000">(</font><font color="#FF0000">"tcnt0_reading1: %u</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font> tcnt0_reading1<font color="#990000">);</font>
+<a href="timer0_stopwatch_test.c.html#24">DEBUG_LOG -> timer0_stopwatch_test.c:24</a>
+<a href="timer0_stopwatch_test.c.html#26">DEBUG_LOG -> timer0_stopwatch_test.c:26</a>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>tcnt0_reading1 <font color="#990000">==</font> <font color="#993399">0</font><font color="#990000">);</font>
+  <b><font color="#000000">DEBUG_LOG</font></b> <font color="#990000">(</font><font color="#FF0000">"tcnt0_reading2: %u</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font> tcnt0_reading2<font color="#990000">);</font>
+<a href="timer0_stopwatch_test.c.html#24">DEBUG_LOG -> timer0_stopwatch_test.c:24</a>
+<a href="timer0_stopwatch_test.c.html#26">DEBUG_LOG -> timer0_stopwatch_test.c:26</a>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>tcnt0_reading2 <font color="#990000">==</font> <font color="#993399">0</font><font color="#990000">);</font>
+  <b><font color="#000000">DEBUG_LOG</font></b> <font color="#990000">(</font><font color="#FF0000">"tcnt0_reading3: %u</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font> tcnt0_reading3<font color="#990000">);</font>
+<a href="timer0_stopwatch_test.c.html#24">DEBUG_LOG -> timer0_stopwatch_test.c:24</a>
+<a href="timer0_stopwatch_test.c.html#26">DEBUG_LOG -> timer0_stopwatch_test.c:26</a>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>tcnt0_reading3 <font color="#990000">==</font> <font color="#993399">0</font><font color="#990000">);</font>
+  <b><font color="#000000">DEBUG_LOG</font></b> <font color="#990000">(</font><font color="#FF0000">"tcnt0_reading4: %u</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font> tcnt0_reading4<font color="#990000">);</font>
+<a href="timer0_stopwatch_test.c.html#24">DEBUG_LOG -> timer0_stopwatch_test.c:24</a>
+<a href="timer0_stopwatch_test.c.html#26">DEBUG_LOG -> timer0_stopwatch_test.c:26</a>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>tcnt0_reading4 <font color="#990000">&gt;=</font> <font color="#993399">2</font><font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>tcnt0_reading4 <font color="#990000">&lt;</font> <font color="#993399">3</font><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// The first in our series of trippleblinks :)</font></i>
+  <b><font color="#000000">CHKP</font></b> <font color="#990000">();</font>
+<a href="accelerometer_test.c.html#26">CHKP -> accelerometer_test.c:26</a>
+<a href="accelerometer_test.c.html#27">CHKP -> accelerometer_test.c:27</a>
+<a href="lis331dlh_driver_private.c.html#49">CHKP -> lis331dlh_driver_private.c:49</a>
+<a href="lis331dlh_driver_private.c.html#50">CHKP -> lis331dlh_driver_private.c:50</a>
+<a href="spi_test.c.html#35">CHKP -> spi_test.c:35</a>
+<a href="spi_test.c.html#36">CHKP -> spi_test.c:36</a>
+<a href="util.h.html#99">CHKP -> util.h:99</a>
+  trippleblinks<font color="#990000">++;</font>
+
+  <i><font color="#9A1900">// This should reset the timer to zero, we can sort of tell if it always</font></i>
+  <i><font color="#9A1900">// has this effect by noting if the three trippleblinks are evenly spaced.</font></i>
+  <i><font color="#9A1900">// Not much to go wrong here hopefully.</font></i>
+  <b><font color="#000000"><a href="timer0_stopwatch.c.html#90">timer0_stopwatch_reset</a></font></b> <font color="#990000">();</font>
+
+  <font color="#009900">int</font> no_reset_yet <font color="#990000">=</font> <font color="#993399">1</font><font color="#990000">;</font>   <i><font color="#9A1900">// Flag true iff we haven't tested reset yet.</font></i>
+
+  <font color="#008080">uint64_t</font> ous <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>  <i><font color="#9A1900">// Old elapsed microseconds reading (on last iteration)</font></i>
+
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#990000">;</font> <font color="#990000">;</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+
+    uint64_t eus
+      <font color="#990000">=</font> <b><font color="#000000"><a href="timer0_stopwatch.c.html#136">timer0_stopwatch_microseconds</a></font></b> <font color="#990000">();</font>   <i><font color="#9A1900">// Elapsed us</font></i>
+
+    <i><font color="#9A1900">// Check for timer overflow</font></i>
+    ous <font color="#990000">=</font> eus<font color="#990000">;</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> ous <font color="#990000">&gt;</font> eus <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000">DEBUG_LOG</font></b> <font color="#990000">(</font><font color="#FF0000">"OVERFLOW DETECTED</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+<a href="timer0_stopwatch_test.c.html#24">DEBUG_LOG -> timer0_stopwatch_test.c:24</a>
+<a href="timer0_stopwatch_test.c.html#26">DEBUG_LOG -> timer0_stopwatch_test.c:26</a>
+      <b><font color="#000000">assert</font></b> <font color="#990000">(</font>ous <font color="#990000">&lt;=</font> ULONG_MAX<font color="#990000">);</font>
+      <b><font color="#000000">DEBUG_LOG</font></b> <font color="#990000">(</font>
+<a href="timer0_stopwatch_test.c.html#24">DEBUG_LOG -> timer0_stopwatch_test.c:24</a>
+<a href="timer0_stopwatch_test.c.html#26">DEBUG_LOG -> timer0_stopwatch_test.c:26</a>
+          <font color="#FF0000">"Overflow detected after %lu microseconds</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font>
+          <font color="#990000">(</font><font color="#009900">long</font> <font color="#009900">unsigned</font><font color="#990000">)</font> ous<font color="#990000">);</font>
+    <font color="#FF0000">}</font>
+
+    <i><font color="#9A1900">// Verify that the ticks() method comes in with about the same reading</font></i>
+    <i><font color="#9A1900">// as the microseconds() method when the conversion factor is used.</font></i>
+    <i><font color="#9A1900">// Note that the tick_slop value used here covers the worst case I get</font></i>
+    <i><font color="#9A1900">// by 30 extra ticks, but doesn't constitute any sort of interface</font></i>
+    <i><font color="#9A1900">// gauranteeabout the maximum delay required for the function call</font></i>
+    <i><font color="#9A1900">// overhead.</font></i>
+    uint64_t eticks
+      <font color="#990000">=</font> <b><font color="#000000"><a href="timer0_stopwatch.c.html#107">timer0_stopwatch_ticks</a></font></b> <font color="#990000">();</font>   <i><font color="#9A1900">// Elapsed ticks</font></i>
+    <b><font color="#0000FF">const</font></b> uint64_t uspt
+      <font color="#990000">=</font> <a href="timer0_stopwatch.h.html#47">TIMER0_STOPWATCH_MICROSECONDS_PER_TIMER_TICK</a><font color="#990000">;</font>
+    <b><font color="#0000FF">const</font></b> <font color="#008080">uint64_t</font> tick_slop <font color="#990000">=</font> <font color="#993399">60</font><font color="#990000">;</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font>eticks <font color="#990000">-</font> eus <font color="#990000">/</font> uspt <font color="#990000">&lt;</font> tick_slop<font color="#990000">);</font>
+
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> eus <font color="#990000">&gt;=</font> tbtbus <font color="#990000">)</font> <font color="#FF0000">{</font>
+
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> trippleblinks <font color="#990000">==</font> <font color="#993399">1</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#000000">CHKP</font></b> <font color="#990000">();</font>
+<a href="accelerometer_test.c.html#26">CHKP -> accelerometer_test.c:26</a>
+<a href="accelerometer_test.c.html#27">CHKP -> accelerometer_test.c:27</a>
+<a href="lis331dlh_driver_private.c.html#49">CHKP -> lis331dlh_driver_private.c:49</a>
+<a href="lis331dlh_driver_private.c.html#50">CHKP -> lis331dlh_driver_private.c:50</a>
+<a href="spi_test.c.html#35">CHKP -> spi_test.c:35</a>
+<a href="spi_test.c.html#36">CHKP -> spi_test.c:36</a>
+<a href="util.h.html#99">CHKP -> util.h:99</a>
+        trippleblinks<font color="#990000">++;</font>
+      <font color="#FF0000">}</font>
+
+      <i><font color="#9A1900">// Test that the reset() method takes us back to zero: it should now</font></i>
+      <i><font color="#9A1900">// be tbtbus microseconds before we blink again.  See not above previous</font></i>
+      <i><font color="#9A1900">// reset() method call.</font></i>
+      <b><font color="#0000FF">else</font></b> <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> trippleblinks <font color="#990000">==</font> <font color="#993399">2</font> <font color="#990000">&amp;&amp;</font> no_reset_yet <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#000000"><a href="timer0_stopwatch.c.html#90">timer0_stopwatch_reset</a></font></b> <font color="#990000">();</font>
+        no_reset_yet <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+      <font color="#FF0000">}</font>
+
+      <i><font color="#9A1900">// Test the shutdown() method: after this, we should never blink again.</font></i>
+      <b><font color="#0000FF">else</font></b> <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> trippleblinks <font color="#990000">==</font> <font color="#993399">2</font> <font color="#990000">&amp;&amp;</font> <font color="#990000">(!</font> no_reset_yet<font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#000000"><a href="timer0_stopwatch.c.html#145">timer0_stopwatch_shutdown</a></font></b> <font color="#990000">();</font>
+        <b><font color="#000000">assert</font></b> <font color="#990000">(</font><b><font color="#000000"><a href="timer0_stopwatch.c.html#107">timer0_stopwatch_ticks</a></font></b> <font color="#990000">()</font> <font color="#990000">==</font> <font color="#993399">0</font><font color="#990000">);</font>
+        <font color="#008080">uint32_t</font> macro_read_ticks<font color="#990000">;</font>
+        <b><font color="#000000"><a href="timer0_stopwatch.h.html#109">TIMER0_STOPWATCH_TICKS</a></font></b> <font color="#990000">(</font>macro_read_ticks<font color="#990000">);</font>
+        <b><font color="#000000">assert</font></b> <font color="#990000">(</font>macro_read_ticks <font color="#990000">==</font> <font color="#993399">0</font><font color="#990000">);</font>
+        <b><font color="#000000">assert</font></b> <font color="#990000">(</font><b><font color="#000000"><a href="timer0_stopwatch.c.html#136">timer0_stopwatch_microseconds</a></font></b> <font color="#990000">()</font> <font color="#990000">==</font> <font color="#993399">0</font><font color="#990000">);</font>
+        <b><font color="#000000">CHKP</font></b> <font color="#990000">();</font>
+<a href="accelerometer_test.c.html#26">CHKP -> accelerometer_test.c:26</a>
+<a href="accelerometer_test.c.html#27">CHKP -> accelerometer_test.c:27</a>
+<a href="lis331dlh_driver_private.c.html#49">CHKP -> lis331dlh_driver_private.c:49</a>
+<a href="lis331dlh_driver_private.c.html#50">CHKP -> lis331dlh_driver_private.c:50</a>
+<a href="spi_test.c.html#35">CHKP -> spi_test.c:35</a>
+<a href="spi_test.c.html#36">CHKP -> spi_test.c:36</a>
+<a href="util.h.html#99">CHKP -> util.h:99</a>
+        trippleblinks<font color="#990000">++;</font>
+        <b><font color="#000000">DEBUG_LOG</font></b> <font color="#990000">(</font><font color="#FF0000">"All tests succeeded.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+<a href="timer0_stopwatch_test.c.html#24">DEBUG_LOG -> timer0_stopwatch_test.c:24</a>
+<a href="timer0_stopwatch_test.c.html#26">DEBUG_LOG -> timer0_stopwatch_test.c:26</a>
+      <font color="#FF0000">}</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+</tt></pre>

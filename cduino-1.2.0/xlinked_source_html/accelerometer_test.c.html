@@ -1,0 +1,160 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Test/demo for the <a href="accelerometer.h.html">accelerometer.h</a> interface.</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;float.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;inttypes.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;math.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="accelerometer.h.html">accelerometer.h</a>"</font>
+<b><font color="#000080">#define</font></b> <a name="8">TERM_IO_POLLUTE_NAMESPACE_WITH_DEBUGGING_GOOP</a>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="term_io.h.html">term_io.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="util.h.html">util.h</a>"</font>
+
+<i><font color="#9A1900">// This test program assumes that an LIS331HH is correctly connected to</font></i>
+<i><font color="#9A1900">// the Arduino via SPI as described in the datasheet for the device.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Since the LIS331H is a 3.3V device, a 5V-3.3V a level shifter is required</font></i>
+<i><font color="#9A1900">// to use it with an Arduino.  I used the Sparkfun BOB-12009.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// The LIS331HH comes in a no-lead LGA16 package, which makes</font></i>
+<i><font color="#9A1900">// prototyping hard.  I like the breakout assembly service available</font></i>
+<i><font color="#9A1900">// from www.proto-advantage.com, in particular for the LIS331HH see</font></i>
+<i><font color="#9A1900">// http://www.proto-advantage.com/store/product_info.php?products_id=2200123</font></i>
+
+<i><font color="#9A1900">// SPI communication uses PB5, so we rewire our debugging macros to use a</font></i>
+<i><font color="#9A1900">// LED on a different pin.</font></i>
+<b><font color="#000080">#ifdef</font></b> CHKP
+<a href="accelerometer_test.c.html#26">CHKP -> accelerometer_test.c:26</a>
+<a href="accelerometer_test.c.html#27">CHKP -> accelerometer_test.c:27</a>
+<a href="lis331dlh_driver_private.c.html#49">CHKP -> lis331dlh_driver_private.c:49</a>
+<a href="lis331dlh_driver_private.c.html#50">CHKP -> lis331dlh_driver_private.c:50</a>
+<a href="spi_test.c.html#35">CHKP -> spi_test.c:35</a>
+<a href="spi_test.c.html#36">CHKP -> spi_test.c:36</a>
+<a href="util.h.html#99">CHKP -> util.h:99</a>
+<b><font color="#000080">#  undef</font></b> <a name="26">CHKP</a>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="27">CHKP</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="util.h.html#72">CHKP_USING</a></font></b><font color="#990000">(</font>DDRD<font color="#990000">,</font> DDD2<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD2<font color="#990000">,</font> <font color="#993399">300.0</font><font color="#990000">,</font> <font color="#993399">3</font><font color="#990000">)</font>
+<b><font color="#000080">#endif</font></b>
+<b><font color="#000080">#ifdef</font></b> BTRAP
+<a href="accelerometer_test.c.html#30">BTRAP -> accelerometer_test.c:30</a>
+<a href="accelerometer_test.c.html#31">BTRAP -> accelerometer_test.c:31</a>
+<a href="lis331dlh_driver_private.c.html#53">BTRAP -> lis331dlh_driver_private.c:53</a>
+<a href="lis331dlh_driver_private.c.html#54">BTRAP -> lis331dlh_driver_private.c:54</a>
+<a href="spi_test.c.html#39">BTRAP -> spi_test.c:39</a>
+<a href="spi_test.c.html#40">BTRAP -> spi_test.c:40</a>
+<a href="util.h.html#102">BTRAP -> util.h:102</a>
+<a href="wireless_xbee.c.html#23">BTRAP -> wireless_xbee.c:23</a>
+<a href="wireless_xbee.c.html#24">BTRAP -> wireless_xbee.c:24</a>
+<a href="wireless_xbee_test.c.html#59">BTRAP -> wireless_xbee_test.c:59</a>
+<a href="wireless_xbee_test.c.html#60">BTRAP -> wireless_xbee_test.c:60</a>
+<b><font color="#000080">#  undef</font></b> <a name="30">BTRAP</a>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="31">BTRAP</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="util.h.html#86">BTRAP_USING</a></font></b><font color="#990000">(</font>DDRD<font color="#990000">,</font> DDD2<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD2<font color="#990000">,</font> <font color="#993399">100.0</font><font color="#990000">)</font>
+<b><font color="#000080">#endif</font></b>
+
+<i><font color="#9A1900">// Buffered Readings Count.  This program makes a series of readings in</font></i>
+<i><font color="#9A1900">// a burst, then reports what we read laer.  This approach prevents the</font></i>
+<i><font color="#9A1900">// serial port delay associated with outputting the data from interfering</font></i>
+<i><font color="#9A1900">// with the accelerometer reading mechanics (e.g. by causing overruns to</font></i>
+<i><font color="#9A1900">// show up in the status register).</font></i>
+<b><font color="#000080">#define</font></b> <a name="39">BRC</a> <font color="#993399">142</font>
+
+<i><font color="#9A1900">// Storage for X/Y/Z acceleration readings</font></i>
+<font color="#008080">int16_t</font> <a name="42">ax</a><font color="#990000">[</font><a href="accelerometer_test.c.html#39">BRC</a><font color="#990000">],</font> <a name="42">ay</a><font color="#990000">[</font><a href="accelerometer_test.c.html#39">BRC</a><font color="#990000">],</font> <a name="42">az</a><font color="#990000">[</font><a href="accelerometer_test.c.html#39">BRC</a><font color="#990000">];</font>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="45">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="term_io.c.html#166">term_io_init</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"term_io_init() completed.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="accelerometer.c.html#22">accelerometer_init</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"accelerometer_init() completed.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// After power-up, control register 1 should consist of its default</font></i>
+  <i><font color="#9A1900">// value (0x07) or'ed with the bits that indicate normal mode (0x20).</font></i>
+  <i><font color="#9A1900">// NOTE that since the accelerometer isn't reset when the ATmega328P is,</font></i>
+  <i><font color="#9A1900">// other settings (performed below) may persist accross resets.  To reset</font></i>
+  <i><font color="#9A1900">// the accelerometer, power down the board.  If you want to see the startup</font></i>
+  <i><font color="#9A1900">// values in screen, hold the reset button down after powering up the board</font></i>
+  <i><font color="#9A1900">// until you have the screen setting up and running (make -rR run_screen),</font></i>
+  <i><font color="#9A1900">// then release the reset button.</font></i>
+  <font color="#008080">uint8_t</font> ctrl1_value<font color="#990000">;</font>
+  <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#76">LIS331DLH_ReadReg</a></font></b> <font color="#990000">(</font>
+      <a href="lis331dlh_driver_private.h.html#183">LIS331DLH_MEMS_I2C_ADDRESS</a><font color="#990000">,</font> <a href="lis331dlh_driver_private.h.html#194">LIS331DLH_CTRL_REG1</a><font color="#990000">,</font> <font color="#990000">&amp;</font>ctrl1_value<font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"CTRL_REG1 value: %x</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font> ctrl1_value<font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="accelerometer.c.html#32">accelerometer_power_down</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"accelerometer_power_down() completed.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// In theory a delay could be inserted here, and the actual power</font></i>
+  <i><font color="#9A1900">// consumption of the device in power-down state measured.  I haven't</font></i>
+  <i><font color="#9A1900">// actually done this.</font></i>
+
+  <b><font color="#000000"><a href="accelerometer.c.html#38">accelerometer_power_up</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"accelerometer_power_up() completed.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="accelerometer.c.html#44">accelerometer_set_fullscale</a></font></b> <font color="#990000">(</font><a href="accelerometer.h.html#49">ACCELEROMETER_FULLSCALE_TYPE_6G</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Fullscale set to 24 gravities.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="accelerometer.c.html#50">accelerometer_set_data_rate</a></font></b> <font color="#990000">(</font><a href="accelerometer.h.html#62">ACCELEROMETER_DATA_RATE_1000HZ</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Date rate set to 1000 Hz.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// FIXME: this is a work in progress.  In theory we can make gravity go</font></i>
+  <i><font color="#9A1900">// away using the high-pass filter.  In practice I'm not yet clear on the</font></i>
+  <i><font color="#9A1900">// exact mantra required.</font></i>
+  <i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900">  // I believe this means: "use the filter for the device readings (I think</font></i>
+<i><font color="#9A1900">  // you use different mantra to apply the filter to interrupt generation).</font></i>
+<i><font color="#9A1900">  LIS331DLH_SetFDS (MEMS_ENABLE);</font></i>
+
+<i><font color="#9A1900">  // Required mantra for turning the filter on generally.</font></i>
+<i><font color="#9A1900">  LIS331DLH_SetHPFMode(LIS331DLH_HPM_REF_SIGNAL);</font></i>
+
+<i><font color="#9A1900">  // This ends up meaning 2.5 Hz when a 1000Hz data rate is being used;</font></i>
+<i><font color="#9A1900">  // see Table 23 of the LIS331HH datasheet.</font></i>
+<i><font color="#9A1900">  LIS331DLH_SetHPFCutOFF(LIS331DLH_HPFCF_3);</font></i>
+
+<i><font color="#9A1900">  // It's totally unclear from the datasheed what the REFERENCE register is</font></i>
+<i><font color="#9A1900">  // for or how it's interpreted.  It definitely has an effect, but I can't</font></i>
+<i><font color="#9A1900">  // tell what it's doing.</font></i>
+<i><font color="#9A1900">  LIS331DLH_SetReference (42);</font></i>
+<i><font color="#9A1900">  */</font></i>
+
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#990000">;</font> <font color="#990000">;</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="accelerometer_test.c.html#39">BRC</a> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="accelerometer.c.html#56">accelerometer_get_accel</a></font></b> <font color="#990000">(&amp;(</font><a href="accelerometer_test.c.html#42">ax</a><font color="#990000">[</font>ii<font color="#990000">]),</font> <font color="#990000">&amp;(</font><a href="accelerometer_test.c.html#42">ay</a><font color="#990000">[</font>ii<font color="#990000">]),</font> <font color="#990000">&amp;(</font><a href="accelerometer_test.c.html#42">az</a><font color="#990000">[</font>ii<font color="#990000">]));</font>
+    <font color="#FF0000">}</font>
+
+    <i><font color="#9A1900">// Find the average and peak acceleration (in an arbitrary direction).</font></i>
+    <font color="#009900">float</font> total_ax <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">,</font> total_ay <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">,</font> total_az <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+    <font color="#009900">float</font> peak_abs_a <font color="#990000">=</font> <font color="#990000">-</font>FLT_MAX<font color="#990000">;</font>
+    <font color="#008080">int16_t</font> peak_ax <font color="#990000">=</font> INT16_MIN<font color="#990000">,</font> peak_ay <font color="#990000">=</font> INT16_MIN<font color="#990000">,</font> peak_az <font color="#990000">=</font> INT16_MIN<font color="#990000">;</font>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="accelerometer_test.c.html#39">BRC</a> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      total_ax <font color="#990000">+=</font> <a href="accelerometer_test.c.html#42">ax</a><font color="#990000">[</font>ii<font color="#990000">];</font>
+      total_ay <font color="#990000">+=</font> <a href="accelerometer_test.c.html#42">ay</a><font color="#990000">[</font>ii<font color="#990000">];</font>
+      total_az <font color="#990000">+=</font> <a href="accelerometer_test.c.html#42">az</a><font color="#990000">[</font>ii<font color="#990000">];</font>
+      <font color="#009900">float</font> cur_a
+        <font color="#990000">=</font> <b><font color="#000000">sqrt</font></b> <font color="#990000">(</font><b><font color="#000000">pow</font></b><font color="#990000">(</font><a href="accelerometer_test.c.html#42">ax</a><font color="#990000">[</font>ii<font color="#990000">],</font> <font color="#993399">2.0</font><font color="#990000">)</font> <font color="#990000">+</font> <b><font color="#000000">pow</font></b> <font color="#990000">(</font><a href="accelerometer_test.c.html#42">ay</a><font color="#990000">[</font>ii<font color="#990000">],</font> <font color="#993399">2.0</font><font color="#990000">)</font> <font color="#990000">+</font> <b><font color="#000000">pow</font></b> <font color="#990000">(</font><a href="accelerometer_test.c.html#42">az</a><font color="#990000">[</font>ii<font color="#990000">],</font> <font color="#993399">2.0</font><font color="#990000">));</font>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> cur_a <font color="#990000">&gt;</font> peak_abs_a <font color="#990000">)</font> <font color="#FF0000">{</font>
+        peak_ax <font color="#990000">=</font> <a href="accelerometer_test.c.html#42">ax</a><font color="#990000">[</font>ii<font color="#990000">];</font>
+        peak_ay <font color="#990000">=</font> <a href="accelerometer_test.c.html#42">ay</a><font color="#990000">[</font>ii<font color="#990000">];</font>
+        peak_az <font color="#990000">=</font> <a href="accelerometer_test.c.html#42">az</a><font color="#990000">[</font>ii<font color="#990000">];</font>
+      <font color="#FF0000">}</font>
+    <font color="#FF0000">}</font>
+    <font color="#009900">float</font> mean_ax <font color="#990000">=</font> total_ax <font color="#990000">/</font> <a href="accelerometer_test.c.html#39">BRC</a><font color="#990000">;</font>
+    <font color="#009900">float</font> mean_ay <font color="#990000">=</font> total_ay <font color="#990000">/</font> <a href="accelerometer_test.c.html#39">BRC</a><font color="#990000">;</font>
+    <font color="#009900">float</font> mean_az <font color="#990000">=</font> total_az <font color="#990000">/</font> <a href="accelerometer_test.c.html#39">BRC</a><font color="#990000">;</font>
+
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font>
+        <font color="#FF0000">"Recent-time peak acceleration: Ax: %3i  Ay: %3i  Az: %3i</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font>
+        <font color="#990000">(</font><font color="#009900">int</font><font color="#990000">)</font> peak_ax<font color="#990000">,</font> <font color="#990000">(</font><font color="#009900">int</font><font color="#990000">)</font> peak_ay<font color="#990000">,</font> <font color="#990000">(</font><font color="#009900">int</font><font color="#990000">)</font> peak_az <font color="#990000">);</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font>
+        <font color="#FF0000">"Recent-time mean acceleration: Ax: %3i  Ay: %3i  Az: %3i</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font>
+        <font color="#990000">(</font><font color="#009900">int</font><font color="#990000">)</font> mean_ax<font color="#990000">,</font> <font color="#990000">(</font><font color="#009900">int</font><font color="#990000">)</font> mean_ay<font color="#990000">,</font> <font color="#990000">(</font><font color="#009900">int</font><font color="#990000">)</font> mean_az <font color="#990000">);</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+</tt></pre>

@@ -1,0 +1,60 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Implementation of the interface described in <a href="uart.h.html">uart.h</a>.</font></i>
+
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900"> * ----------------------------------------------------------------------------</font></i>
+<i><font color="#9A1900"> * "THE BEER-WARE LICENSE" (Revision 42):</font></i>
+<i><font color="#9A1900"> * </font></i><u><font color="#0000FF">&lt;joerg@FreeBSD.ORG&gt;</font></u><i><font color="#9A1900"> wrote this file.  As long as you retain this notice you</font></i>
+<i><font color="#9A1900"> * can do whatever you want with this stuff. If we meet some day, and you think</font></i>
+<i><font color="#9A1900"> * this stuff is worth it, you can buy me a beer in return.        Joerg Wunsch</font></i>
+<i><font color="#9A1900"> * ----------------------------------------------------------------------------</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * Stdio demo, UART implementation of interface described in <a href="uart.h.html">uart.h</a></font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * $Id: <a href="uart.c.html">uart.c</a> 1008 2005-12-28 21:38:59Z joerg_wunsch $</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="uart.h.html">uart.h</a>"</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="21">uart_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// FIXME: is there some hardware that we should be waking from sleep here?</font></i>
+
+<b><font color="#000080">#ifndef</font></b> F_CPU
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> the AVR <font color="#008080">libc</font> util<font color="#990000">/</font>setbaud<font color="#990000">.</font>h header will <font color="#008080">require</font> F_CPU to be defined
+<b><font color="#000080">#endif</font></b>
+
+  <i><font color="#9A1900">// The magical AVR libc util/setbaud.h header requires BAUD to be defined,</font></i>
+  <i><font color="#9A1900">// so we first ensure it isn't already defined then set it.</font></i>
+<b><font color="#000080">#ifdef</font></b> BAUD
+<a href="lesson8.c.html#25">BAUD -> lesson8.c:25</a>
+<a href="uart.c.html#34">BAUD -> uart.c:34</a>
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> We need to <font color="#008080">set</font> BAUD<font color="#990000">,</font> <font color="#008080">but</font> it<font color="#FF0000">'s already defined, so we'</font>re too scared
+<a href="lesson8.c.html#25">BAUD -> lesson8.c:25</a>
+<a href="uart.c.html#34">BAUD -> uart.c:34</a>
+<b><font color="#000080">#endif</font></b>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="34">BAUD</a></font> <a href="uart.h.html#21">UART_BAUD</a>
+
+<i><font color="#9A1900">// This is a special calculation-only header that can be included anywhere.</font></i>
+<i><font color="#9A1900">// It's going to give us back some macros that help set up the serial port</font></i>
+<i><font color="#9A1900">// control registers: UBRRH_VALUE, UBRRL_VALUE, and USE_2X.</font></i>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/setbaud.h&gt;</font>
+
+  <i><font color="#9A1900">// Set up clocking</font></i>
+  UBRR0L <font color="#990000">=</font> UBRRL_VALUE<font color="#990000">;</font>
+  UBRR0H <font color="#990000">=</font> UBRRH_VALUE<font color="#990000">;</font>
+<b><font color="#000080">#if</font></b> USE_2X
+  UCSR0A <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>U2X0<font color="#990000">);</font>
+<b><font color="#000080">#else</font></b>
+  UCSR0A <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>U2X0<font color="#990000">));</font>
+<b><font color="#000080">#endif</font></b>
+
+  UCSR0B <font color="#990000">=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>TXEN0<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>RXEN0<font color="#990000">);</font>   <i><font color="#9A1900">// Enable TX/RX</font></i>
+<font color="#FF0000">}</font>
+</tt></pre>

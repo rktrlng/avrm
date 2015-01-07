@@ -1,0 +1,110 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Test/demo for the <a href="spi.h.html">spi.h</a> interface.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This test driver requires an Analog Devices AD5206 connected as follows:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * A6 pin (of AD5206) connected to +5V</font></i>
+<i><font color="#9A1900">//   * B6 of AD5206 connected to ground</font></i>
+<i><font color="#9A1900">//   * /CS to digital pin 10  (SS pin)</font></i>
+<i><font color="#9A1900">//   * SDI to digital pin 11 (MOSI pin)</font></i>
+<i><font color="#9A1900">//   * CLK - to digital pin 13 (SCK pin)</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This program starts with the wiper pin W6 connected to ground (SPI data</font></i>
+<i><font color="#9A1900">// input 0x00).  It then moves the wiper 1/4 of the way up the scale every</font></i>
+<i><font color="#9A1900">// 5 seconds.  If things are working correctly, this will produce a voltage</font></i>
+<i><font color="#9A1900">// output sequence of ~0V, ~1/4 Vcc, ~1/2 Vcc, ~3/4 Vcc, and ~Vcc at wiper</font></i>
+<i><font color="#9A1900">// pin W6.  It then repeats this sequence using all the different clock</font></i>
+<i><font color="#9A1900">// divider frequencies (of which there are a total of 7).</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;assert.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdlib.h&gt;</font>   <i><font color="#9A1900">// FIXME: remove this once assert.h is fixed (new avrlibc)</font></i>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="spi.h.html">spi.h</a>"</font>
+
+<b><font color="#000080">#if</font></b> <font color="#990000">!</font> <font color="#990000">(</font><b><font color="#000000">defined</font></b> <font color="#990000">(</font>MY_SPI_SLAVE_1_SELECT_INIT<font color="#990000">)</font> <font color="#990000">&amp;&amp;</font> <font color="#990000">\</font>
+       <b><font color="#000000">defined</font></b> <font color="#990000">(</font>MY_SPI_SLAVE_1_SELECT_SET_LOW<font color="#990000">)</font> <font color="#990000">&amp;&amp;</font> <font color="#990000">\</font>
+       <b><font color="#000000">defined</font></b> <font color="#990000">(</font>MY_SPI_SLAVE_1_SELECT_SET_HIGH<font color="#990000">))</font>
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> The macros which specify which pin should be used <b><font color="#0000FF">for</font></b> <font color="#008080">SPI</font> slave <font color="#990000">\</font>
+         selection are <font color="#008080">not</font> set<font color="#990000">.</font>  Please see the example in <font color="#008080">the</font> Makefile <font color="#990000">\</font>
+         in the spi <font color="#008080">module</font> directory<font color="#990000">.</font>
+<b><font color="#000080">#endif</font></b>
+
+<i><font color="#9A1900">// SPI communication uses PB5, so we rewire the blinky macros to use a LED</font></i>
+<i><font color="#9A1900">// on a different pin.</font></i>
+<b><font color="#000080">#ifdef</font></b> CHKP
+<a href="accelerometer_test.c.html#26">CHKP -> accelerometer_test.c:26</a>
+<a href="accelerometer_test.c.html#27">CHKP -> accelerometer_test.c:27</a>
+<a href="lis331dlh_driver_private.c.html#49">CHKP -> lis331dlh_driver_private.c:49</a>
+<a href="lis331dlh_driver_private.c.html#50">CHKP -> lis331dlh_driver_private.c:50</a>
+<a href="spi_test.c.html#35">CHKP -> spi_test.c:35</a>
+<a href="spi_test.c.html#36">CHKP -> spi_test.c:36</a>
+<a href="util.h.html#99">CHKP -> util.h:99</a>
+<b><font color="#000080">#  undef</font></b> <a name="35">CHKP</a>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="36">CHKP</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="util.h.html#72">CHKP_USING</a></font></b><font color="#990000">(</font>DDRD<font color="#990000">,</font> DDD2<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD2<font color="#990000">,</font> <font color="#993399">300.0</font><font color="#990000">,</font> <font color="#993399">3</font><font color="#990000">)</font>
+<b><font color="#000080">#endif</font></b>
+<b><font color="#000080">#ifdef</font></b> BTRAP
+<a href="accelerometer_test.c.html#30">BTRAP -> accelerometer_test.c:30</a>
+<a href="accelerometer_test.c.html#31">BTRAP -> accelerometer_test.c:31</a>
+<a href="lis331dlh_driver_private.c.html#53">BTRAP -> lis331dlh_driver_private.c:53</a>
+<a href="lis331dlh_driver_private.c.html#54">BTRAP -> lis331dlh_driver_private.c:54</a>
+<a href="spi_test.c.html#39">BTRAP -> spi_test.c:39</a>
+<a href="spi_test.c.html#40">BTRAP -> spi_test.c:40</a>
+<a href="util.h.html#102">BTRAP -> util.h:102</a>
+<a href="wireless_xbee.c.html#23">BTRAP -> wireless_xbee.c:23</a>
+<a href="wireless_xbee.c.html#24">BTRAP -> wireless_xbee.c:24</a>
+<a href="wireless_xbee_test.c.html#59">BTRAP -> wireless_xbee_test.c:59</a>
+<a href="wireless_xbee_test.c.html#60">BTRAP -> wireless_xbee_test.c:60</a>
+<b><font color="#000080">#  undef</font></b> <a name="39">BTRAP</a>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="40">BTRAP</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="util.h.html#86">BTRAP_USING</a></font></b><font color="#990000">(</font>DDRD<font color="#990000">,</font> DDD2<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD2<font color="#990000">,</font> <font color="#993399">100.0</font><font color="#990000">)</font>
+<b><font color="#000080">#endif</font></b>
+
+<i><font color="#9A1900">// WARNING: This module not fully tested.  These tests test output with</font></i>
+<i><font color="#9A1900">// SPI_BIT_ORDER_MSB_FIRST and SPI_DATA_MODE_0 with all SPI_CLOCK_DIVIDER_*</font></i>
+<i><font color="#9A1900">// settings.  The <a href="sd_card.h.html">sd_card.h</a> interface exercises input.  The other data</font></i>
+<i><font color="#9A1900">// orders and modes are only trivially different and should work fine,</font></i>
+<i><font color="#9A1900">// but I have not personally tried them. Remove this warning trap and try it!</font></i>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="50">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000">MY_SPI_SLAVE_1_SELECT_INIT</font></b> <font color="#990000">();</font> 
+
+  <b><font color="#000000"><a href="spi.c.html#22">spi_init</a></font></b> <font color="#990000">();</font>
+
+  <b><font color="#000000"><a href="spi.c.html#62">spi_set_data_order</a></font></b> <font color="#990000">(</font><a href="spi.h.html#110">SPI_DATA_ORDER_MSB_FIRST</a><font color="#990000">);</font>
+  
+  <b><font color="#000000"><a href="spi.c.html#80">spi_set_data_mode</a></font></b> <font color="#990000">(</font><a href="spi.h.html#130">SPI_DATA_MODE_0</a><font color="#990000">);</font>
+  
+  <i><font color="#9A1900">// We're going to use a loop over the clock divider settings, so here we</font></i>
+  <i><font color="#9A1900">// verify that the interface gives them the the endpoint values we expect.</font></i>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font><a href="spi.h.html#115">SPI_CLOCK_DIVIDER_DIV4</a> <font color="#990000">==</font> <font color="#993399">0x00</font><font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font><a href="spi.h.html#121">SPI_CLOCK_DIVIDER_DIV32</a> <font color="#990000">==</font> <font color="#993399">0x06</font><font color="#990000">);</font>
+ 
+  <i><font color="#9A1900">// Smallest, Largest Clock divider Setting</font></i>
+  <font color="#008080">uint8_t</font> scs <font color="#990000">=</font> <a href="spi.h.html#115">SPI_CLOCK_DIVIDER_DIV4</a><font color="#990000">,</font> lcs <font color="#990000">=</font> <a href="spi.h.html#121">SPI_CLOCK_DIVIDER_DIV32</a><font color="#990000">;</font>
+
+  <i><font color="#9A1900">// For each clock divider setting...</font></i>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> cds <font color="#990000">=</font> scs <font color="#990000">;</font> cds <font color="#990000">&lt;=</font> lcs <font color="#990000">;</font> cds<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+
+    <b><font color="#000000"><a href="spi.c.html#89">spi_set_clock_divider</a></font></b> <font color="#990000">(</font>cds<font color="#990000">);</font> 
+
+    <i><font color="#9A1900">// Number of different resistor settings we test</font></i>
+    <font color="#009900">int</font> <b><font color="#0000FF">const</font></b> test_steps <font color="#990000">=</font> <font color="#993399">5</font><font color="#990000">;</font>
+
+    <i><font color="#9A1900">// For each different resistance setting we want to test...</font></i>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#009900">int</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> test_steps <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000">MY_SPI_SLAVE_1_SELECT_SET_LOW</font></b> <font color="#990000">();</font>
+      uint8_t <font color="#008080">const</font> channel_six_address <font color="#990000">=</font> <font color="#993399">0x05</font><font color="#990000">;</font>   <i><font color="#9A1900">// From AD5206 datasheet</font></i>
+      <b><font color="#000000"><a href="spi.c.html#97">spi_transfer</a></font></b> <font color="#990000">(</font>channel_six_address<font color="#990000">);</font>
+      <b><font color="#000000"><a href="spi.c.html#97">spi_transfer</a></font></b> <font color="#990000">(</font>ii <font color="#990000">*</font> <font color="#993399">255</font> <font color="#990000">/</font> <font color="#993399">4</font><font color="#990000">);</font>
+      <b><font color="#000000">MY_SPI_SLAVE_1_SELECT_SET_HIGH</font></b> <font color="#990000">();</font>
+      <font color="#009900">double</font> <b><font color="#0000FF">const</font></b> seconds_per_step <font color="#990000">=</font> <font color="#993399">5.0</font><font color="#990000">;</font>
+      <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font><font color="#993399">1000.0</font> <font color="#990000">*</font> seconds_per_step<font color="#990000">);</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>  
+<font color="#FF0000">}</font>
+</tt></pre>

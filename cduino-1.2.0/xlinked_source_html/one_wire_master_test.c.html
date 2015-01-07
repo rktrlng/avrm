@@ -1,0 +1,353 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Test/demo for the <a href="one_wire_master.h.html">one_wire_master.h</a> interface.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// By default, this test program requires exactly one slave to be present:</font></i>
+<i><font color="#9A1900">// a Maxim DS18B20 temperature sensor connected to the chosen one wire master</font></i>
+<i><font color="#9A1900">// pin of the arduino (by default DIO_PIN_DIGITAL_2 -- see the Makefile for</font></i>
+<i><font color="#9A1900">// this module to change this value).  The D18B20 is required to be powered</font></i>
+<i><font color="#9A1900">// externally, not using parasite power.  The DS18B20 must be in its default</font></i>
+<i><font color="#9A1900">// (factory) state.  A 4.7 kohm pull-up resistor must be used on the Arduino</font></i>
+<i><font color="#9A1900">// side of the wire.  See Figure 5 of the DS18B20 datasheet, revision 042208.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Test results are ouput via the <a href="term_io.h.html">term_io.h</a> interface (which is not required</font></i>
+<i><font color="#9A1900">// by the module itself).  If the USB cable used for programming the Arduino</font></i>
+<i><font color="#9A1900">// is still connected, it should be possible to run</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   make -rR run_screen</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// from the module directory to see the test results.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// If everything works correctly, the Arduino should also blink out the</font></i>
+<i><font color="#9A1900">// absolute value of the sensed temperature in degrees Celcius multiplied</font></i>
+<i><font color="#9A1900">// by 10000 on the on-board led (connected to PB5).  Single quick blinks</font></i>
+<i><font color="#9A1900">// are zeros, slower series of blinks are other digits.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// It's also possible to compile this module differently to test its</font></i>
+<i><font color="#9A1900">// performance with multiple slaves.  See the notes in the Makefile for</font></i>
+<i><font color="#9A1900">// this module for details.</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;assert.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;math.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdlib.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="dio.h.html">dio.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="one_wire_master.h.html">one_wire_master.h</a>"</font>
+<b><font color="#000080">#define</font></b> <a name="34">TERM_IO_POLLUTE_NAMESPACE_WITH_DEBUGGING_GOOP</a>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="term_io.h.html">term_io.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="util.h.html">util.h</a>"</font>
+
+<i><font color="#9A1900">// The default incarnation of this test program expects a single slave,</font></i>
+<i><font color="#9A1900">// but it can also be compiled and tweaked slightly to test a multi-slave bus.</font></i>
+
+<i><font color="#9A1900">// The functions that perform DS18B20-specific operations are only used in</font></i>
+<i><font color="#9A1900">// the default single-slave test condition.</font></i>
+<b><font color="#000080">#ifdef</font></b> OWM_TEST_CONDITION_SINGLE_SLAVE
+
+<b><font color="#000080">#  define</font></b> <font color="#008080"><a name="45">DS18B20_FAMILY_CODE</a></font> <b><font color="#000000">UINT8_C</font></b> <font color="#990000">(</font><font color="#993399">0x28</font><font color="#990000">)</font>
+
+<i><font color="#9A1900">// These are properties of the DS18B20 that have nothing to do with the</font></i>
+<i><font color="#9A1900">// one-wire bus in general.</font></i>
+<b><font color="#000080">#  define</font></b> <a name="49">DS18B20_SCRATCHPAD_SIZE</a>  <font color="#993399">9</font>
+<b><font color="#000080">#  define</font></b> <a name="50">DS18B20_SCRATCHPAD_T_LSB</a> <font color="#993399">0</font>
+<b><font color="#000080">#  define</font></b> <a name="51">DS18B20_SCRATCHPAD_T_MSB</a> <font color="#993399">1</font>
+
+<b><font color="#0000FF">static</font></b> <font color="#008080">uint8_t</font> <a name="53">spb</a><font color="#990000">[</font><a href="one_wire_master_test.c.html#49">DS18B20_SCRATCHPAD_SIZE</a><font color="#990000">];</font>   <i><font color="#9A1900">// DS18B20 Scratchpad Buffer</font></i>
+
+<b><font color="#0000FF">static</font></b> uint64_t
+<b><font color="#000000"><a name="56">ds18b20_init_and_rom_command</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Requies exactly one DS18B20 device to be present on the bus.  Perform the</font></i>
+  <i><font color="#9A1900">// Initialization (Step 1) and ROM Command (Step 2) steps of the transaction</font></i>
+  <i><font color="#9A1900">// sequence described in the DS18B20 datasheet, and return the discovered</font></i>
+  <i><font color="#9A1900">// ROM code of the slave.  Note that functions that perform this operation</font></i>
+  <i><font color="#9A1900">// in a single call are available in the <a href="one_wire_master.h.html">one_wire_master.h</a> interface,</font></i>
+  <i><font color="#9A1900">// but here we perform them manually as a cross-check.</font></i>
+
+  <i><font color="#9A1900">// Prompt the slave(s) to respond with a "presence pulse".  This corresponds</font></i>
+  <i><font color="#9A1900">// to the "INITIALIZATION" step (Step 1) described in the DS18B20 datasheet.</font></i>
+  <i><font color="#9A1900">// FIXME: would be nice to have datasheet available on web and linked to</font></i>
+  <i><font color="#9A1900">// by the docs...</font></i>
+  <font color="#008080">uint8_t</font> slave_presence <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#74">owm_touch_reset</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>slave_presence<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// This test program requires that only one slave be present, so we can</font></i>
+  <i><font color="#9A1900">// use the READ ROM command to get the slave's ROM ID.</font></i>
+  <font color="#008080">uint64_t</font> slave_rid<font color="#990000">;</font>
+  <b><font color="#000000"><a href="one_wire_master.c.html#374">owm_write_byte</a></font></b> <font color="#990000">(</font><a href="one_wire_master.h.html#65">OWM_READ_ROM_COMMAND</a><font color="#990000">);</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <b><font color="#0000FF">sizeof</font></b> <font color="#990000">(</font>slave_rid<font color="#990000">)</font> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> <font color="#990000">(&amp;</font>slave_rid<font color="#990000">))[</font>ii<font color="#990000">]</font> <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#416">owm_read_byte</a></font></b> <font color="#990000">();</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// We should have gotten the fixed family code as the first byte of the ID.</font></i>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(((</font>uint8_t <font color="#990000">*)</font> <font color="#990000">(&amp;</font>slave_rid<font color="#990000">))[</font><font color="#993399">0</font><font color="#990000">]</font> <font color="#990000">==</font> <a href="one_wire_master_test.c.html#45">DS18B20_FAMILY_CODE</a><font color="#990000">);</font>
+
+  <b><font color="#0000FF">return</font></b> slave_rid<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">void</font>
+<b><font color="#000000"><a name="87">ds18b20_get_scratchpad_contents</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Send the command that causes the DS18B20 to send the scratchpad contents,</font></i>
+  <i><font color="#9A1900">// then read the result and store it in spb.  This routine must follow an</font></i>
+  <i><font color="#9A1900">// ds18b20_init_and_rom_command() call.</font></i>
+
+  uint8_t <font color="#008080">const</font> read_scratchpad_command <font color="#990000">=</font> <font color="#993399">0xBE</font><font color="#990000">;</font>
+  <b><font color="#000000"><a href="one_wire_master.c.html#374">owm_write_byte</a></font></b> <font color="#990000">(</font>read_scratchpad_command<font color="#990000">);</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <a href="one_wire_master_test.c.html#49">DS18B20_SCRATCHPAD_SIZE</a> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <a href="one_wire_master_test.c.html#53">spb</a><font color="#990000">[</font>ii<font color="#990000">]</font> <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#416">owm_read_byte</a></font></b> <font color="#990000">();</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#000080">#endif</font></b>
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">void</font>
+<b><font color="#000000"><a name="103">print_slave_id</a></font></b> <font color="#990000">(</font><font color="#008080">uint64_t</font> id<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+   <i><font color="#9A1900">// Output the given slave id as a 64 bit hex number, using printf().</font></i>
+
+  <b><font color="#000000">printf</font></b> <font color="#990000">(</font><font color="#FF0000">"0x"</font><font color="#990000">);</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> <b><font color="#0000FF">sizeof</font></b> <font color="#990000">(</font>id<font color="#990000">)</font> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000">printf</font></b> <font color="#990000">(</font><font color="#FF0000">"%02"</font> PRIx8<font color="#990000">,</font> <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> <font color="#990000">(&amp;</font>id<font color="#990000">))[</font>ii<font color="#990000">]</font> <font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="114">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// This isn't what we're testing exactly, but we need to know if it's</font></i>
+  <i><font color="#9A1900">// working or not to interpret other results.</font></i>
+  <b><font color="#000000"><a href="term_io.c.html#166">term_io_init</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"term_io_init() worked.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="one_wire_master.c.html#68">owm_init</a></font></b> <font color="#990000">();</font>   <i><font color="#9A1900">// Initialize the one-wire interface master end</font></i>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying owm_touch_reset()... "</font><font color="#990000">);</font>
+  <font color="#008080">uint8_t</font> slave_presence <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#74">owm_touch_reset</a></font></b> <font color="#990000">();</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> slave_presence <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"failed: non-true was returned"</font><font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font><a href="util.h.html#20">FALSE</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok, got slave presence pulse.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+<b><font color="#000080">#ifdef</font></b> OWM_TEST_CONDITION_SINGLE_SLAVE
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying DS18B20 initialization... "</font><font color="#990000">);</font>
+  <font color="#008080">uint64_t</font> slave_rid <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master_test.c.html#56">ds18b20_init_and_rom_command</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok, succeeded.  Slave ID: "</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="one_wire_master_test.c.html#103">print_slave_id</a></font></b> <font color="#990000">(</font>slave_rid<font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+
+  <i><font color="#9A1900">// Uncomment this to repeatedly blink out the (decimal) byte values of</font></i>
+  <i><font color="#9A1900">// the ROM ID for the device instead of continuing the normal test program.</font></i>
+  <i><font color="#9A1900">//for ( ; ; ) {</font></i>
+  <i><font color="#9A1900">//  for ( uint8_t ii = 0 ; ii &lt; sizeof (uint64_t) ; ii++ ) {</font></i>
+  <i><font color="#9A1900">//    BLINK_OUT_UINT32_FEEDING_WDT (((uint8_t *) slave_id)[ii]);</font></i>
+  <i><font color="#9A1900">//  }</font></i>
+  <i><font color="#9A1900">//  _delay_ms (4.2);</font></i>
+  <i><font color="#9A1900">//}</font></i>
+
+  <font color="#008080">uint64_t</font> rid<font color="#990000">;</font>   <i><font color="#9A1900">// ROM ID</font></i>
+
+  <i><font color="#9A1900">// We can use owm_read_id() because we know we have exactly one slave.</font></i>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying owm_read_id()... "</font><font color="#990000">);</font>
+  <font color="#008080">uint8_t</font> device_found <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#125">owm_read_id</a></font></b> <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> <font color="#990000">&amp;</font>rid<font color="#990000">);</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">(!</font> device_found<font color="#990000">)</font> <font color="#990000">||</font> rid <font color="#990000">!=</font> slave_rid <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"failed: didn't find slave with previously discovered ID"</font><font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font><a href="util.h.html#20">FALSE</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok, found slave with previously discovered ID.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying owm_first()... "</font><font color="#990000">);</font>
+  device_found <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#343">owm_first</a></font></b> <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> <font color="#990000">&amp;</font>rid<font color="#990000">);</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">(!</font> device_found<font color="#990000">)</font> <font color="#990000">||</font> rid <font color="#990000">!=</font> slave_rid <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"failed: didn't find slave with previously discovered ID"</font><font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font><a href="util.h.html#20">FALSE</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok, found slave with previously discovered ID.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Verify that owm_next() (following the owm_first() call above) returns</font></i>
+  <i><font color="#9A1900">// false, since there is only one device on the bus.</font></i>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying owm_next()... "</font><font color="#990000">);</font>
+  device_found <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#355">owm_next</a></font></b> <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> <font color="#990000">&amp;</font>rid<font color="#990000">);</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> device_found <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"failed: unexpectedly returned true"</font><font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font><a href="util.h.html#20">FALSE</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok, no </font><font color="#FF0000"><a href="one_wire_master.c.html#287">next</a></font><font color="#FF0000"> device found.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// owm_verify() should work with either a single or multiple slaves.</font></i>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying owm_verify() with previously discoved ID... "</font><font color="#990000">);</font>
+  device_found <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#366">owm_verify</a></font></b> <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> <font color="#990000">&amp;</font>rid<font color="#990000">);</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> device_found <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"failed: unexpectedly returned false"</font><font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font><a href="util.h.html#20">FALSE</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok, ID verified.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Starting temperature conversion... "</font><font color="#990000">);</font>
+  uint8_t <font color="#008080">const</font> convert_t_command <font color="#990000">=</font> <font color="#993399">0x44</font><font color="#990000">;</font>
+  <b><font color="#000000"><a href="one_wire_master.c.html#374">owm_write_byte</a></font></b> <font color="#990000">(</font>convert_t_command<font color="#990000">);</font>
+  <i><font color="#9A1900">// The DS18B20 is now supposed to respond with a stream of 0 bits until</font></i>
+  <i><font color="#9A1900">// the conversion completes, after which it's supposed to send 1 bits.</font></i>
+  <i><font color="#9A1900">// Note that this is probably a typical behavior for busy one-wire devices.</font></i>
+  <font color="#008080">uint8_t</font> conversion_complete <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#990000">!</font> <font color="#990000">(</font>conversion_complete <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#110">owm_read_bit</a></font></b> <font color="#990000">())</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"conversion complete.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// We can now read the device scratchpad memory.  This requires us to first</font></i>
+  <i><font color="#9A1900">// perform the initialization and read rom commands again as described in</font></i>
+  <i><font color="#9A1900">// the DS18B20 datasheet.  The slave ROM code better be the same on second</font></i>
+  <i><font color="#9A1900">// reading :)</font></i>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Reading DS18B20 scratchpad memory... "</font><font color="#990000">);</font>
+  <font color="#008080">uint64_t</font> slave_rid_2nd_reading <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master_test.c.html#56">ds18b20_init_and_rom_command</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>slave_rid_2nd_reading <font color="#990000">==</font> slave_rid<font color="#990000">);</font>
+  <b><font color="#000000"><a href="one_wire_master_test.c.html#87">ds18b20_get_scratchpad_contents</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"done.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Convenient names for the temperature bytes</font></i>
+  <font color="#008080">uint8_t</font> t_lsb <font color="#990000">=</font> <a href="one_wire_master_test.c.html#53">spb</a><font color="#990000">[</font><a href="one_wire_master_test.c.html#50">DS18B20_SCRATCHPAD_T_LSB</a><font color="#990000">];</font>
+  <font color="#008080">uint8_t</font> t_msb <font color="#990000">=</font> <a href="one_wire_master_test.c.html#53">spb</a><font color="#990000">[</font><a href="one_wire_master_test.c.html#51">DS18B20_SCRATCHPAD_T_MSB</a><font color="#990000">];</font>
+
+  <font color="#008080">uint8_t</font> tin <font color="#990000">=</font> <font color="#990000">(</font>t_msb <font color="#990000">&amp;</font> <a href="util.h.html#657">B10000000</a><font color="#990000">);</font>   <i><font color="#9A1900">// Temperature Is Negative</font></i>
+
+  <i><font color="#9A1900">// Absolute value of temperature (in degrees C) times 2^4.  This is just</font></i>
+  <i><font color="#9A1900">// what the DS18B20 likes to spit out.  See Fig. 2 of the DS18B20 datasheet.</font></i>
+  <font color="#008080">int16_t</font> atemp_t2tt4 <font color="#990000">=</font> <font color="#990000">(((</font>int16_t<font color="#990000">)</font> t_msb<font color="#990000">)</font> <font color="#990000">&lt;&lt;</font> <a href="util.h.html#262">BITS_PER_BYTE</a><font color="#990000">)</font> <font color="#990000">|</font> t_lsb<font color="#990000">;</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> tin <font color="#990000">)</font> <font color="#FF0000">{</font>   <i><font color="#9A1900">// If negative...</font></i>
+    <i><font color="#9A1900">// ...just make it positive (it's 2's compliment)</font></i>
+    atemp_t2tt4 <font color="#990000">=</font> <font color="#990000">(~</font>atemp_t2tt4<font color="#990000">)</font> <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Uncomment some of this to test the the 2's compliment and blinky-output</font></i>
+  <i><font color="#9A1900">// features themselves, ignoring the real sensor output (but assuming</font></i>
+  <i><font color="#9A1900">// we make it to this point :).  Table 1 of the DS18B20 datasheet has a</font></i>
+  <i><font color="#9A1900">// number of example values.</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">//atemp_t2tt4 = INT16_C (0xFF5E);    // Means -10.125 (blinks out 101250)</font></i>
+  <i><font color="#9A1900">//atemp_t2tt4 = (~atemp_t2tt4) + 1;  // Knowns to be negative so abs it</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">//atemp_t2tt4 = INT16_C (0x0191);    // Means 25.0625 (blinks out 250625)</font></i>
+
+  <i><font color="#9A1900">// Absolute value of temperature, in degrees C.  These factors of 2.0 are</font></i>
+  <i><font color="#9A1900">// due to the meaning the DS18B20 assigns to the individual field bits.</font></i>
+  <font color="#009900">double</font> atemp <font color="#990000">=</font> atemp_t2tt4 <font color="#990000">/</font> <font color="#990000">(</font><font color="#993399">2.0</font> <font color="#990000">*</font> <font color="#993399">2.0</font> <font color="#990000">*</font> <font color="#993399">2.0</font> <font color="#990000">*</font> <font color="#993399">2.0</font><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// NOTE: I think avrlibc doesn't suppor the # printf flag.  No big loss, but</font></i>
+  <i><font color="#9A1900">// it means the blinked-out output might have a different number of digits</font></i>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font>
+      <font color="#FF0000">"Temperature reading: %#.6g degrees C (subject to rounding issues).</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font>
+      <font color="#990000">(</font>tin <font color="#990000">?</font> <font color="#990000">-</font><font color="#993399">1.0</font> <font color="#990000">:</font> <font color="#993399">1.0</font><font color="#990000">)</font> <font color="#990000">*</font> atemp<font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"All tests passed (assuming temperature looks sane :).</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font>
+      <font color="#FF0000">"Will now blink out abs(temperature) forever. Note that due to</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font>
+      <font color="#FF0000">"rounding/formatting issues the number of blinked-out digits or values</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font>
+      <font color="#FF0000">"of those digits might differ slightly from the printf()-generated</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font>
+      <font color="#FF0000">"version.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font> <font color="#990000">);</font>
+
+  <i><font color="#9A1900">// atemp Times 10000</font></i>
+  <font color="#008080">uint32_t</font> att10000 <font color="#990000">=</font> <b><font color="#000000">round</font></b><font color="#990000">(</font>atemp <font color="#990000">*</font> <font color="#993399">10000</font><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Blink out the absolute value of the current temperate times 10000</font></i>
+  <i><font color="#9A1900">// (effectively including four decimal places).</font></i>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#990000">;</font> <font color="#990000">;</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <i><font color="#9A1900">// Feeding the wdt is harmless even when it's not initialized.</font></i>
+    <b><font color="#000000"><a href="util.h.html#207">BLINK_OUT_UINT32_FEEDING_WDT</a></font></b> <font color="#990000">(</font>att10000<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+<b><font color="#000080">#endif</font></b>
+
+<b><font color="#000080">#ifdef</font></b> OWM_TEST_CONDITION_MULTIPLE_SLAVES
+
+<b><font color="#000080">#ifndef</font></b> OWM_FIRST_SLAVE_ID
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> OWM_FIRST_SLAVE_ID is not defined
+<b><font color="#000080">#endif</font></b>
+<b><font color="#000080">#ifndef</font></b> OWM_SECOND_SLAVE_ID
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> OWM_SECOND_SLAVE_ID is not defined
+<b><font color="#000080">#endif</font></b>
+
+  <i><font color="#9A1900">// Account for endianness by swapping the bytes of the literal ID values.</font></i>
+  <font color="#008080">uint64_t</font> first_device_id
+    <font color="#990000">=</font> <b><font color="#000000">__builtin_bswap64</font></b> <font color="#990000">(</font><b><font color="#000000">UINT64_C</font></b> <font color="#990000">(</font>OWM_FIRST_SLAVE_ID<font color="#990000">));</font>
+  <font color="#008080">uint64_t</font> second_device_id
+    <font color="#990000">=</font> <b><font color="#000000">__builtin_bswap64</font></b> <font color="#990000">(</font><b><font color="#000000">UINT64_C</font></b> <font color="#990000">(</font>OWM_SECOND_SLAVE_ID<font color="#990000">));</font>
+
+  <font color="#008080">uint64_t</font> rid<font color="#990000">;</font>   <i><font color="#9A1900">// ROM ID</font></i>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying owm_first()... "</font><font color="#990000">);</font>
+  <font color="#008080">uint8_t</font> device_found <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#343">owm_first</a></font></b> <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> <font color="#990000">&amp;</font>rid<font color="#990000">);</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> device_found <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"failed: didn't discover any slave devices"</font><font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font><a href="util.h.html#20">FALSE</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> rid <font color="#990000">!=</font> first_device_id <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"failed: discovered </font><font color="#FF0000"><a href="one_wire_master.c.html#271">first</a></font><font color="#FF0000"> device ID was "</font><font color="#990000">);</font>
+    <b><font color="#000000"><a href="one_wire_master_test.c.html#103">print_slave_id</a></font></b> <font color="#990000">(</font>rid<font color="#990000">);</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">", not the expected "</font><font color="#990000">);</font>
+    <b><font color="#000000"><a href="one_wire_master_test.c.html#103">print_slave_id</a></font></b> <font color="#990000">(</font>first_device_id<font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font><a href="util.h.html#20">FALSE</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok, found 1st device with expected ID "</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="one_wire_master_test.c.html#103">print_slave_id</a></font></b> <font color="#990000">(</font>rid<font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">".</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying owm_next()... "</font><font color="#990000">);</font>
+  device_found <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#355">owm_next</a></font></b> <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> <font color="#990000">&amp;</font>rid<font color="#990000">);</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> device_found <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"failed: didn't discover a second slave device"</font><font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font><a href="util.h.html#20">FALSE</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> rid <font color="#990000">!=</font> second_device_id <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"failed: discovered second device ID was "</font><font color="#990000">);</font>
+    <b><font color="#000000"><a href="one_wire_master_test.c.html#103">print_slave_id</a></font></b> <font color="#990000">(</font>rid<font color="#990000">);</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">", not the expected "</font><font color="#990000">);</font>
+    <b><font color="#000000"><a href="one_wire_master_test.c.html#103">print_slave_id</a></font></b> <font color="#990000">(</font>second_device_id<font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font><a href="util.h.html#20">FALSE</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok, found 2nd device with expected ID "</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="one_wire_master_test.c.html#103">print_slave_id</a></font></b> <font color="#990000">(</font>rid<font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">".</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Verify that owm_next() (following the owm_first() call above) returns</font></i>
+  <i><font color="#9A1900">// false, since there are only two devices on the bus.</font></i>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Trying owm_next() again... "</font><font color="#990000">);</font>
+  device_found <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#355">owm_next</a></font></b> <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> <font color="#990000">&amp;</font>rid<font color="#990000">);</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> device_found <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"failed: unexpectedly returned true"</font><font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font><a href="util.h.html#20">FALSE</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok, no </font><font color="#FF0000"><a href="one_wire_master.c.html#287">next</a></font><font color="#FF0000"> device found.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b><font color="#990000">(</font><font color="#FF0000">"Trying owm_verify(first_device_id)... "</font><font color="#990000">);</font>
+  device_found <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#366">owm_verify</a></font></b> <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> <font color="#990000">&amp;</font>rid<font color="#990000">);</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> device_found <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"failed: didn't find device"</font><font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font><a href="util.h.html#20">FALSE</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok, found it.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b><font color="#990000">(</font><font color="#FF0000">"Trying owm_verify(second_device_id)... "</font><font color="#990000">);</font>
+  device_found <font color="#990000">=</font> <b><font color="#000000"><a href="one_wire_master.c.html#366">owm_verify</a></font></b> <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> <font color="#990000">&amp;</font>rid<font color="#990000">);</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> device_found <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"failed: didn't find device"</font><font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font><a href="util.h.html#20">FALSE</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"ok, found it.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"All tests passed.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="term_io.h.html#77">PFP</a></font></b> <font color="#990000">(</font><font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+<b><font color="#000080">#endif</font></b>
+
+<font color="#FF0000">}</font>
+</tt></pre>

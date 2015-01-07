@@ -1,0 +1,92 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Simple Analog to Digital Converter Interface</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Test driver: <a href="adc_test.c.html">adc_test.c</a>    Implementation: <a href="adc.c.html">adc.c</a></font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This interface always uses a 125 kHz ADC clock.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// See the ATMega328P datasheet for details of other options.</font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="adc.h.html#10">ADC_H</a>
+<b><font color="#000080">#define</font></b> <a name="10">ADC_H</a>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdint.h&gt;</font>
+
+<i><font color="#9A1900">// Possible reference sources for the ADC.  See section 23.5.2 of ATMegs328P</font></i>
+<i><font color="#9A1900">// datasheet Rev. 8271C.  Note that Arduinos connect AVCC to VCC, so both</font></i>
+<i><font color="#9A1900">// ADC_REFERENCE_AVCC and ADC_REFERENCE_INTERNAL are pretty easy to use</font></i>
+<i><font color="#9A1900">// (but see the warning below regarding ADC_REFERENCE_INTERNAL).</font></i>
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="19">ADC_REFERENCE_AREF</a><font color="#990000">,</font>
+  <a name="20">ADC_REFERENCE_AVCC</a><font color="#990000">,</font>
+  <a name="21">ADC_REFERENCE_INTERNAL</a>
+<font color="#FF0000">}</font> <a name="22">adc_reference_source_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// WARNING: using ADC_REFERENCE_INTERNAL when the AREF pin is connected to</font></i>
+<i><font color="#9A1900">// an external DC voltage can destroy the ADC.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Prepare port C pins for use by the ADC, and ready the ADC.  If the</font></i>
+<i><font color="#9A1900">// ADC hardware is shut down to save power (i.e. if the PRADC bit of PRR</font></i>
+<i><font color="#9A1900">// register is set), this routine wakes it up.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// The ADC is initialized for polling operation with a 125 kHz ADC clock</font></i>
+<i><font color="#9A1900">// using reference_source.  Note that after this function is called,</font></i>
+<i><font color="#9A1900">// adc_pin_init() must still be called on the pin to be read.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="adc.c.html#10">adc_init</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="adc.h.html#22">adc_reference_source_t</a></font> reference_source<font color="#990000">);</font>
+
+<i><font color="#9A1900">// ADC pins available (corresponding to ADC0 .. ADC5).</font></i>
+<b><font color="#000080">#define</font></b> <a name="38">ADC_LOWEST_PIN</a> <font color="#993399">0</font>
+<b><font color="#000080">#define</font></b> <a name="39">ADC_HIGHEST_PIN</a> <font color="#993399">5</font>
+
+<i><font color="#9A1900">// Initialize a single pin for use as an ADC input.  Note that the pin</font></i>
+<i><font color="#9A1900">// argument must be an integer in the range [ADC_LOWEST_PIN, ADC_HIGHEST_PIN]</font></i>
+<i><font color="#9A1900">// (NOT a bit field specifying multiple pins at once).  The internal pull-up</font></i>
+<i><font color="#9A1900">// on the pin is disabled, the pin is set as an input, and the appropriate bit</font></i>
+<i><font color="#9A1900">// of the DIDR0 register is set to disable the digital input buffer on the pin</font></i>
+<i><font color="#9A1900">// (saving power).  Note that if you're trying to do something odd and use</font></i>
+<i><font color="#9A1900">// the pin for both analog and digital input, this might cause you trouble.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="adc.c.html#52">adc_pin_init</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> pin<font color="#990000">);</font>
+
+<i><font color="#9A1900">// The adc_read_raw() function returns values between 0 and</font></i>
+<i><font color="#9A1900">// ADC_RAW_READING_STEPS - 1.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="53">ADC_RAW_READING_STEPS</a></font></b> <font color="#990000">((</font>uint16_t<font color="#990000">)</font> <font color="#993399">1024</font><font color="#990000">)</font>
+
+<i><font color="#9A1900">// Read a raw sample value from pin (which must be on of 0 through 5).</font></i>
+uint16_t
+<b><font color="#000000"><a href="adc.c.html#66">adc_read_raw</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> pin<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Read a voltage value from pin (which must be one of 0 through 5),</font></i>
+<i><font color="#9A1900">// assuming reference_voltage.  Note that if ADC_REFERENCE_INTERNAL was</font></i>
+<i><font color="#9A1900">// used with adc_init(), reference_voltage should be 1.1 for most (all?) AVR</font></i>
+<i><font color="#9A1900">// microcontrollers.</font></i>
+<font color="#009900">float</font>
+<b><font color="#000000"><a href="adc.c.html#86">adc_read_voltage</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> pin<font color="#990000">,</font> <font color="#009900">float</font> reference_voltage<font color="#990000">);</font>
+
+<i><font color="#9A1900">// The ADC hardware is not automatically disabled when entering power-saving</font></i>
+<i><font color="#9A1900">// sleep modes.  (see ATmega328P datasheet Rev. 8271C, section 23.6).</font></i>
+<i><font color="#9A1900">// The ADC hardware does not consume power when the ADEN bit of ADCSRA</font></i>
+<i><font color="#9A1900">// is cleared (ATmega328P datasheet Rev. 8271C, section 23.2).</font></i>
+
+<i><font color="#9A1900">// Disable the ADC to save power.  NOTE: the ADC hardware is NOT automatically</font></i>
+<i><font color="#9A1900">// disabled when entering power-saving sleep modes.  (see ATmega328P</font></i>
+<i><font color="#9A1900">// datasheet Rev. 8271C, sections, 23.2 and 23.6).</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="74">ADC_DISABLE</a></font></b><font color="#990000">()</font>                       <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font>                                      <font color="#990000">\</font>
+    ADCSRA <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>ADEN<font color="#990000">));</font>                <font color="#990000">\</font>
+    <b><font color="#000000">loop_until_bit_is_clear</font></b> <font color="#990000">(</font>ADCSRA<font color="#990000">,</font> ADEN<font color="#990000">);</font> <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">);</font>
+
+<i><font color="#9A1900">// Re-enable ADC hardware.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="81">ADC_ENABLE</a></font></b><font color="#990000">()</font>                      <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font>                                    <font color="#990000">\</font>
+    ADCSRA <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>ADEN<font color="#990000">);</font>                 <font color="#990000">\</font>
+    <b><font color="#000000">loop_until_bit_is_set</font></b> <font color="#990000">(</font>ADCSRA<font color="#990000">,</font> ADEN<font color="#990000">);</font> <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">);</font>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// ADC_H</font></i>
+</tt></pre>

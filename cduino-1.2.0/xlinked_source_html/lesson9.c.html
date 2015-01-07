@@ -1,0 +1,130 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">/* $CSK: <a href="lesson9.c.html">lesson9.c</a>,v 1.7 2009/05/17 06:22:44 ckuethe Exp $ */</font></i>
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900"> * Copyright (c) 2009 Chris Kuethe </font></i><u><font color="#0000FF">&lt;chris.kuethe@gmail.com&gt;</font></u>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * Permission to use, copy, modify, and distribute this software for any</font></i>
+<i><font color="#9A1900"> * purpose with or without fee is hereby granted, provided that the above</font></i>
+<i><font color="#9A1900"> * copyright notice and this permission notice appear in all copies.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES</font></i>
+<i><font color="#9A1900"> * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF</font></i>
+<i><font color="#9A1900"> * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR</font></i>
+<i><font color="#9A1900"> * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES</font></i>
+<i><font color="#9A1900"> * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN</font></i>
+<i><font color="#9A1900"> * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF</font></i>
+<i><font color="#9A1900"> * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<i><font color="#9A1900">// Assumptions:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// 	- 10 kohm (or so) potentiometer connected between 5V supply and ground,</font></i>
+<i><font color="#9A1900">// 	  with potentionmeter tap connected to pin A0 (aka PC0 aka ADC0).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// 	- Note that there are a variety of hardware techniques that can be used</font></i>
+<i><font color="#9A1900">// 	  to improve the resolution and noise resistance of the ADC; the</font></i>
+<i><font color="#9A1900">// 	  ATMega328P datasheet discusses these.  For simplicity, we assume</font></i>
+<i><font color="#9A1900">// 	  that they aren't needed here.</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdio.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/pgmspace.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="term_io.h.html">term_io.h</a>"</font>
+
+<i><font color="#9A1900">// Initialize the ADC unit, without initialized any particular pins (see</font></i>
+<i><font color="#9A1900">// initialize_adc_pin() for that).  See the implementatation for details.</font></i>
+<b><font color="#0000FF">static</font></b> <font color="#009900">void</font>
+<b><font color="#000000"><a name="39">initialize_adc</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  ADMUX <font color="#990000">=</font> <font color="#993399">0x00</font><font color="#990000">;</font>   <i><font color="#9A1900">// Restore the default settings for ADMUX.</font></i>
+
+  <i><font color="#9A1900">// Unless otherwise configured, arduinos use the internal Vcc reference.</font></i>
+  <i><font color="#9A1900">// Thats what we're going to do as well, so we set bit REFS0 to specify</font></i>
+  <i><font color="#9A1900">// this (in combination with the already set default value of 0 for bit</font></i>
+  <i><font color="#9A1900">// REFS1). The MUX[3:0] bit setting used here indicate that we should</font></i>
+  <i><font color="#9A1900">// sample the ground (0.0V) (we'll change this before each actual ADC read).</font></i>
+  ADMUX <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>REFS0<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>MUX3<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>MUX2<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>MUX1<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>MUX0<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Restore the default settings for ADC status register A.</font></i>
+  ADCSRA <font color="#990000">=</font> <font color="#993399">0x00</font><font color="#990000">;</font>
+
+  <i><font color="#9A1900">// Restore the default settings for ADC status register B.</font></i>
+  ADCSRB <font color="#990000">=</font> <font color="#993399">0x00</font><font color="#990000">;</font>
+
+  <i><font color="#9A1900">// Enable the ADC system, use 128 as the clock divider on a 16MHz arduino</font></i>
+  <i><font color="#9A1900">// (ADC needs a 50 - 200kHz clock) and start a sample.  The ATmega329P</font></i>
+  <i><font color="#9A1900">// datasheet specifies that the first sample taken after the voltage</font></i>
+  <i><font color="#9A1900">// reference is changed should be discarded.</font></i>
+  ADCSRA <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>ADEN<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>ADPS2<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>ADPS1<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>ADPS0<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>ADSC<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Wait for the ADC to return a sample (and discard it).</font></i>
+  <b><font color="#000000">loop_until_bit_is_clear</font></b> <font color="#990000">(</font>ADCSRA<font color="#990000">,</font> ADSC<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">// ADC pins available (corresponding to ADC0 .. ADC5).</font></i>
+<b><font color="#000080">#define</font></b> <a name="67">ADC_LOWEST_PIN</a> <font color="#993399">0</font>
+<b><font color="#000080">#define</font></b> <a name="68">ADC_HIGHEST_PIN</a> <font color="#993399">5</font>
+
+<i><font color="#9A1900">// Initialize a particular ADC pin (ADC_LOWEST_PIN up to ADC_HIGHEST_PIN)</font></i>
+<i><font color="#9A1900">// for use as an ADC input.</font></i>
+<b><font color="#0000FF">static</font></b> <font color="#009900">void</font>
+<b><font color="#000000"><a name="73">initialize_adc_pin</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> pin<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  PORTC <font color="#990000">&amp;=</font> <font color="#990000">~(</font><font color="#993399">0x01</font> <font color="#990000">&lt;&lt;</font> pin<font color="#990000">);</font>   <i><font color="#9A1900">// Disable pull-up on pin</font></i>
+  DDRC <font color="#990000">&amp;=</font> <font color="#990000">~(</font><font color="#993399">0x01</font> <font color="#990000">&lt;&lt;</font> pin<font color="#990000">);</font>    <i><font color="#9A1900">// Ensure pin is set as an input</font></i>
+  DIDR0 <font color="#990000">|=</font> <font color="#993399">0x01</font> <font color="#990000">&lt;&lt;</font> pin<font color="#990000">;</font>      <i><font color="#9A1900">// Disable digital input buffer on pin</font></i>
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">// Read an initialized ADC pin (ADC_LOWEST_PIN up to ADC_HIGHEST_PIN).</font></i>
+<b><font color="#0000FF">static</font></b> uint16_t
+<b><font color="#000000"><a name="82">adc_read</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> pin<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Select the input channel.</font></i>
+  <font color="#008080">uint8_t</font> admux_value <font color="#990000">=</font> <font color="#990000">(</font>ADMUX <font color="#990000">&amp;</font> <font color="#993399">0xf0</font><font color="#990000">)</font> <font color="#990000">|</font> <font color="#990000">(</font>pin <font color="#990000">&amp;</font> <font color="#993399">0x0f</font><font color="#990000">);</font>
+  ADMUX <font color="#990000">=</font> admux_value<font color="#990000">;</font>
+
+  <i><font color="#9A1900">// Start a sample and wait until it's done.</font></i>
+  ADCSRA <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>ADSC<font color="#990000">);</font>
+  <b><font color="#000000">loop_until_bit_is_clear</font></b> <font color="#990000">(</font>ADCSRA<font color="#990000">,</font> ADSC<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// It is required to read the low ADC byte before the high byte.</font></i>
+  <font color="#008080">uint8_t</font> lb <font color="#990000">=</font> ADCL<font color="#990000">;</font>   <i><font color="#9A1900">// Low Byte</font></i>
+  <font color="#008080">uint8_t</font> hb <font color="#990000">=</font> ADCH<font color="#990000">;</font>   <i><font color="#9A1900">// High Byte</font></i>
+
+  <b><font color="#0000FF">return</font></b> <font color="#990000">(((</font>uint16_t<font color="#990000">)</font> hb<font color="#990000">)</font> <font color="#990000">&lt;&lt;</font> <font color="#993399">8</font><font color="#990000">)</font> <font color="#990000">|</font> lb<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="100">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="term_io.c.html#166">term_io_init</a></font></b> <font color="#990000">();</font>   <i><font color="#9A1900">// Set up terminal communications.</font></i>
+
+  uint8_t <font color="#008080">const</font> aip <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>   <i><font color="#9A1900">// Analog Input Pin being used</font></i>
+
+  <b><font color="#000000"><a href="lesson9.c.html#39">initialize_adc</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="lesson9.c.html#73">initialize_adc_pin</a></font></b> <font color="#990000">(</font>aip<font color="#990000">);</font>
+
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">1</font> <font color="#990000">)</font>
+  <font color="#FF0000">{</font>
+    <font color="#008080">uint16_t</font> raw <font color="#990000">=</font> <b><font color="#000000"><a href="lesson9.c.html#82">adc_read</a></font></b> <font color="#990000">(</font>aip<font color="#990000">);</font>
+
+    <i><font color="#9A1900">// Print tap voltage and raw ADC value.</font></i>
+    uint16_t <font color="#008080">const</font> a2d_steps <font color="#990000">=</font> <font color="#993399">1024</font><font color="#990000">;</font>
+    <font color="#009900">float</font> <b><font color="#0000FF">const</font></b> reference_voltage <font color="#990000">=</font> <font color="#993399">5.0</font><font color="#990000">;</font>
+    <font color="#009900">float</font> tap_voltage <font color="#990000">=</font> <font color="#990000">((</font><font color="#009900">float</font><font color="#990000">)</font> raw <font color="#990000">/</font> a2d_steps<font color="#990000">)</font> <font color="#990000">*</font> reference_voltage<font color="#990000">;</font>
+    <b><font color="#000000">printf_P</font></b> <font color="#990000">(</font>
+        <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"Potentiometer tap voltage: %f (%d raw)</font><font color="#CC33CC">\r\n</font><font color="#FF0000">"</font><font color="#990000">),</font>
+        tap_voltage<font color="#990000">,</font>
+        raw <font color="#990000">);</font>
+
+    <font color="#009900">float</font> <b><font color="#0000FF">const</font></b> mspr <font color="#990000">=</font> <font color="#993399">500</font><font color="#990000">;</font>   <i><font color="#9A1900">// Milliseconds Per Reading</font></i>
+    <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>mspr<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+</tt></pre>

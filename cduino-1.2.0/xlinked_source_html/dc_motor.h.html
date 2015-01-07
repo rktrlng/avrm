@@ -1,0 +1,117 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Control one or two DC motors of up to 2 amps each using the Arduino</font></i>
+<i><font color="#9A1900">// Motor Shield Model R3 (http://arduino.cc/en/Main/ArduinoMotorShieldR3).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Test driver: <a href="dc_motor_test.c.html">dc_motor_test.c</a>    Implementation: <a href="dc_motor.c.html">dc_motor.c</a></font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// The Arduino motor shield is a fairly thin wrapper around the underlying</font></i>
+<i><font color="#9A1900">// L298P H-Bridge controller chip.</font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="dc_motor.h.html#10">DC_MOTOR_H</a>
+<b><font color="#000080">#define</font></b> <a name="10">DC_MOTOR_H</a>
+
+<i><font color="#9A1900">//  These pins are used by the shield for direction and brake controls</font></i>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="13">DC_MOTOR_CHANNEL_A_DIRECTION_DIO_PIN</a></font> <a href="dio.h.html#596">DIO_PIN_DIGITAL_12</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="14">DC_MOTOR_CHANNEL_B_DIRECTION_DIO_PIN</a></font> <a href="dio.h.html#597">DIO_PIN_DIGITAL_13</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="15">DC_MOTOR_CHANNEL_A_BRAKE_DIO_PIN</a></font> <a href="dio.h.html#593">DIO_PIN_DIGITAL_9</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="16">DC_MOTOR_CHANNEL_B_BRAKE_DIO_PIN</a></font> <a href="dio.h.html#592">DIO_PIN_DIGITAL_8</a>
+
+<i><font color="#9A1900">// These pins are use by the shield for adc inputs which give load current.</font></i>
+<i><font color="#9A1900">// These are the pins as the Arduino numbers them:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   0 -&gt; Arduino A0 -&gt; ATmega pin PC0</font></i>
+<i><font color="#9A1900">//   1 -&gt; Arduino A1 -&gt; ATmega pin PC1</font></i>
+<i><font color="#9A1900">//</font></i>
+<b><font color="#000080">#define</font></b> <a name="24">DC_MOTOR_CHANNEL_A_CURRENT_SENSE_ADC_PIN</a> <font color="#993399">0</font>
+<b><font color="#000080">#define</font></b> <a name="25">DC_MOTOR_CHANNEL_B_CURRENT_SENSE_ADC_PIN</a> <font color="#993399">1</font>
+
+<i><font color="#9A1900">// NOTE: In addition to the above pins, the motor shield uses pins Digital</font></i>
+<i><font color="#9A1900">// 3 and Digital 11 (aka PD3 and PB3 respectively in ATmega328P-speak)</font></i>
+<i><font color="#9A1900">// as PWM outputs to control the motor speed.</font></i>
+
+<i><font color="#9A1900">// NOTE: For some reason, the Arduino motor shield uses the OC2B pin (which</font></i>
+<i><font color="#9A1900">// is in turn affected by the OCR2B register) to control what it calls</font></i>
+<i><font color="#9A1900">// motor channel A, and the OC2A pin (and OCR2A register) to control what</font></i>
+<i><font color="#9A1900">// it calls channel B.  In theory clients don't need to know about this,</font></i>
+<i><font color="#9A1900">// but it seems to have enough potential for confusion that I'm documenting</font></i>
+<i><font color="#9A1900">// it here in the interface.</font></i>
+<b><font color="#000080">#define</font></b> <a name="37">DC_MOTOR_CHANNEL_A_OCR_REGISTER</a> OCR2B
+<b><font color="#000080">#define</font></b> <a name="38">DC_MOTOR_CHANNEL_B_OCR_REGISTER</a> OCR2A
+
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="41">DC_MOTOR_CHANNEL_A</a><font color="#990000">,</font>
+  <a name="42">DC_MOTOR_CHANNEL_B</a>
+<font color="#FF0000">}</font> <a name="43">dc_motor_channel_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// The Arduino connects its internal VCC to AVCC, so this is the reference</font></i>
+<i><font color="#9A1900">// source we'll use to measure the current sensing outputs.</font></i>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="47">DC_MOTOR_ADC_REFERENCE</a></font> <a href="adc.h.html#20">ADC_REFERENCE_AVCC</a>
+
+<i><font color="#9A1900">// Initialize the direction control pins, brake pins, PWM pins and their</font></i>
+<i><font color="#9A1900">// associated timer hardware, and current sensing pins, and set the motor</font></i>
+<i><font color="#9A1900">// speeds to 0.  If the timer/counter0 hardware is shut down to save power</font></i>
+<i><font color="#9A1900">// (i.e. if the PRTIM2 bit of the PRR register is set), this routine wakes</font></i>
+<i><font color="#9A1900">// it up.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="dc_motor.c.html#24">dc_motor_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Set motor target speed for channel.  The speed argument must be in</font></i>
+<i><font color="#9A1900">// [-100, 100] and is interpreted as follows: -100 =&gt; full speed reverse,</font></i>
+<i><font color="#9A1900">// 0 =&gt; off, 100 =&gt; full speed ahead).  WARNING: it's possible for sudden</font></i>
+<i><font color="#9A1900">// changes to the motor speed or direction to place significant inertial</font></i>
+<i><font color="#9A1900">// loads on the motor.  You might want to call this routine multiple times</font></i>
+<i><font color="#9A1900">// over time, or perhaps implement dc_motor_ramp_to_speed() (see below).</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="dc_motor.c.html#123">dc_motor_set_speed</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="dc_motor.h.html#43">dc_motor_channel_t</a></font> channel<font color="#990000">,</font> <font color="#008080">int8_t</font> <a href="sd_card.c.html#95">speed</a><font color="#990000">);</font>
+
+<i><font color="#9A1900">// FIXXME: something like this might be useful in some applications to slowly</font></i>
+<i><font color="#9A1900">// ramp the speed to a given setting and thereby avoid high acceleration</font></i>
+<i><font color="#9A1900">// loading.  It could be implemented easily in terms of dc_motor_set_speed().</font></i>
+<i><font color="#9A1900">// It's unimplemented because I've only used heavily geared gear motors,</font></i>
+<i><font color="#9A1900">// and so haven't needed this.</font></i>
+<i><font color="#9A1900">//void</font></i>
+<i><font color="#9A1900">//dc_motor_ramp_to_speed (</font></i>
+<i><font color="#9A1900">//    dc_motor_channel_t channel, uint8_t target_speed, uint8_t rate );</font></i>
+
+<i><font color="#9A1900">// FIXXME: For reaons similar to those discussed above for the prospective</font></i>
+<i><font color="#9A1900">// dc_motor_ramp_to_speed() function, this is currently unimplemented</font></i>
+<i><font color="#9A1900">// (though the break lines are initialized by dc_motor_init()).</font></i>
+<i><font color="#9A1900">//void</font></i>
+<i><font color="#9A1900">//dc_motor_brake (dc_motor_channel_t channel);</font></i>
+
+<i><font color="#9A1900">// For the ADC-based load current calculations, we assume that the ADC</font></i>
+<i><font color="#9A1900">// reference voltage has this value.  Note that even if a high-voltage</font></i>
+<i><font color="#9A1900">// power supply is being used (to drive a more powerful motor), the Arduino</font></i>
+<i><font color="#9A1900">// will still have its internal voltage-regulator-generated VCC connected</font></i>
+<i><font color="#9A1900">// to AVCC.  It's possible for this to be 3.3V under some circumstances,</font></i>
+<i><font color="#9A1900">// in which case this assumption will be wrong (FIXXME: arduino has a</font></i>
+<i><font color="#9A1900">// jumper or something to detect this, read it?).  But if you're driving</font></i>
+<i><font color="#9A1900">// motors chances are you have at least a 5V supply lurking somewhere,</font></i>
+<i><font color="#9A1900">// and hopefully you're running the CPU off 5V as well as the motor...</font></i>
+<b><font color="#000080">#define</font></b> <a name="90">DC_MOTOR_ADC_REFERENCE_VOLTAGE</a> <font color="#993399">5.0</font>
+
+<i><font color="#9A1900">// The Arduino Motor Shield Model R3 features a current sensing resistor</font></i>
+<i><font color="#9A1900">// and amplifier arrangement such than we get this many volts per amp of</font></i>
+<i><font color="#9A1900">// load current.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="95">DC_MOTOR_CURRENT_SENSE_AMPS_PER_VOLT</a></font></b> <font color="#990000">(</font><font color="#993399">2.0</font> <font color="#990000">/</font> <font color="#993399">3.3</font><font color="#990000">)</font>
+
+<i><font color="#9A1900">// Return the load current in amps for motor on channel</font></i>
+<i><font color="#9A1900">// channel.  Note that this is the current value as computed using</font></i>
+<i><font color="#9A1900">// DC_MOTOR_CURRENT_SENSE_AMPS_PER_VOLT, not the voltage reading at the</font></i>
+<i><font color="#9A1900">// sensor output.</font></i>
+<font color="#009900">float</font>
+<b><font color="#000000"><a href="dc_motor.c.html#156">dc_motor_load_current</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="dc_motor.h.html#43">dc_motor_channel_t</a></font> channel<font color="#990000">);</font>
+
+<i><font color="#9A1900">// FIXXME: if we wanted to entirely shut down the timer/counter2 hardware to</font></i>
+<i><font color="#9A1900">// save power or something (and perhaps deconfigure direction/brake/current</font></i>
+<i><font color="#9A1900">// sense lines?, make sure OCR2A/B end up low by strobing FOC2X from</font></i>
+<i><font color="#9A1900">// normal mode like the ATmega328P datasheed babbles about? ), we would</font></i>
+<i><font color="#9A1900">// have implemented this function :)</font></i>
+<i><font color="#9A1900">//void</font></i>
+<i><font color="#9A1900">//dc_motor_shutdown (void)</font></i>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// DC_MOTOR_H</font></i>
+</tt></pre>

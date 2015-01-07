@@ -1,0 +1,114 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Test/demo for the <a href="lcd_keypad.h.html">lcd_keypad.h</a> interface.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Of course, this requires an installed DFRobot DFR0009 shield or equivalent.</font></i>
+
+<i><font color="#9A1900">// vim: foldmethod=marker</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;assert.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/pgmspace.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;inttypes.h&gt;</font>
+<i><font color="#9A1900">// FIXME: here only cause assert.h wrongly needs, remove when that bug is</font></i>
+<i><font color="#9A1900">// fixed (which it is in most recent upstream AVR libc</font></i>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdlib.h&gt;</font>   
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;string.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="lcd_keypad.h.html">lcd_keypad.h</a>"</font>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="19">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="lcd_keypad.c.html#17">lcd_keypad_init</a></font></b> <font color="#990000">();</font>
+  
+  <b><font color="#0000FF">const</font></b> <font color="#009900">double</font> transition_message_time_ms <font color="#990000">=</font> <font color="#993399">2000.0</font><font color="#990000">;</font>
+
+  <i><font color="#9A1900">// Test lcd_keypad_wait_for_button() and lcd_keypad_button_name().</font></i>
+  <i><font color="#9A1900">// {{{1</font></i>
+
+  <b><font color="#0000FF">const</font></b> <font color="#008080">uint8_t</font> presses_required <font color="#990000">=</font> <font color="#993399">20</font><font color="#990000">;</font>
+
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font><b><font color="#0000FF">sizeof</font></b> <font color="#990000">(</font><font color="#009900">unsigned</font> <font color="#009900">char</font><font color="#990000">)</font> <font color="#990000">==</font> <font color="#993399">1</font><font color="#990000">);</font>   <i><font color="#9A1900">// Hey, you never know :)</font></i>
+  <b><font color="#000000"><a href="lcd.c.html#278">lcd_printf</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Press %hhu buttons"</font><font color="#990000">,</font> presses_required<font color="#990000">);</font>
+
+  <font color="#008080">uint8_t</font> presses <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> presses <font color="#990000">&lt;</font> presses_required <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <font color="#008080"><a href="lcd_keypad.h.html#39">lcd_keypad_button_t</a></font> button <font color="#990000">=</font> <b><font color="#000000"><a href="lcd_keypad.c.html#126">lcd_keypad_wait_for_button</a></font></b> <font color="#990000">();</font>
+    presses<font color="#990000">++;</font>
+
+    <b><font color="#000000"><a href="lcd.c.html#189">lcd_clear</a></font></b> <font color="#990000">();</font>
+    <b><font color="#000000"><a href="lcd.c.html#196">lcd_home</a></font></b> <font color="#990000">();</font>
+    <b><font color="#000000"><a href="lcd.c.html#278">lcd_printf</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Press %hhu buttons"</font><font color="#990000">,</font> presses_required <font color="#990000">-</font> presses<font color="#990000">);</font>
+    <font color="#009900">char</font> button_name<font color="#990000">[</font><a href="lcd_keypad.h.html#42">LCD_KEYPAD_MAX_BUTTON_NAME_LENGTH</a> <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">];</font>
+    <b><font color="#000000"><a href="lcd_keypad.c.html#25">lcd_keypad_button_name</a></font></b> <font color="#990000">(</font>button<font color="#990000">,</font> button_name<font color="#990000">);</font>
+    <b><font color="#000000"><a href="lcd.c.html#204">lcd_set_cursor_position</a></font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">);</font>
+    <b><font color="#000000"><a href="lcd.c.html#310">lcd_write_string</a></font></b> <font color="#990000">(</font>button_name<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+ 
+  <b><font color="#000000"><a href="lcd.c.html#189">lcd_clear</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="lcd.c.html#196">lcd_home</a></font></b> <font color="#990000">();</font> 
+  <b><font color="#000000"><a href="lcd.c.html#310">lcd_write_string</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Ok, good enough"</font><font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>transition_message_time_ms<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// }}}1</font></i>
+
+  <i><font color="#9A1900">// Test lcd_keypad_show_value().</font></i>
+  <i><font color="#9A1900">// {{{1</font></i>
+
+  <b><font color="#000000"><a href="lcd.c.html#189">lcd_clear</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="lcd.c.html#196">lcd_home</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="lcd.c.html#310">lcd_write_string</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Will now test"</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd.c.html#204">lcd_set_cursor_position</a></font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd.c.html#310">lcd_write_string</a></font></b> <font color="#990000">(</font><font color="#FF0000">"show_value"</font><font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>transition_message_time_ms<font color="#990000">);</font>
+  <font color="#009900">double</font> the_answer <font color="#990000">=</font> <font color="#993399">42.0</font><font color="#990000">;</font>
+  <a href="lcd_keypad.h.html#39">lcd_keypad_button_t</a> button
+    <font color="#990000">=</font> <b><font color="#000000"><a href="lcd_keypad.c.html#158">lcd_keypad_show_value</a></font></b> <font color="#990000">(</font><font color="#FF0000">"the_answer"</font><font color="#990000">,</font> <font color="#990000">&amp;</font>the_answer<font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="lcd.c.html#189">lcd_clear</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="lcd.c.html#196">lcd_home</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="lcd.c.html#310">lcd_write_string</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Finish button:"</font><font color="#990000">);</font>
+  <font color="#009900">char</font> button_name<font color="#990000">[</font><a href="lcd_keypad.h.html#42">LCD_KEYPAD_MAX_BUTTON_NAME_LENGTH</a> <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">];</font>
+  <b><font color="#000000"><a href="lcd_keypad.c.html#25">lcd_keypad_button_name</a></font></b> <font color="#990000">(</font>button<font color="#990000">,</font> button_name<font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd.c.html#204">lcd_set_cursor_position</a></font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd.c.html#310">lcd_write_string</a></font></b> <font color="#990000">(</font>button_name<font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>transition_message_time_ms<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// }}}1</font></i>
+
+  <i><font color="#9A1900">// Test lcd_keypad_set_value().</font></i>
+  <i><font color="#9A1900">// {{{1</font></i>
+
+  <b><font color="#000000"><a href="lcd.c.html#189">lcd_clear</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="lcd.c.html#196">lcd_home</a></font></b> <font color="#990000">();</font> 
+  <b><font color="#000000"><a href="lcd.c.html#310">lcd_write_string</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Will now test"</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd.c.html#204">lcd_set_cursor_position</a></font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd.c.html#310">lcd_write_string</a></font></b> <font color="#990000">(</font><font color="#FF0000">"set_value"</font><font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>transition_message_time_ms<font color="#990000">);</font>
+  the_answer <font color="#990000">=</font> <font color="#993399">42.0e-12</font><font color="#990000">;</font>
+  <font color="#009900">double</font> step_size <font color="#990000">=</font> <font color="#993399">42e-13</font><font color="#990000">;</font>
+  button <font color="#990000">=</font> <b><font color="#000000"><a href="lcd_keypad.c.html#212">lcd_keypad_set_value</a></font></b> <font color="#990000">(</font><font color="#FF0000">"the_answer"</font><font color="#990000">,</font> <font color="#990000">&amp;</font>the_answer<font color="#990000">,</font> step_size<font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="lcd.c.html#189">lcd_clear</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="lcd.c.html#196">lcd_home</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="lcd.c.html#310">lcd_write_string</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Final answer:"</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd.c.html#204">lcd_set_cursor_position</a></font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd.c.html#294">lcd_printf_P</a></font></b> <font color="#990000">(</font><b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><a href="lcd_keypad.h.html#83">LCD_KEYPAD_VALUE_DISPLAY_FORMAT</a><font color="#990000">),</font> the_answer<font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>transition_message_time_ms<font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="lcd.c.html#189">lcd_clear</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="lcd.c.html#196">lcd_home</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="lcd.c.html#310">lcd_write_string</a></font></b> <font color="#990000">(</font><font color="#FF0000">"Finish button:"</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd_keypad.c.html#25">lcd_keypad_button_name</a></font></b> <font color="#990000">(</font>button<font color="#990000">,</font> button_name<font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd.c.html#204">lcd_set_cursor_position</a></font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="lcd.c.html#310">lcd_write_string</a></font></b> <font color="#990000">(</font>button_name<font color="#990000">);</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>transition_message_time_ms<font color="#990000">);</font>
+  
+  <i><font color="#9A1900">// }}}1</font></i>
+
+  <b><font color="#0000FF">return</font></b> <font color="#993399">0</font><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+</tt></pre>

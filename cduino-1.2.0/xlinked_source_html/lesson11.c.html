@@ -1,0 +1,140 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">/* $CSK: <a href="lesson11.c.html">lesson11.c</a>,v 1.2 2009/05/17 20:21:23 ckuethe Exp $ */</font></i>
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900"> * Copyright (c) 2009 Chris Kuethe </font></i><u><font color="#0000FF">&lt;chris.kuethe@gmail.com&gt;</font></u>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * Permission to use, copy, modify, and distribute this software for any</font></i>
+<i><font color="#9A1900"> * purpose with or without fee is hereby granted, provided that the above</font></i>
+<i><font color="#9A1900"> * copyright notice and this permission notice appear in all copies.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES</font></i>
+<i><font color="#9A1900"> * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF</font></i>
+<i><font color="#9A1900"> * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR</font></i>
+<i><font color="#9A1900"> * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES</font></i>
+<i><font color="#9A1900"> * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN</font></i>
+<i><font color="#9A1900"> * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF</font></i>
+<i><font color="#9A1900"> * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;assert.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/eeprom.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/interrupt.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/pgmspace.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdio.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdlib.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;string.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="term_io.h.html">term_io.h</a>"</font>
+
+<b><font color="#000080">#define</font></b> <a name="30">SIG_LEN</a> <font color="#993399">4</font>               <i><font color="#9A1900">// Length of our signature string</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="31">OFF_SIG</a></font></b> <font color="#990000">((</font>uint32_t <font color="#990000">*)</font> <font color="#993399">0</font><font color="#990000">)</font>   <i><font color="#9A1900">// Our signature offset</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="32">OFF_CTR</a></font></b> <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> <font color="#993399">4</font><font color="#990000">)</font>    <i><font color="#9A1900">// Write counter offset</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="33">OFF_LEN</a></font></b> <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> <font color="#993399">5</font><font color="#990000">)</font>    <i><font color="#9A1900">// String length offset</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="34">OFF_TXT</a></font></b> <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> <font color="#993399">6</font><font color="#990000">)</font>    <i><font color="#9A1900">// String text offset</font></i>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="37">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#009900">char</font> <font color="#990000">*</font>signature <font color="#990000">=</font> <font color="#FF0000">"AVRm"</font><font color="#990000">;</font>
+  <font color="#009900">char</font> buffer<font color="#990000">[</font><a href="term_io.h.html#39">TERM_IO_LINE_BUFFER_MIN_SIZE</a><font color="#990000">];</font>
+  <font color="#008080">uint8_t</font> write_counter <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <font color="#008080">uint8_t</font> str_length<font color="#990000">;</font>
+
+  <i><font color="#9A1900">// The eeprom_* routines are not reentrant, so they must not be used</font></i>
+  <i><font color="#9A1900">// from both the main context and interrupt context without ensuring that</font></i>
+  <i><font color="#9A1900">// interrupts are disabled before accessing them from the main context.</font></i>
+  <i><font color="#9A1900">// This isn't an issue for this program since interrupts aren't used,</font></i>
+  <i><font color="#9A1900">// just to make the point we disable them anyway :)</font></i>
+  <b><font color="#000000">cli</font></b> <font color="#990000">();</font>
+
+  <b><font color="#000000"><a href="term_io.c.html#166">term_io_init</a></font></b> <font color="#990000">();</font>
+
+  <i><font color="#9A1900">// NOTE: you may have to connect to the AVR right after a reboot to see</font></i>
+  <i><font color="#9A1900">// this startup stuff happen...</font></i>
+
+  <i><font color="#9A1900">// Make sure the EEPROM is ready. </font></i>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font><b><font color="#000000">eeprom_is_ready</font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000">printf_P</font></b> <font color="#990000">(</font><b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"Waiting for EEPROM to become ready...</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">));</font>
+    <b><font color="#000000">eeprom_busy_wait</font></b> <font color="#990000">();</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000">printf_P</font></b> <font color="#990000">(</font><b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"EEPROM ready.</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">));</font>
+
+  <i><font color="#9A1900">// Check for signature, report what we find, and format if necessary.</font></i>
+  <b><font color="#000000">printf_P</font></b> <font color="#990000">(</font><b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"Checking EEPROM format...</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">));</font>
+  <b><font color="#000000">eeprom_read_block</font></b> <font color="#990000">(&amp;</font>buffer<font color="#990000">,</font> <a href="lesson11.c.html#31">OFF_SIG</a><font color="#990000">,</font> <font color="#993399">4</font><font color="#990000">);</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000">memcmp</font></b> <font color="#990000">(</font>buffer<font color="#990000">,</font> signature<font color="#990000">,</font> <a href="lesson11.c.html#30">SIG_LEN</a><font color="#990000">)</font> <font color="#990000">==</font> <font color="#993399">0</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000">printf_P</font></b> <font color="#990000">(</font><b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"EEPROM already formatted.</font><font color="#CC33CC">\n\n</font><font color="#FF0000">"</font><font color="#990000">));</font>
+    write_counter <font color="#990000">=</font> <b><font color="#000000">eeprom_read_byte</font></b> <font color="#990000">(</font><a href="lesson11.c.html#32">OFF_CTR</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+    <b><font color="#000000">printf_P</font></b> <font color="#990000">(</font><b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"EEPROM is blank, formatting...</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">));</font>
+    <b><font color="#000000">eeprom_write_block</font></b> <font color="#990000">(</font>signature<font color="#990000">,</font> <a href="lesson11.c.html#31">OFF_SIG</a><font color="#990000">,</font> <font color="#993399">4</font><font color="#990000">);</font>
+    <b><font color="#000000">eeprom_write_byte</font></b> <font color="#990000">(</font><a href="lesson11.c.html#32">OFF_CTR</a><font color="#990000">,</font> <font color="#990000">(</font>int8_t<font color="#990000">)</font> <font color="#993399">0</font><font color="#990000">);</font>
+    write_counter <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+    <b><font color="#000000">eeprom_write_byte</font></b> <font color="#990000">(</font><a href="lesson11.c.html#33">OFF_LEN</a><font color="#990000">,</font> <font color="#990000">(</font>int8_t<font color="#990000">)</font> <font color="#993399">0</font><font color="#990000">);</font>
+    <i><font color="#9A1900">// Null byte at start of string effectively blanks the whole string.</font></i>
+    <b><font color="#000000">eeprom_write_byte</font></b> <font color="#990000">(</font><a href="lesson11.c.html#34">OFF_TXT</a><font color="#990000">,</font> <font color="#990000">(</font>int8_t<font color="#990000">)</font> <font color="#993399">0</font><font color="#990000">);</font>  
+    <b><font color="#000000">printf_P</font></b> <font color="#990000">(</font><b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"EEPROM formatted.</font><font color="#CC33CC">\n\n</font><font color="#FF0000">"</font><font color="#990000">));</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">1</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+
+    <i><font color="#9A1900">// Prompt to determine if we want to read or write EEPROM.</font></i>
+    <b><font color="#000000">printf_P</font></b> <font color="#990000">(</font><b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"(writes: %d) [r]ead, [w]rite, [e]rase: "</font><font color="#990000">),</font> write_counter<font color="#990000">);</font>
+    <font color="#009900">int</font> char_count <font color="#990000">=</font> <b><font color="#000000"><a href="term_io.c.html#174">term_io_getline</a></font></b> <font color="#990000">(</font>buffer<font color="#990000">);</font>
+    <b><font color="#000000">assert</font></b> <font color="#990000">(</font>char_count <font color="#990000">!=</font> <font color="#990000">-</font><font color="#993399">1</font><font color="#990000">);</font>
+
+    <b><font color="#0000FF">switch</font></b> <font color="#990000">(</font> buffer<font color="#990000">[</font><font color="#993399">0</font><font color="#990000">]</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+
+      <b><font color="#0000FF">case</font></b> <font color="#FF0000">'W'</font><font color="#990000">:</font>
+      <b><font color="#0000FF">case</font></b> <font color="#FF0000">'w'</font><font color="#990000">:</font>
+        <b><font color="#000000">printf_P</font></b> <font color="#990000">(</font><b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"Enter a string to store in EEPROM: "</font><font color="#990000">));</font>
+        <font color="#009900">int</font> char_count <font color="#990000">=</font> <b><font color="#000000"><a href="term_io.c.html#174">term_io_getline</a></font></b> <font color="#990000">(</font>buffer<font color="#990000">);</font>
+        <b><font color="#000000">assert</font></b> <font color="#990000">(</font>char_count <font color="#990000">!=</font> <font color="#990000">-</font><font color="#993399">1</font><font color="#990000">);</font>
+        str_length <font color="#990000">=</font> <b><font color="#000000">strlen</font></b> <font color="#990000">(</font>buffer<font color="#990000">);</font>
+        <b><font color="#000000">printf_P</font></b> <font color="#990000">(</font><b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"EEPROM written.</font><font color="#CC33CC">\n\n</font><font color="#FF0000">"</font><font color="#990000">));</font>
+
+        <i><font color="#9A1900">// Increment the counter.</font></i>
+        write_counter <font color="#990000">=</font> <b><font color="#000000">eeprom_read_byte</font></b> <font color="#990000">(</font><a href="lesson11.c.html#32">OFF_CTR</a><font color="#990000">)</font> <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">;</font>
+        <b><font color="#000000">eeprom_write_byte</font></b> <font color="#990000">(</font><a href="lesson11.c.html#32">OFF_CTR</a><font color="#990000">,</font> write_counter<font color="#990000">);</font>
+
+        <i><font color="#9A1900">// Stash the length.</font></i>
+        <b><font color="#000000">eeprom_write_byte</font></b> <font color="#990000">(</font><a href="lesson11.c.html#33">OFF_LEN</a><font color="#990000">,</font> str_length<font color="#990000">);</font>
+
+        <i><font color="#9A1900">// Write out the input text (+1 for trailing null byte).</font></i>
+        <b><font color="#000000">eeprom_write_block</font></b> <font color="#990000">(&amp;</font>buffer<font color="#990000">,</font> <a href="lesson11.c.html#34">OFF_TXT</a><font color="#990000">,</font> str_length <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">);</font>
+        <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+      <b><font color="#0000FF">case</font></b> <font color="#FF0000">'R'</font><font color="#990000">:</font>
+      <b><font color="#0000FF">case</font></b> <font color="#FF0000">'r'</font><font color="#990000">:</font>
+        write_counter <font color="#990000">=</font> <b><font color="#000000">eeprom_read_byte</font></b> <font color="#990000">(</font><a href="lesson11.c.html#32">OFF_CTR</a><font color="#990000">);</font>
+
+        str_length <font color="#990000">=</font> <b><font color="#000000">eeprom_read_byte</font></b> <font color="#990000">(</font><a href="lesson11.c.html#33">OFF_LEN</a><font color="#990000">);</font>
+
+        <b><font color="#000000">eeprom_read_block</font></b> <font color="#990000">(&amp;</font>buffer<font color="#990000">,</font> <a href="lesson11.c.html#34">OFF_TXT</a><font color="#990000">,</font> str_length <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">);</font>
+        <b><font color="#000000">printf_P</font></b> <font color="#990000">(</font><b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"Contents of string in EEPROM: %s</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">),</font> buffer<font color="#990000">);</font>
+        <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+      <b><font color="#0000FF">case</font></b> <font color="#FF0000">'E'</font><font color="#990000">:</font>
+      <b><font color="#0000FF">case</font></b> <font color="#FF0000">'e'</font><font color="#990000">:</font>
+        <b><font color="#000000">eeprom_write_dword</font></b> <font color="#990000">(</font><a href="lesson11.c.html#31">OFF_SIG</a><font color="#990000">,</font> <font color="#993399">0x0000</font><font color="#990000">);</font>
+        <b><font color="#000000">eeprom_write_byte</font></b> <font color="#990000">(</font><a href="lesson11.c.html#32">OFF_CTR</a><font color="#990000">,</font> <font color="#990000">(</font>int8_t<font color="#990000">)</font> <font color="#993399">0</font><font color="#990000">);</font>
+        <b><font color="#000000">eeprom_write_byte</font></b> <font color="#990000">(</font><a href="lesson11.c.html#33">OFF_LEN</a><font color="#990000">,</font> <font color="#990000">(</font>int8_t<font color="#990000">)</font> <font color="#993399">0</font><font color="#990000">);</font>
+        <i><font color="#9A1900">// Null byte at start of string effectively blanks the whole string.</font></i>
+        <b><font color="#000000">eeprom_write_byte</font></b> <font color="#990000">(</font><a href="lesson11.c.html#34">OFF_TXT</a><font color="#990000">,</font> <font color="#990000">(</font>int8_t<font color="#990000">)</font> <font color="#993399">0</font><font color="#990000">);</font>
+        write_counter <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+        <b><font color="#000000">printf_P</font></b> <font color="#990000">(</font><b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"EEPROM erased.</font><font color="#CC33CC">\n\n</font><font color="#FF0000">"</font><font color="#990000">));</font>
+        <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+<b><font color="#008080">      default:</font></b>
+        <b><font color="#000000">printf_P</font></b> <font color="#990000">(</font><b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"Invalid operation (first letter not r,w, or e)</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">));</font>
+        <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+</tt></pre>

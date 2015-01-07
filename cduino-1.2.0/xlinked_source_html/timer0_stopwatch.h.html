@@ -1,0 +1,209 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Use timer/counter0 and an Interrupt to Measure Ellapsed Time</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Test driver: <a href="timer0_stopwatch_test.c.html">timer0_stopwatch_test.c</a>    Implementation: <a href="timer0_stopwatch.c.html">timer0_stopwatch.c</a></font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// WARNING: many functions in this interface manipulate the presclar shared</font></i>
+<i><font color="#9A1900">// by timer/count0 and timer/counter1.  So they will affect the counting</font></i>
+<i><font color="#9A1900">// of timer/counter1.  If this is a problem, the implementation code can</font></i>
+<i><font color="#9A1900">// be edited to remove all statements that refer to bit PSRSYNC of GTCCR.</font></i>
+<i><font color="#9A1900">// This will leave timer1 alone, but adds one additional timer tick of</font></i>
+<i><font color="#9A1900">// uncertainty to measurements (since the current position of the prescaler</font></i>
+<i><font color="#9A1900">// will not be reset when the counter is reset).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Interface allowing timer/counter0 to be used as a stopwatch, by</font></i>
+<i><font color="#9A1900">// incrementing a software overflow counter when a timer/counter0 overflow</font></i>
+<i><font color="#9A1900">// interrupt handler is triggered.  This arrangement allows the eight</font></i>
+<i><font color="#9A1900">// bit timer to be used to precisely measure much longer periods of time.</font></i>
+<i><font color="#9A1900">// There are also some macros to allow use of the raw counter value, without</font></i>
+<i><font color="#9A1900">// the overhead imposed by keeping track of the software overflow counter.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Note that this is NOT the interface to use for timer-driven alarms, output</font></i>
+<i><font color="#9A1900">// compare pin control, pulse width modulation, or other applications of the</font></i>
+<i><font color="#9A1900">// timer/counter0 hardware.  The hardware underlying this module can be used</font></i>
+<i><font color="#9A1900">// for variety of different purposes, and we don't try to support them all</font></i>
+<i><font color="#9A1900">// in one large, confusing interface.  Pick the software module that uses</font></i>
+<i><font color="#9A1900">// the hardware in the way you want (assuming it has been written yet :).</font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="timer0_stopwatch.h.html#28">TIMER0_STOPWATCH_H</a>
+<b><font color="#000080">#define</font></b> <a name="28">TIMER0_STOPWATCH_H</a>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdint.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/atomic.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="util.h.html">util.h</a>"</font>
+
+<i><font color="#9A1900">// The number of values the underlying counter can assums (values</font></i>
+<i><font color="#9A1900">// representable with eight bits).  Some interface macros need this, but</font></i>
+<i><font color="#9A1900">// there should be no reason to use it directly.</font></i>
+<b><font color="#000080">#define</font></b> <a name="38">TIMER0_STOPWATCH_COUNTER_VALUES</a> <font color="#993399">256</font>
+
+<i><font color="#9A1900">// This interface ensures that the prescaler divider is set as per this macro.</font></i>
+<i><font color="#9A1900">// It should be possible to use a different prescaler setting, but many of</font></i>
+<i><font color="#9A1900">// the macros in this header which specify overflow and overhead performance</font></i>
+<i><font color="#9A1900">// will be incorrect.</font></i>
+<b><font color="#000080">#define</font></b> <a name="44">TIMER0_STOPWATCH_PRESCALER_DIVIDER</a> <font color="#993399">64</font>
+
+<i><font color="#9A1900">// The number of microseconds per tick of the timer/counter0.</font></i>
+<b><font color="#000080">#define</font></b> <a name="47">TIMER0_STOPWATCH_MICROSECONDS_PER_TIMER_TICK</a> <font color="#990000">\</font>
+  <b><font color="#000000">CLOCK_CYCLES_TO_MICROSECONDS</font></b> <font color="#990000">(</font><a href="timer0_stopwatch.h.html#44">TIMER0_STOPWATCH_PRESCALER_DIVIDER</a><font color="#990000">)</font>
+<a href="util.h.html#27">CLOCK_CYCLES_TO_MICROSECONDS -> util.h:27</a>
+<a href="util.h.html#34">CLOCK_CYCLES_TO_MICROSECONDS -> util.h:34</a>
+
+<i><font color="#9A1900">// WARNING: this function manipulates the prescaler and thereby affects</font></i>
+<i><font color="#9A1900">// timer1 (which uses the same prescaler).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Do everything required to prepare the timer for use as an interrupt-driven</font></i>
+<i><font color="#9A1900">// stopwatch, in this order:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Ensure that the timer/counter0 hardware isn't shut down to save power.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Initialize the time/counter0 hardware to normal mode.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Enable the prescaler as per TIMER0_STOPWATCH_PRESCALER_DIVIDER.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Enable the timer/counter0 overflow interrupt source.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Set our count of interrupt events (timer0_stopwatch_oc) to 0.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Clear the overflow timer/counter0 overflow flag.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Set the counter to use a prescaler divider as per</font></i>
+<i><font color="#9A1900">//     TIMER0_STOPWATCH_PRESCALER_DIVIDER, and reset the presacler.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Set the elapsed time to 0, and start it running.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Ensure that interrupts are enabled globally.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="timer0_stopwatch.c.html#50">timer0_stopwatch_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// WARNING: this function resets the prescaler and thereby affects the</font></i>
+<i><font color="#9A1900">// counting of the timer1 hardware (which shares the prescaler with timer0).</font></i>
+<i><font color="#9A1900">// Reset prescaler and timer/counter0 to 0.  All interrupts are deferred</font></i>
+<i><font color="#9A1900">// during execution of this routine.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="timer0_stopwatch.c.html#90">timer0_stopwatch_reset</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// This is the number of ticks we can measure without overflow.</font></i>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="85">TIMER0_STOPWATCH_OVERFLOW_TICKS</a></font> UINT32_MAX
+
+<i><font color="#9A1900">// An interface macro or function should be used to access this variable.</font></i>
+<i><font color="#9A1900">// This is the overflow counter that gets incremented in the interrupt handler</font></i>
+<i><font color="#9A1900">// when TCNT0 overflows.  Note: it's possible to use narrower or wider integer</font></i>
+<i><font color="#9A1900">// types here (and in the appropriate places in the implementation file).</font></i>
+<i><font color="#9A1900">// But there seems to be little advantage to doing so.  Using a 64 bit types</font></i>
+<i><font color="#9A1900">// results in a lot more overhead per read, and using a narrower type gives</font></i>
+<i><font color="#9A1900">// only a small reduction in overhead (see also TIMER0_STOPWATCH_TCNT0()</font></i>
+<i><font color="#9A1900">// if extremely high time precision is required).</font></i>
+<b><font color="#0000FF">extern</font></b> <b><font color="#0000FF">volatile</font></b> <font color="#008080">uint32_t</font> <a href="timer0_stopwatch.c.html#27">timer0_stopwatch_oc</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// This is the maximum per-use overhead associate with the</font></i>
+<i><font color="#9A1900">// TIMER0_STOPWATCH_TICKS() macro.  This value has been determined</font></i>
+<i><font color="#9A1900">// experimentally (see <a href="timer0_stopwatch_test.c.html">timer0_stopwatch_test.c</a>) but includes a safety margin</font></i>
+<i><font color="#9A1900">// and should be reliable unless the compiler does something really insane :)</font></i>
+<b><font color="#000080">#define</font></b> <a name="101">TIMER0_STOPWATCH_TICKS_MACRO_MAX_OVERHEAD_TICKS</a> <font color="#993399">1</font>
+
+<i><font color="#9A1900">// Set OUTVAR (which must be a variable of type uint32_t) to the current</font></i>
+<i><font color="#9A1900">// elapsed timer ticks.  This macro is provided because it can operate with a</font></i>
+<i><font color="#9A1900">// little bit less time overhead than the timer0_stopwatch_ticks() function</font></i>
+<i><font color="#9A1900">// (at least when the compiler is set to optimize for small code size).</font></i>
+<i><font color="#9A1900">// For explanations of how this macro works, see the implementation of</font></i>
+<i><font color="#9A1900">// that function in <a href="timer0_stopwatch.c.html">timer0_stopwatch.c</a>.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="109">TIMER0_STOPWATCH_TICKS</a></font></b><font color="#990000">(</font>OUTVAR<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+    <b><font color="#000000">ATOMIC_BLOCK</font></b> <font color="#990000">(</font>ATOMIC_RESTORESTATE<font color="#990000">)</font> <font color="#990000">\</font>
+    <font color="#FF0000">{</font> <font color="#990000">\</font>
+      <b><font color="#0000FF">register</font></b> <font color="#008080">uint8_t</font> XxX_tcv <font color="#990000">=</font> TCNT0<font color="#990000">;</font> <font color="#990000">\</font>
+      <font color="#990000">\</font>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> TIFR0 <font color="#990000">&amp;</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>TOV0<font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font> <font color="#990000">\</font>
+        OUTVAR <font color="#990000">\</font>
+          <font color="#990000">=</font> <font color="#990000">(</font><a href="timer0_stopwatch.c.html#27">timer0_stopwatch_oc</a> <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">)</font> <font color="#990000">*</font> <a href="timer0_stopwatch.h.html#38">TIMER0_STOPWATCH_COUNTER_VALUES</a><font color="#990000">;</font> <font color="#990000">\</font>
+      <font color="#FF0000">}</font> <font color="#990000">\</font>
+      <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+        OUTVAR <font color="#990000">\</font>
+          <font color="#990000">=</font> <a href="timer0_stopwatch.c.html#27">timer0_stopwatch_oc</a> <font color="#990000">*</font> <a href="timer0_stopwatch.h.html#38">TIMER0_STOPWATCH_COUNTER_VALUES</a> <font color="#990000">+</font> XxX_tcv<font color="#990000">;</font> <font color="#990000">\</font>
+      <font color="#FF0000">}</font> <font color="#990000">\</font>
+    <font color="#FF0000">}</font> <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+
+<i><font color="#9A1900">// This is the maximum per-use overhead associate with the</font></i>
+<i><font color="#9A1900">// timer0_stopwatch_ticks() function.  This value has been determined</font></i>
+<i><font color="#9A1900">// experimentally (see <a href="timer0_stopwatch_test.c.html">timer0_stopwatch_test.c</a>) but includes a safety margin</font></i>
+<i><font color="#9A1900">// and should be reliable unless the compiler does something really insane :)</font></i>
+<b><font color="#000080">#define</font></b> <a name="130">TIMER0_STOPWATCH_TICKS_FUNCTION_MAX_OVERHEAD_TICKS</a> <font color="#993399">1</font>
+
+<i><font color="#9A1900">// Total number of timer/counter0 ticks since the last init() or reset()</font></i>
+<i><font color="#9A1900">// method call.  This routine is effectively atomic (All interrupts are</font></i>
+<i><font color="#9A1900">// deferred during most of its execution).</font></i>
+uint32_t
+<b><font color="#000000"><a href="timer0_stopwatch.c.html#107">timer0_stopwatch_ticks</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// The number of microseconds before results from</font></i>
+<i><font color="#9A1900">// timer0_stopwatch_microseconds() will overflow.</font></i>
+<b><font color="#000080">#define</font></b> <a name="140">TIMER0_STOPWATCH_OVERFLOW_MICROSECONDS</a> <font color="#990000">\</font>
+  <font color="#990000">(</font> <font color="#990000">\</font>
+    <a href="timer0_stopwatch.h.html#47">TIMER0_STOPWATCH_MICROSECONDS_PER_TIMER_TICK</a> <font color="#990000">*</font> <font color="#990000">\</font>
+    <a href="timer0_stopwatch.h.html#85">TIMER0_STOPWATCH_OVERFLOW_TICKS</a> <font color="#990000">\</font>
+  <font color="#990000">)</font>
+
+<i><font color="#9A1900">// This macro is analagous to the</font></i>
+<i><font color="#9A1900">// TIMER0_STOPWATCH_TICKS_FUNCTION_MAX_READ_OVERHEAD_TICKS macro.</font></i>
+<b><font color="#000080">#define</font></b> <a name="148">TIMER0_STOPWATCH_MICROSECONDS_FUNCTION_MAX_READ_OVERHEAD_US</a> <font color="#993399">4</font>
+
+<i><font color="#9A1900">// The approximate number of elapsed microseconds since the last</font></i>
+<i><font color="#9A1900">// init() or reset() method call.  This is just a wrapper around the</font></i>
+<i><font color="#9A1900">// TIMER0_STOPWATCH_TICKS() macro.</font></i>
+uint32_t
+<b><font color="#000000"><a href="timer0_stopwatch.c.html#136">timer0_stopwatch_microseconds</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// WARNING: this macro resets the prescaler and thereby affects the counting</font></i>
+<i><font color="#9A1900">// of the timer1 hardware (which shares the prescaler with timer0).</font></i>
+<i><font color="#9A1900">// This macro can be used together with TIMER0_STOPWATCH_TCNT0 to time</font></i>
+<i><font color="#9A1900">// very short intervals of time with minimal overhead.  It doesn't reset</font></i>
+<i><font color="#9A1900">// the overflow counter and isn't appropriate for timing intervals</font></i>
+<i><font color="#9A1900">// of time long enough for overflow of the eight bit TCNT0 to occur.</font></i>
+<i><font color="#9A1900">// See the timer0_stopwatch_reset implementation for explanation of the</font></i>
+<i><font color="#9A1900">// individual instructions.  The time between the completion of this code</font></i>
+<i><font color="#9A1900">// and the evaluation of TIMER0_STOPWATCH_TCNT0 in an immediately following</font></i>
+<i><font color="#9A1900">// statement should not be more than a couple of machine instructions.</font></i>
+<i><font color="#9A1900">// About the only thing you can do to get tighter timing performance is to</font></i>
+<i><font color="#9A1900">// disable the timer overflow interrupts, so that you don't have to worry</font></i>
+<i><font color="#9A1900">// about clearing TOV0.  This interface doesn't support doing that, however.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="169">TIMER0_STOPWATCH_RESET_TCNT0</a></font></b><font color="#990000">()</font> <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+    <b><font color="#000000">ATOMIC_BLOCK</font></b> <font color="#990000">(</font>ATOMIC_RESTORESTATE<font color="#990000">)</font> <font color="#990000">\</font>
+    <font color="#FF0000">{</font> <font color="#990000">\</font>
+      GTCCR <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PSRSYNC<font color="#990000">);</font> <font color="#990000">\</font>
+      TIFR0 <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>TOV0<font color="#990000">);</font> <font color="#990000">\</font>
+      TCNT0 <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font> <font color="#990000">\</font>
+    <font color="#FF0000">}</font> <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+
+<i><font color="#9A1900">// This macro evaluates to the current value of the counter.  It should be</font></i>
+<i><font color="#9A1900">// used together with TIMER0_STOPWATCH_RESET_TCNT0.  See the description</font></i>
+<i><font color="#9A1900">// of that macro for more details.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="182">TIMER0_STOPWATCH_TCNT0</a></font></b><font color="#990000">()</font> TCNT0
+
+<i><font color="#9A1900">// This method entirely shuts down timer/counter0:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * The timer/counter0 overflow interrupt is disabled.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * The timer/counter0 control registers TCCR0A and TCCR0B are reset to</font></i>
+<i><font color="#9A1900">//     their default values.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * The overflow flag is cleared.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * The timer reading is reset to 0.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Th counter is entirely disabled to save power.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// NOTE that interrupts are NOT disabled globally (in this respect this</font></i>
+<i><font color="#9A1900">// routine is asymmetric with timer0_stopwatch_init()).</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="timer0_stopwatch.c.html#145">timer0_stopwatch_shutdown</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// TIMER0_STOPWATCH_H</font></i>
+</tt></pre>

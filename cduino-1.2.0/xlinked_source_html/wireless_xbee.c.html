@@ -1,0 +1,900 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Implementation of the interface escribed in <a href="wireless_xbee.h.html">wireless_xbee.h</a>.</font></i>
+
+<i><font color="#9A1900">// We're using assert() to handle errors, we can't let clients turn it off.</font></i>
+<b><font color="#000080">#ifdef</font></b> NDEBUG
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> <font color="#008080">The</font> <b><font color="#000000">HANDLE_ERRORS</font></b><font color="#990000">()</font> macro in this file <font color="#008080">requires</font> <b><font color="#000000">assert</font></b><font color="#990000">()</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+<b><font color="#000080">#endif</font></b>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;assert.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/pgmspace.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;inttypes.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdio.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdlib.h&gt;</font>   <i><font color="#9A1900">// FIXXME: probably only needed for broken assert header</font></i>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;string.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/crc16.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="uart.h.html">uart.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="wireless_xbee.h.html">wireless_xbee.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="util.h.html">util.h</a>"</font>
+
+<i><font color="#9A1900">// These macros are convenient during development of this module; see the</font></i>
+<i><font color="#9A1900">// notes about them in <a href="wireless_xbee_test.c.html">wireless_xbee_test.c</a>.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="22">CHKP_PD4</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="util.h.html#72">CHKP_USING</a></font></b> <font color="#990000">(</font>DDRD<font color="#990000">,</font> DDD4<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD4<font color="#990000">,</font> <font color="#993399">300.0</font><font color="#990000">,</font> <font color="#993399">3</font><font color="#990000">)</font>
+<b><font color="#000080">#undef</font></b> <a name="23">BTRAP</a>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="24">BTRAP</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="util.h.html#86">BTRAP_USING</a></font></b> <font color="#990000">(</font>DDRD<font color="#990000">,</font> DDD4<font color="#990000">,</font> PORTD<font color="#990000">,</font> PORTD4<font color="#990000">,</font> <font color="#993399">100.0</font><font color="#990000">)</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="27">wx_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="uart.c.html#21">uart_init</a></font></b> <font color="#990000">();</font>
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">// Define a HANDLE_ERRORS macro that either asserts the given condition, or</font></i>
+<i><font color="#9A1900">// simply returns FALSE depending on a compile-time setting.  We guarantee</font></i>
+<i><font color="#9A1900">// that this macro will evaluate its argument only once, so it's safe to</font></i>
+<i><font color="#9A1900">// use around a function that has other effects.</font></i>
+<b><font color="#000080">#ifdef</font></b> WX_ASSERT_SUCCESS
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="37">HANDLE_ERRORS</a></font></b><font color="#990000">(</font>condition<font color="#990000">)</font> <b><font color="#000000">assert</font></b> <font color="#990000">(</font>condition<font color="#990000">)</font>
+<b><font color="#000080">#else</font></b>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="39">HANDLE_ERRORS</a></font></b><font color="#990000">(</font>condition<font color="#990000">)</font> <font color="#990000">\</font>
+     <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+       <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="util.h.html#41">UNLIKELY</a></font></b> <font color="#990000">(!</font> <font color="#990000">(</font>condition<font color="#990000">))</font> <font color="#990000">)</font> <font color="#FF0000">{</font> <font color="#990000">\</font>
+         <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font> <font color="#990000">\</font>
+       <font color="#FF0000">}</font> <font color="#990000">\</font>
+     <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+<b><font color="#000080">#endif</font></b>
+
+<b><font color="#0000FF">static</font></b> uint32_t
+<b><font color="#000000"><a name="48">get_char</a></font></b> <font color="#990000">(</font><font color="#009900">char</font> <font color="#990000">*</font>dest<font color="#990000">,</font> <font color="#008080">uint32_t</font> timeout<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Spend up to about timeout microseconds trying to get a character from</font></i>
+  <i><font color="#9A1900">// the serial port.  Write the character into dest and return the non-zero</font></i>
+  <i><font color="#9A1900">// approximate ellapsed time on success, or return FALSE via HANDLE_ERRORS()</font></i>
+  <i><font color="#9A1900">// if a UART receive error or timeout occurs.</font></i>
+
+  <i><font color="#9A1900">// Long enough to be longish relative to the loop overhead in the loop</font></i>
+  <i><font color="#9A1900">// where it's used.  More than that we cannot say.</font></i>
+  <font color="#009900">double</font> <b><font color="#0000FF">const</font></b> <a href="lcd_keypad.c.html#58">poll_interval_us</a> <font color="#990000">=</font> <font color="#993399">142.0</font><font color="#990000">;</font>
+
+  <font color="#008080">uint32_t</font> elapsed_time_us <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font>
+    <b><font color="#000000">_delay_us</font></b> <font color="#990000">(</font><a href="lcd_keypad.c.html#58">poll_interval_us</a><font color="#990000">);</font>
+    elapsed_time_us <font color="#990000">+=</font> <a href="lcd_keypad.c.html#58">poll_interval_us</a><font color="#990000">;</font>
+    <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font>elapsed_time_us <font color="#990000">&lt;</font> timeout<font color="#990000">);</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#990000">!</font> <b><font color="#000000"><a href="wireless_xbee.h.html#335">WX_BYTE_AVAILABLE</a></font></b> <font color="#990000">()</font> <font color="#990000">);</font>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="wireless_xbee.h.html#337">WX_UART_RX_ERROR</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="wireless_xbee.h.html#341">WX_UART_FLUSH_RX_BUFFER</a></font></b> <font color="#990000">();</font>
+    <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font><a href="util.h.html#20">FALSE</a><font color="#990000">);</font>   <i><font color="#9A1900">// Meaning we have an error to handle</font></i>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+  <font color="#FF0000">}</font>
+
+  <font color="#990000">*</font>dest <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.h.html#340">WX_GET_BYTE</a></font></b> <font color="#990000">();</font>
+
+  <b><font color="#0000FF">return</font></b> elapsed_time_us<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> uint8_t
+<b><font color="#000000"><a name="78">get_line</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> bufsize<font color="#990000">,</font> <font color="#009900">char</font> <font color="#990000">*</font>buf<font color="#990000">,</font> <font color="#008080">uint16_t</font> timeout<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Spend up to approximately timeout milliseconds trying to get up to</font></i>
+  <i><font color="#9A1900">// bufsize - 1 characters from the serial port, or until a carriage return</font></i>
+  <i><font color="#9A1900">// ('\r') character is recieved, then add a terminating NUL byte and return</font></i>
+  <i><font color="#9A1900">// TRUE to indicate success, or FALSE if a timeout has occurred.</font></i>
+
+  <font color="#008080">uint8_t</font> ii<font color="#990000">;</font>   <i><font color="#9A1900">// Index</font></i>
+
+  <font color="#008080">uint32_t</font> elapsed_time_us <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> bufsize <font color="#990000">-</font> <font color="#993399">1</font> <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    uint32_t <font color="#008080">const</font> uspms <font color="#990000">=</font> <font color="#993399">1000</font><font color="#990000">;</font>   <i><font color="#9A1900">// Microseconds Per MilliSecond</font></i>
+    <font color="#008080">uint32_t</font> timeout_us <font color="#990000">=</font> timeout <font color="#990000">*</font> uspms<font color="#990000">;</font>
+    <i><font color="#9A1900">// Get character, return Time Taken (in microseconds), or FALSE on timeout</font></i>
+    <font color="#008080">uint32_t</font> tt <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.c.html#48">get_char</a></font></b> <font color="#990000">(&amp;(</font>buf<font color="#990000">[</font>ii<font color="#990000">]),</font> timeout_us<font color="#990000">);</font>
+    <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font>tt <font color="#990000">!=</font> <a href="util.h.html#20">FALSE</a><font color="#990000">);</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+    elapsed_time_us <font color="#990000">+=</font> tt<font color="#990000">;</font>
+    <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font>elapsed_time_us <font color="#990000">&lt;</font> timeout_us<font color="#990000">);</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> buf<font color="#990000">[</font>ii<font color="#990000">]</font> <font color="#990000">==</font> <font color="#FF0000">'</font><font color="#CC33CC">\r</font><font color="#FF0000">'</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      ii<font color="#990000">++;</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+
+  buf<font color="#990000">[</font>ii<font color="#990000">]</font> <font color="#990000">=</font> <font color="#FF0000">'</font><font color="#CC33CC">\0</font><font color="#FF0000">'</font><font color="#990000">;</font>
+
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="109">wx_enter_at_command_mode</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Send the sequence which initiates AT command mode, returning TRUE on</font></i>
+  <i><font color="#9A1900">// success.  After this function returns, the XBee will remain in command</font></i>
+  <i><font color="#9A1900">// mode for up to 10 seconds (or until exit_at_command_mode() is called.</font></i>
+
+  <i><font color="#9A1900">// This magic sequence should send us into AT command mode</font></i>
+  <font color="#009900">double</font> <b><font color="#0000FF">const</font></b> dwmms <font color="#990000">=</font> <font color="#993399">1042</font><font color="#990000">;</font>   <i><font color="#9A1900">// Delay With Margin (in ms) -- AT requires 1 s</font></i>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>dwmms<font color="#990000">);</font>
+  <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(</font><font color="#FF0000">'+'</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(</font><font color="#FF0000">'+'</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(</font><font color="#FF0000">'+'</font><font color="#990000">);</font>
+  <i><font color="#9A1900">// Note that waiting too long after this point to start reading could be bad,</font></i>
+  <i><font color="#9A1900">// since we might overflow part of the "OK\r" string.</font></i>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>dwmms<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// We're now going to spend some time making sure any remaining input</font></i>
+  <i><font color="#9A1900">// is flushed.  This is probably overly conservative, but since it's hard</font></i>
+  <i><font color="#9A1900">// to distinguish the "OK\r" we're supposed to get out in the presence</font></i>
+  <i><font color="#9A1900">// of radio chatter (in fact I strongly suspect that that string can get</font></i>
+  <i><font color="#9A1900">// interspersed with radio data), we want to thouroughly flush things</font></i>
+  <i><font color="#9A1900">// before we try a command to make sure we're in command mode.</font></i>
+  <font color="#009900">double</font> <b><font color="#0000FF">const</font></b> flushing_time_ms <font color="#990000">=</font> <font color="#993399">300.42</font><font color="#990000">;</font>   <i><font color="#9A1900">// Total time to spend flushing</font></i>
+  <font color="#009900">double</font> <b><font color="#0000FF">const</font></b> ms_per_flush     <font color="#990000">=</font> <font color="#993399">4.2</font><font color="#990000">;</font>      <i><font color="#9A1900">// Plenty Time for 2 byte buf fill</font></i>
+  <font color="#009900">double</font>       et_us            <font color="#990000">=</font> <font color="#993399">0.0</font><font color="#990000">;</font>      <i><font color="#9A1900">// Elapsed Time in microseconds</font></i>
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> et_us <font color="#990000">&lt;</font> flushing_time_ms <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="wireless_xbee.h.html#341">WX_UART_FLUSH_RX_BUFFER</a></font></b> <font color="#990000">();</font>
+    <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>ms_per_flush<font color="#990000">);</font>
+    et_us <font color="#990000">+=</font> ms_per_flush<font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// We now expect silence unless we enter a command.  By *not* flushing the</font></i>
+  <i><font color="#9A1900">// buffer for a short time, we help ensure that the command we're going to</font></i>
+  <i><font color="#9A1900">// try next will not end up with the expected response if there is still</font></i>
+  <i><font color="#9A1900">// chatter on the line.  Yes, I'm paranoid.</font></i>
+  <font color="#009900">double</font> <b><font color="#0000FF">const</font></b> magic_guard_time <font color="#990000">=</font> <font color="#993399">4.2</font><font color="#990000">;</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>magic_guard_time<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Now try a command to ensure that we've made in into command mode.</font></i>
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font><b><font color="#000000"><a href="wireless_xbee.c.html#205">wx_at_command_expect_ok</a></font></b> <font color="#990000">(</font><font color="#FF0000">""</font><font color="#990000">));</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="154">wx_exit_at_command_mode</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Require the XBee module to be in AT command mode (see</font></i>
+  <i><font color="#9A1900">// enter_at_command_mode()).  Leave AT command mode.</font></i>
+
+  <font color="#009900">char</font> response<font color="#990000">[</font><a href="wireless_xbee.h.html#552">WX_MCOSL</a><font color="#990000">];</font>
+
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font><b><font color="#000000"><a href="wireless_xbee.c.html#188">wx_at_command</a></font></b> <font color="#990000">(</font><font color="#FF0000">"CN"</font><font color="#990000">,</font> response<font color="#990000">));</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(!</font> <b><font color="#000000">strcmp</font></b> <font color="#990000">(</font>response<font color="#990000">,</font> <font color="#FF0000">"OK"</font><font color="#990000">));</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">void</font>
+<b><font color="#000000"><a name="170">put_command</a></font></b> <font color="#990000">(</font><font color="#009900">char</font> <b><font color="#0000FF">const</font></b> <font color="#990000">*</font><a href="lcd.c.html#112">command</a><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Put a command out on the serial port.  The "AT" prefix and "\r" postfix</font></i>
+  <i><font color="#9A1900">// are automatically added to the supplied command.  This resulting bytes</font></i>
+  <i><font color="#9A1900">// are sent.  This routine doesn't wait for a response.</font></i>
+
+  <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(</font><font color="#FF0000">'A'</font><font color="#990000">);</font>
+  <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(</font><font color="#FF0000">'T'</font><font color="#990000">);</font>
+
+  <font color="#008080">uint8_t</font> csl <font color="#990000">=</font> <b><font color="#000000">strlen</font></b> <font color="#990000">(</font><a href="lcd.c.html#112">command</a><font color="#990000">);</font>   <i><font color="#9A1900">// Command String Length</font></i>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> csl <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(</font><a href="lcd.c.html#112">command</a><font color="#990000">[</font>ii<font color="#990000">]);</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(</font><font color="#FF0000">'</font><font color="#CC33CC">\r</font><font color="#FF0000">'</font><font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="188">wx_at_command</a></font></b> <font color="#990000">(</font><font color="#009900">char</font> <font color="#990000">*</font><a href="lcd.c.html#112">command</a><font color="#990000">,</font> <font color="#009900">char</font> <font color="#990000">*</font>output<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="wireless_xbee.c.html#170">put_command</a></font></b> <font color="#990000">(</font><a href="lcd.c.html#112">command</a><font color="#990000">);</font>
+
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+      <b><font color="#000000"><a href="wireless_xbee.c.html#78">get_line</a></font></b> <font color="#990000">(</font><a href="wireless_xbee.h.html#552">WX_MCOSL</a><font color="#990000">,</font> output<font color="#990000">,</font> <a href="wireless_xbee.h.html#259">WX_AT_COMMAND_RESPONSE_TIME_LIMIT_MS</a><font color="#990000">)</font> <font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Verify that the output string ends with '\r'</font></i>
+  <font color="#008080">uint8_t</font> osl <font color="#990000">=</font> <b><font color="#000000">strnlen</font></b> <font color="#990000">(</font>output<font color="#990000">,</font> <a href="wireless_xbee.h.html#552">WX_MCOSL</a><font color="#990000">);</font>   <i><font color="#9A1900">// Output String Length</font></i>
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font>output<font color="#990000">[</font>osl <font color="#990000">-</font> <font color="#993399">1</font><font color="#990000">]</font> <font color="#990000">==</font> <font color="#FF0000">'</font><font color="#CC33CC">\r</font><font color="#FF0000">'</font><font color="#990000">);</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  output<font color="#990000">[</font>osl <font color="#990000">-</font> <font color="#993399">1</font><font color="#990000">]</font> <font color="#990000">=</font> <font color="#FF0000">'</font><font color="#CC33CC">\0</font><font color="#FF0000">'</font><font color="#990000">;</font>   <i><font color="#9A1900">// Snip the trailing "\r" as promised</font></i>
+
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="205">wx_at_command_expect_ok</a></font></b> <font color="#990000">(</font><font color="#009900">char</font> <b><font color="#0000FF">const</font></b> <font color="#990000">*</font><a href="lcd.c.html#112">command</a><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="wireless_xbee.c.html#170">put_command</a></font></b> <font color="#990000">(</font><a href="lcd.c.html#112">command</a><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// NOTE: this seems like more RAM than we need, but clients are eventually</font></i>
+  <i><font color="#9A1900">// going to need it anyway to read the (longer) responses from real query</font></i>
+  <i><font color="#9A1900">// commands.</font></i>
+  <font color="#009900">char</font> response<font color="#990000">[</font><a href="wireless_xbee.h.html#552">WX_MCOSL</a><font color="#990000">];</font>
+
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+      <b><font color="#000000"><a href="wireless_xbee.c.html#78">get_line</a></font></b> <font color="#990000">(</font><a href="wireless_xbee.h.html#552">WX_MCOSL</a><font color="#990000">,</font> response<font color="#990000">,</font> <a href="wireless_xbee.h.html#259">WX_AT_COMMAND_RESPONSE_TIME_LIMIT_MS</a><font color="#990000">)</font> <font color="#990000">);</font>
+
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(!</font> <b><font color="#000000">strcmp</font></b> <font color="#990000">(</font>response<font color="#990000">,</font> <font color="#FF0000">"OK</font><font color="#CC33CC">\r</font><font color="#FF0000">"</font><font color="#990000">));</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="223">wx_ensure_network_id_set_to</a></font></b> <font color="#990000">(</font><font color="#008080">uint16_t</font> id<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#009900">char</font> buf<font color="#990000">[</font><a href="wireless_xbee.h.html#552">WX_MCOSL</a><font color="#990000">];</font>   <i><font color="#9A1900">// Buffer for command/output string storage</font></i>
+
+  <font color="#008080">uint8_t</font> cp <font color="#990000">=</font> <b><font color="#000000">sprintf_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"ID"</font><font color="#990000">));</font>   <i><font color="#9A1900">// Chars Printed</font></i>
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font>cp <font color="#990000">==</font> <font color="#993399">2</font><font color="#990000">);</font>  <i><font color="#9A1900">// sprintf_P gives a return value, so we check it</font></i>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font><b><font color="#000000"><a href="wireless_xbee.c.html#188">wx_at_command</a></font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> buf<font color="#990000">));</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  <font color="#009900">int</font> <b><font color="#0000FF">const</font></b> base_16 <font color="#990000">=</font> <font color="#993399">16</font><font color="#990000">;</font>   <i><font color="#9A1900">// Base to use to convert retrieved string</font></i>
+  <font color="#009900">char</font> <font color="#990000">*</font>endptr<font color="#990000">;</font>   <i><font color="#9A1900">//  Pointer to be set to end of converted string</font></i>
+  <font color="#009900">long</font> <font color="#009900">int</font> eidv <font color="#990000">=</font> <b><font color="#000000">strtol</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <font color="#990000">&amp;</font>endptr<font color="#990000">,</font> base_16<font color="#990000">);</font>   <i><font color="#9A1900">// Existing ID value</font></i>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">*</font>buf <font color="#990000">!=</font> <font color="#FF0000">'</font><font color="#CC33CC">\0</font><font color="#FF0000">'</font> <font color="#990000">&amp;&amp;</font> <font color="#990000">*</font>endptr <font color="#990000">==</font> <font color="#FF0000">'</font><font color="#CC33CC">\0</font><font color="#FF0000">'</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> eidv <font color="#990000">==</font> id <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>   <i><font color="#9A1900">// ID is already set as requested, so we're done</font></i>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+    <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>   <i><font color="#9A1900">// Didn't get a convertible string back from command</font></i>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Print the id into a command string (in the form expected by</font></i>
+  <i><font color="#9A1900">// at_command_expect_ok()).  The argument itself must be upper case,</font></i>
+  <i><font color="#9A1900">// without any leading "0x" or "0X".</font></i>
+  uint8_t <font color="#008080">const</font> escsl <font color="#990000">=</font> <font color="#993399">6</font><font color="#990000">;</font>   <i><font color="#9A1900">// Expected Setting Command String Length</font></i>
+  cp <font color="#990000">=</font> <b><font color="#000000">sprintf_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"ID%.4"</font> PRIX16<font color="#990000">),</font> id<font color="#990000">);</font>
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font>cp <font color="#990000">==</font> escsl<font color="#990000">);</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font><b><font color="#000000"><a href="wireless_xbee.c.html#205">wx_at_command_expect_ok</a></font></b> <font color="#990000">(</font>buf<font color="#990000">));</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font><b><font color="#000000"><a href="wireless_xbee.c.html#205">wx_at_command_expect_ok</a></font></b> <font color="#990000">(</font><font color="#FF0000">"WR"</font><font color="#990000">));</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="259">wx_ensure_channel_set_to</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> channel<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// The channel argument must fall in the valid range.</font></i>
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font>channel <font color="#990000">&gt;=</font> <font color="#993399">0x0b</font><font color="#990000">);</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font>channel <font color="#990000">&lt;=</font> <font color="#993399">0x1a</font><font color="#990000">);</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  <font color="#009900">char</font> buf<font color="#990000">[</font><a href="wireless_xbee.h.html#552">WX_MCOSL</a><font color="#990000">];</font>   <i><font color="#9A1900">// Buffer for command/output string storage</font></i>
+
+  <font color="#008080">uint8_t</font> cp <font color="#990000">=</font> <b><font color="#000000">sprintf_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"CH"</font><font color="#990000">));</font>   <i><font color="#9A1900">// Chars Printed</font></i>
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font>cp <font color="#990000">==</font> <font color="#993399">2</font><font color="#990000">);</font>  <i><font color="#9A1900">// sprintf_P gives a return value, so we check it</font></i>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font><b><font color="#000000"><a href="wireless_xbee.c.html#188">wx_at_command</a></font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> buf<font color="#990000">));</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  <font color="#009900">int</font> <b><font color="#0000FF">const</font></b> base_16 <font color="#990000">=</font> <font color="#993399">16</font><font color="#990000">;</font>   <i><font color="#9A1900">// Base to use to convert retrieved string</font></i>
+  <font color="#009900">char</font> <font color="#990000">*</font>endptr<font color="#990000">;</font>   <i><font color="#9A1900">//  Pointer to be set to end of converted string</font></i>
+  <font color="#009900">long</font> <font color="#009900">int</font> echv <font color="#990000">=</font> <b><font color="#000000">strtol</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <font color="#990000">&amp;</font>endptr<font color="#990000">,</font> base_16<font color="#990000">);</font>   <i><font color="#9A1900">// Existing CH value</font></i>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">*</font>buf <font color="#990000">!=</font> <font color="#FF0000">'</font><font color="#CC33CC">\0</font><font color="#FF0000">'</font> <font color="#990000">&amp;&amp;</font> <font color="#990000">*</font>endptr <font color="#990000">==</font> <font color="#FF0000">'</font><font color="#CC33CC">\0</font><font color="#FF0000">'</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> echv <font color="#990000">==</font> channel <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>   <i><font color="#9A1900">// CH is already set as requested, so we're done</font></i>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+    <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>   <i><font color="#9A1900">// Didn't get a convertible string back from command</font></i>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Print the channel into a command string (in the form expected by</font></i>
+  <i><font color="#9A1900">// at_command_expect_ok()).  The argument itself must be upper case,</font></i>
+  <i><font color="#9A1900">// without any leading "0x" or "0X".</font></i>
+  uint8_t <font color="#008080">const</font> escsl <font color="#990000">=</font> <font color="#993399">6</font><font color="#990000">;</font>   <i><font color="#9A1900">// Expected Setting Command String Length</font></i>
+  cp <font color="#990000">=</font> <b><font color="#000000">sprintf_P</font></b> <font color="#990000">(</font>buf<font color="#990000">,</font> <b><font color="#000000">PSTR</font></b> <font color="#990000">(</font><font color="#FF0000">"CH%.4"</font> PRIX16<font color="#990000">),</font> channel<font color="#990000">);</font>
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font>cp <font color="#990000">==</font> escsl<font color="#990000">);</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font><b><font color="#000000"><a href="wireless_xbee.c.html#205">wx_at_command_expect_ok</a></font></b> <font color="#990000">(</font>buf<font color="#990000">));</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font><b><font color="#000000"><a href="wireless_xbee.c.html#205">wx_at_command_expect_ok</a></font></b> <font color="#990000">(</font><font color="#FF0000">"WR"</font><font color="#990000">));</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="299">wx_restore_defaults</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font><b><font color="#000000"><a href="wireless_xbee.c.html#205">wx_at_command_expect_ok</a></font></b> <font color="#990000">(</font><font color="#FF0000">"RE"</font><font color="#990000">));</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  <b><font color="#000000">HANDLE_ERRORS</font></b> <font color="#990000">(</font><b><font color="#000000"><a href="wireless_xbee.c.html#205">wx_at_command_expect_ok</a></font></b> <font color="#990000">(</font><font color="#FF0000">"WR"</font><font color="#990000">));</font>
+<a href="wireless_xbee.c.html#37">HANDLE_ERRORS -> wireless_xbee.c:37</a>
+<a href="wireless_xbee.c.html#39">HANDLE_ERRORS -> wireless_xbee.c:39</a>
+
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">// Factor of safety to use when delaying to force radio packet transmission.</font></i>
+<i><font color="#9A1900">// We make this a little large since the character time might actually be</font></i>
+<i><font color="#9A1900">// a bit greater than what we calculate in DELAY_TO_FORCE_TRANSMISSION()</font></i>
+<i><font color="#9A1900">// due to start bits, padding etc.</font></i>
+<b><font color="#000080">#define</font></b> <a name="312">PACKETIZATION_TIMEOUT_FOS</a> <font color="#993399">1.42</font>
+
+<i><font color="#9A1900">// Delay for long enough to force data already sent to the XBee to be</font></i>
+<i><font color="#9A1900">// transmitted.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="316">DELAY_TO_FORCE_TRANSMISSION</a></font></b><font color="#990000">()</font>                                 <font color="#990000">\</font>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>                                                         <font color="#990000">\</font>
+      <a href="util.h.html#265">MS_PER_S</a> <font color="#990000">*</font>                                                      <font color="#990000">\</font>
+      <a href="util.h.html#262">BITS_PER_BYTE</a> <font color="#990000">*</font>                                                 <font color="#990000">\</font>
+      <font color="#990000">(</font><font color="#993399">1.0</font> <font color="#990000">/</font> <a href="wireless_xbee.h.html#147">WX_BAUD</a><font color="#990000">)</font> <font color="#990000">*</font>                                               <font color="#990000">\</font>
+      <a href="wireless_xbee.h.html#366">WX_TRANSPARENT_MODE_PACKETIZATION_TIMEOUT_BYTES</a> <font color="#990000">*</font>               <font color="#990000">\</font>
+      <a href="wireless_xbee.c.html#312">PACKETIZATION_TIMEOUT_FOS</a> <font color="#990000">)</font>
+
+<i><font color="#9A1900">// Bytes that need to be escaped when they occur in data frames</font></i>
+<b><font color="#000080">#define</font></b> <a name="325">FRAME_DELIMITER</a> <font color="#993399">0x7e</font>
+<b><font color="#000080">#define</font></b> <a name="326">ESCAPE</a>          <font color="#993399">0x7d</font>
+<b><font color="#000080">#define</font></b> <a name="327">XON</a>             <font color="#993399">0x11</font>
+<b><font color="#000080">#define</font></b> <a name="328">XOFF</a>            <font color="#993399">0x13</font>
+
+<i><font color="#9A1900">// Bytes that need to be escaped are escaped by transmitting an ESCAPE byte</font></i>
+<i><font color="#9A1900">// first, then transmitting the byte value xor'ed this value.  The escaped</font></i>
+<i><font color="#9A1900">// byte values are recovered by xor'ing with this value again.</font></i>
+<b><font color="#000080">#define</font></b> <a name="333">ESCAPE_MODIFIER</a> <font color="#993399">0x20</font>
+
+<i><font color="#9A1900">// The CRC algorithm being used starts with this value</font></i>
+<b><font color="#000080">#define</font></b> <a name="336">CRC_INITIAL_VALUE</a> <font color="#993399">0xffff</font>
+
+<b><font color="#0000FF">static</font></b> uint8_t
+<b><font color="#000000"><a name="339">needs_escaped</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> byte<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Return true iff byte is one of the ones that needs to be escaped in</font></i>
+  <i><font color="#9A1900">// our frame scheme.</font></i>
+
+  <b><font color="#0000FF">switch</font></b> <font color="#990000">(</font> byte <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <i><font color="#9A1900">// NOTE: we're using fall-through behavior of C switch statement here</font></i>
+    <b><font color="#0000FF">case</font></b> <a href="wireless_xbee.c.html#325">FRAME_DELIMITER</a><font color="#990000">:</font>
+    <b><font color="#0000FF">case</font></b> <a href="wireless_xbee.c.html#326">ESCAPE</a><font color="#990000">:</font>
+    <b><font color="#0000FF">case</font></b> <a href="wireless_xbee.c.html#327">XON</a><font color="#990000">:</font>
+    <b><font color="#0000FF">case</font></b> <a href="wireless_xbee.c.html#328">XOFF</a><font color="#990000">:</font>
+      <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+<b><font color="#008080">    default:</font></b>
+      <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">// Put two possibly escaped CRC bytes out over the air (a total of up to 4</font></i>
+<i><font color="#9A1900">// real bytes).  This is probably most easily understood from its use context.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="360">PUT_POSSIBLY_ESCAPED_CRC_BYTES</a></font></b><font color="#990000">(</font>crc16<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="util.h.html#41">UNLIKELY</a></font></b> <font color="#990000">(</font><b><font color="#000000"><a href="wireless_xbee.c.html#339">needs_escaped</a></font></b> <font color="#990000">(</font><b><font color="#000000"><a href="util.h.html#269">HIGH_BYTE</a></font></b> <font color="#990000">(</font>crc16<font color="#990000">)))</font> <font color="#990000">)</font> <font color="#FF0000">{</font> <font color="#990000">\</font>
+      <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(</font><a href="wireless_xbee.c.html#326">ESCAPE</a><font color="#990000">);</font> <font color="#990000">\</font>
+      <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(</font><b><font color="#000000"><a href="util.h.html#269">HIGH_BYTE</a></font></b> <font color="#990000">(</font>crc16<font color="#990000">)</font> <font color="#990000">^</font> <a href="wireless_xbee.c.html#333">ESCAPE_MODIFIER</a><font color="#990000">);</font> <font color="#990000">\</font>
+    <font color="#FF0000">}</font> <font color="#990000">\</font>
+    <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+      <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(</font><b><font color="#000000"><a href="util.h.html#269">HIGH_BYTE</a></font></b> <font color="#990000">(</font>crc16<font color="#990000">));</font> <font color="#990000">\</font>
+    <font color="#FF0000">}</font> <font color="#990000">\</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="util.h.html#41">UNLIKELY</a></font></b> <font color="#990000">(</font><b><font color="#000000"><a href="wireless_xbee.c.html#339">needs_escaped</a></font></b> <font color="#990000">(</font><b><font color="#000000"><a href="util.h.html#271">LOW_BYTE</a></font></b> <font color="#990000">(</font>crc16<font color="#990000">)))</font> <font color="#990000">)</font> <font color="#FF0000">{</font> <font color="#990000">\</font>
+      <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(</font><a href="wireless_xbee.c.html#326">ESCAPE</a><font color="#990000">);</font> <font color="#990000">\</font>
+      <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(</font><b><font color="#000000"><a href="util.h.html#271">LOW_BYTE</a></font></b> <font color="#990000">(</font>crc16<font color="#990000">)</font> <font color="#990000">^</font> <a href="wireless_xbee.c.html#333">ESCAPE_MODIFIER</a><font color="#990000">);</font> <font color="#990000">\</font>
+    <font color="#FF0000">}</font> <font color="#990000">\</font>
+    <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+      <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(</font><b><font color="#000000"><a href="util.h.html#271">LOW_BYTE</a></font></b> <font color="#990000">(</font>crc16<font color="#990000">));</font> <font color="#990000">\</font>
+    <font color="#FF0000">}</font> <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+
+uint8_t
+<b><font color="#000000"><a name="379">wx_put_frame</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> count<font color="#990000">,</font> <font color="#009900">void</font> <b><font color="#0000FF">const</font></b> <font color="#990000">*</font>buf<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#008080">uint8_t</font> epl <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>   <i><font color="#9A1900">// Escaped payload length</font></i>
+  <font color="#008080">uint8_t</font> ii<font color="#990000">;</font>        <i><font color="#9A1900">// Index variable</font></i>
+
+  <font color="#008080">uint16_t</font> lcrc <font color="#990000">=</font> <a href="wireless_xbee.c.html#336">CRC_INITIAL_VALUE</a><font color="#990000">;</font>   <i><font color="#9A1900">// Length (and delimiter) CRC value</font></i>
+  <font color="#008080">uint16_t</font> pcrc <font color="#990000">=</font> <a href="wireless_xbee.c.html#336">CRC_INITIAL_VALUE</a><font color="#990000">;</font>   <i><font color="#9A1900">// Payload CRC value</font></i>
+
+  <i><font color="#9A1900">// Compute checksum and escaped payload length</font></i>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> count <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="wireless_xbee.c.html#339">needs_escaped</a></font></b><font color="#990000">(((</font>uint8_t <font color="#990000">*)</font> buf<font color="#990000">)[</font>ii<font color="#990000">])</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      pcrc <font color="#990000">=</font> <b><font color="#000000">_crc_ccitt_update</font></b> <font color="#990000">(</font>pcrc<font color="#990000">,</font> <a href="wireless_xbee.c.html#326">ESCAPE</a><font color="#990000">);</font>
+      pcrc <font color="#990000">=</font> <b><font color="#000000">_crc_ccitt_update</font></b> <font color="#990000">(</font>pcrc<font color="#990000">,</font> <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> buf<font color="#990000">)[</font>ii<font color="#990000">]</font> <font color="#990000">^</font> <a href="wireless_xbee.c.html#333">ESCAPE_MODIFIER</a><font color="#990000">);</font>
+      epl <font color="#990000">+=</font> <font color="#993399">2</font><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+      pcrc <font color="#990000">=</font> <b><font color="#000000">_crc_ccitt_update</font></b> <font color="#990000">(</font>pcrc<font color="#990000">,</font> <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> buf<font color="#990000">)[</font>ii<font color="#990000">]);</font>
+      epl<font color="#990000">++;</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Compute the length field bytes and the CRC that covers the frame</font></i>
+  <i><font color="#9A1900">// delimiter and length bytes</font></i>
+  <font color="#008080">uint8_t</font> lxorfb<font color="#990000">;</font>   <i><font color="#9A1900">// Lenght XOR'ed Flag Byte</font></i>
+  <font color="#008080">uint8_t</font> pxlb<font color="#990000">;</font>     <i><font color="#9A1900">// Possibley Xor'ed Length Byte</font></i>
+  lcrc <font color="#990000">=</font> <b><font color="#000000">_crc_ccitt_update</font></b> <font color="#990000">(</font>lcrc<font color="#990000">,</font> <a href="wireless_xbee.c.html#325">FRAME_DELIMITER</a><font color="#990000">);</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="wireless_xbee.c.html#339">needs_escaped</a></font></b> <font color="#990000">(</font>epl<font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    lxorfb <font color="#990000">=</font> <a href="wireless_xbee.h.html#391">WX_LENGTH_BYTE_XORED</a><font color="#990000">;</font>
+    pxlb <font color="#990000">=</font> epl <font color="#990000">^</font> <a href="wireless_xbee.c.html#333">ESCAPE_MODIFIER</a><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+    lxorfb <font color="#990000">=</font> <a href="wireless_xbee.h.html#392">WX_LENGTH_BYTE_NOT_XORED</a><font color="#990000">;</font>
+    pxlb <font color="#990000">=</font> epl<font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+  lcrc <font color="#990000">=</font> <b><font color="#000000">_crc_ccitt_update</font></b> <font color="#990000">(</font>lcrc<font color="#990000">,</font> lxorfb<font color="#990000">);</font>
+  lcrc <font color="#990000">=</font> <b><font color="#000000">_crc_ccitt_update</font></b> <font color="#990000">(</font>lcrc<font color="#990000">,</font> pxlb<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// These are constant properties of our frame format</font></i>
+  uint8_t <font color="#008080">const</font> fdbc <font color="#990000">=</font> <font color="#993399">1</font><font color="#990000">;</font>   <i><font color="#9A1900">// Frame Delimiter Byte Count</font></i>
+  uint8_t <font color="#008080">const</font> lbc  <font color="#990000">=</font> <font color="#993399">2</font><font color="#990000">;</font>   <i><font color="#9A1900">// Length Byte Count</font></i>
+  uint8_t <font color="#008080">const</font> cbc  <font color="#990000">=</font> <font color="#993399">4</font><font color="#990000">;</font>   <i><font color="#9A1900">// CRC Byte Count</font></i>
+
+  <font color="#008080">uint8_t</font> cebc <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>   <i><font color="#9A1900">// CRC escape byte count</font></i>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="wireless_xbee.c.html#339">needs_escaped</a></font></b> <font color="#990000">(</font><b><font color="#000000"><a href="util.h.html#269">HIGH_BYTE</a></font></b> <font color="#990000">(</font>lcrc<font color="#990000">))</font> <font color="#990000">)</font> <font color="#FF0000">{</font> cebc<font color="#990000">++;</font> <font color="#FF0000">}</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="wireless_xbee.c.html#339">needs_escaped</a></font></b> <font color="#990000">(</font><b><font color="#000000"><a href="util.h.html#271">LOW_BYTE</a></font></b> <font color="#990000">(</font>lcrc<font color="#990000">))</font> <font color="#990000">)</font>  <font color="#FF0000">{</font> cebc<font color="#990000">++;</font> <font color="#FF0000">}</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="wireless_xbee.c.html#339">needs_escaped</a></font></b> <font color="#990000">(</font><b><font color="#000000"><a href="util.h.html#269">HIGH_BYTE</a></font></b> <font color="#990000">(</font>pcrc<font color="#990000">))</font> <font color="#990000">)</font> <font color="#FF0000">{</font> cebc<font color="#990000">++;</font> <font color="#FF0000">}</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="wireless_xbee.c.html#339">needs_escaped</a></font></b> <font color="#990000">(</font><b><font color="#000000"><a href="util.h.html#271">LOW_BYTE</a></font></b> <font color="#990000">(</font>pcrc<font color="#990000">))</font> <font color="#990000">)</font>  <font color="#FF0000">{</font> cebc<font color="#990000">++;</font> <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// If our frame won't fit in a radio packet, return FALSE</font></i>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> fdbc <font color="#990000">+</font> lbc <font color="#990000">+</font> cbc <font color="#990000">+</font> cebc <font color="#990000">+</font> epl <font color="#990000">&gt;</font> <a href="wireless_xbee.h.html#365">WX_TRANSPARENT_MODE_MAX_PACKET_SIZE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Transmit the actual frame</font></i>
+  <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(</font><a href="wireless_xbee.c.html#325">FRAME_DELIMITER</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(</font>lxorfb<font color="#990000">);</font>
+  <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(</font>pxlb<font color="#990000">);</font>
+  <b><font color="#000000"><a href="wireless_xbee.c.html#360">PUT_POSSIBLY_ESCAPED_CRC_BYTES</a></font></b> <font color="#990000">(</font>lcrc<font color="#990000">);</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> count <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <i><font color="#9A1900">// NOTE: we're using fall-through behavior of C switch statement here</font></i>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="wireless_xbee.c.html#339">needs_escaped</a></font></b> <font color="#990000">(((</font>uint8_t <font color="#990000">*)</font> buf<font color="#990000">)[</font>ii<font color="#990000">])</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(</font><a href="wireless_xbee.c.html#326">ESCAPE</a><font color="#990000">);</font>
+        <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(((</font>uint8_t <font color="#990000">*)</font> buf<font color="#990000">)[</font>ii<font color="#990000">]</font> <font color="#990000">^</font> <a href="wireless_xbee.c.html#333">ESCAPE_MODIFIER</a><font color="#990000">);</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b><font color="#FF0000">{</font>
+      <b><font color="#000000"><a href="wireless_xbee.h.html#334">WX_PUT_BYTE</a></font></b> <font color="#990000">(((</font>uint8_t <font color="#990000">*)</font> buf<font color="#990000">)[</font>ii<font color="#990000">]);</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#000000"><a href="wireless_xbee.c.html#360">PUT_POSSIBLY_ESCAPED_CRC_BYTES</a></font></b> <font color="#990000">(</font>pcrc<font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="wireless_xbee.c.html#316">DELAY_TO_FORCE_TRANSMISSION</a></font></b> <font color="#990000">();</font>
+
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="455">wx_put_string_frame</a></font></b> <font color="#990000">(</font><font color="#009900">char</font> <b><font color="#0000FF">const</font></b> <font color="#990000">*</font>str<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font><b><font color="#0000FF">sizeof</font></b> <font color="#990000">(</font><font color="#009900">char</font><font color="#990000">)</font> <font color="#990000">==</font> <font color="#993399">1</font><font color="#990000">);</font>   <i><font color="#9A1900">// Paranoid truism :)</font></i>
+
+  <font color="#008080">size_t</font> sl <font color="#990000">=</font> <b><font color="#000000">strlen</font></b> <font color="#990000">(</font>str<font color="#990000">);</font>   <i><font color="#9A1900">// String length</font></i>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font>sl <font color="#990000">&lt;=</font> UINT8_MAX<font color="#990000">);</font>   <i><font color="#9A1900">// -1 to allow for terminating NUL</font></i>
+
+  <b><font color="#0000FF">return</font></b> <b><font color="#000000"><a href="wireless_xbee.c.html#379">wx_put_frame</a></font></b> <font color="#990000">(</font>sl<font color="#990000">,</font> str<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="466">wx_put_string_frame_printf</a></font></b> <font color="#990000">(</font><font color="#009900">char</font> <b><font color="#0000FF">const</font></b> <font color="#990000">*</font>format<font color="#990000">,</font> <font color="#990000">...)</font>
+<font color="#FF0000">{</font>
+  <font color="#009900">char</font> es<font color="#990000">[</font><a href="wireless_xbee.h.html#386">WX_FRAME_SAFE_UNESCAPED_PAYLOAD_LENGTH</a> <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">];</font>   <i><font color="#9A1900">// Expanded String</font></i>
+
+  <font color="#008080">va_list</font> ap<font color="#990000">;</font>
+  <b><font color="#000000">va_start</font></b> <font color="#990000">(</font>ap<font color="#990000">,</font> format<font color="#990000">);</font>
+  <font color="#009900">int</font> char_count
+    <font color="#990000">=</font> <b><font color="#000000">vsnprintf</font></b> <font color="#990000">(</font>es<font color="#990000">,</font> <a href="wireless_xbee.h.html#386">WX_FRAME_SAFE_UNESCAPED_PAYLOAD_LENGTH</a> <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">,</font> format<font color="#990000">,</font> ap<font color="#990000">);</font>
+  <b><font color="#000000">va_end</font></b> <font color="#990000">(</font>ap<font color="#990000">);</font>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> char_count <font color="#990000">&gt;</font> <a href="wireless_xbee.h.html#386">WX_FRAME_SAFE_UNESCAPED_PAYLOAD_LENGTH</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">return</font></b> <b><font color="#000000"><a href="wireless_xbee.c.html#455">wx_put_string_frame</a></font></b> <font color="#990000">(</font>es<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#000080">#define</font></b> <a name="483">FRAME_STATE_OUTSIDE_FRAME</a>                     <font color="#993399">1</font>
+<b><font color="#000080">#define</font></b> <a name="484">FRAME_STATE_AT_LENGTH_XORED_FLAG</a>              <font color="#993399">2</font>
+<b><font color="#000080">#define</font></b> <a name="485">FRAME_STATE_AT_LENGTH_ITSELF</a>                  <font color="#993399">3</font>
+<b><font color="#000080">#define</font></b> <a name="486">FRAME_STATE_AT_LENGTH_CRC_HIGH_BYTE</a>           <font color="#993399">4</font>
+<b><font color="#000080">#define</font></b> <a name="487">FRAME_STATE_AT_LENGTH_CRC_HIGH_BYTE_ESCAPED</a>   <font color="#993399">5</font>
+<b><font color="#000080">#define</font></b> <a name="488">FRAME_STATE_AT_LENGTH_CRC_LOW_BYTE</a>            <font color="#993399">6</font>
+<b><font color="#000080">#define</font></b> <a name="489">FRAME_STATE_AT_LENGTH_CRC_LOW_BYTE_ESCAPED</a>    <font color="#993399">7</font>
+<b><font color="#000080">#define</font></b> <a name="490">FRAME_STATE_IN_PAYLOAD</a>                        <font color="#993399">8</font>
+<b><font color="#000080">#define</font></b> <a name="491">FRAME_STATE_IN_PAYLOAD_ESCAPED</a>                <font color="#993399">9</font>
+<b><font color="#000080">#define</font></b> <a name="492">FRAME_STATE_AT_PAYLOAD_CRC_HIGH_BYTE</a>         <font color="#993399">10</font>
+<b><font color="#000080">#define</font></b> <a name="493">FRAME_STATE_AT_PAYLOAD_CRC_HIGH_BYTE_ESCAPED</a> <font color="#993399">11</font>
+<b><font color="#000080">#define</font></b> <a name="494">FRAME_STATE_AT_PAYLOAD_CRC_LOW_BYTE</a>          <font color="#993399">12</font>
+<b><font color="#000080">#define</font></b> <a name="495">FRAME_STATE_AT_PAYLOAD_CRC_LOW_BYTE_ESCAPED</a>  <font color="#993399">13</font>
+<b><font color="#000080">#define</font></b> <a name="496">FRAME_STATE_COMPLETE</a>                         <font color="#993399">14</font>
+
+<i><font color="#9A1900">// This chunk of code can be compared to the avr libc _crc_ccitt_update</font></i>
+<i><font color="#9A1900">// behavior.  There is a commented out block in wx_get_frame() that can be</font></i>
+<i><font color="#9A1900">// used to drive this function.  FIXXME: commented out sections should go</font></i>
+<i><font color="#9A1900">// away eventually.</font></i>
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900">#define lo8(arg) ((uint8_t) (0x00ff &amp; arg))</font></i>
+<i><font color="#9A1900">#define hi8(arg) ((uint8_t) ((0xff00 &amp; arg) &gt;&gt; 8))</font></i>
+<i><font color="#9A1900">static uint16_t</font></i>
+<i><font color="#9A1900">crc_ccitt_update (uint16_t crc, uint8_t data)</font></i>
+<i><font color="#9A1900">{</font></i>
+<i><font color="#9A1900">  data ^= lo8 (crc);</font></i>
+<i><font color="#9A1900">  data ^= data &lt;&lt; 4;</font></i>
+
+<i><font color="#9A1900">  return (</font></i>
+<i><font color="#9A1900">      (((uint16_t) data &lt;&lt; 8) | hi8 (crc)) ^</font></i>
+<i><font color="#9A1900">      (uint8_t) (data &gt;&gt; 4) ^</font></i>
+<i><font color="#9A1900">      ((uint16_t) data &lt;&lt; 3) );</font></i>
+<i><font color="#9A1900">}</font></i>
+<i><font color="#9A1900">*/</font></i>
+
+uint8_t
+<b><font color="#000000"><a name="519">wx_get_frame</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> mfps<font color="#990000">,</font> <font color="#008080">uint8_t</font> <font color="#990000">*</font>rfps<font color="#990000">,</font> <font color="#009900">void</font> <font color="#990000">*</font>buf<font color="#990000">,</font> <font color="#008080">uint16_t</font> timeout<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#008080">uint8_t</font> fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#483">FRAME_STATE_OUTSIDE_FRAME</a><font color="#990000">;</font>   <i><font color="#9A1900">// Frame State</font></i>
+  <font color="#008080">uint16_t</font> crc <font color="#990000">=</font> <a href="wireless_xbee.c.html#336">CRC_INITIAL_VALUE</a><font color="#990000">;</font>         <i><font color="#9A1900">// Cyclic Redundany Check value</font></i>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+  <font color="#008080">uint16_t</font> et <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>    <i><font color="#9A1900">// Elapsed Time</font></i>
+  <font color="#008080">uint8_t</font> lxorfb <font color="#990000">=</font> <font color="#993399">42</font><font color="#990000">;</font>   <i><font color="#9A1900">// Length XOR'ed Flag Byte (bogus initialization)</font></i>
+  <font color="#008080">uint8_t</font> epl <font color="#990000">=</font> <font color="#993399">42</font><font color="#990000">;</font>   <i><font color="#9A1900">// Escaped Payload Length  (bogus "= 42" for compiler)</font></i>
+  <font color="#008080">uint8_t</font> epbr <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>   <i><font color="#9A1900">// Escaped Payload Bytes Read (so far)</font></i>
+
+  <font color="#990000">*</font>rfps <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>   <i><font color="#9A1900">// We've received nothing so far</font></i>
+
+  <i><font color="#9A1900">// Commented out code useful for comparing crc_ccitt_update to the builtin</font></i>
+  <i><font color="#9A1900">// _crc_ccitt_update routine</font></i>
+  <font color="#FF0000">{</font>
+    <i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900">    uint16_t tcrc1 = CRC_INITIAL_VALUE;</font></i>
+<i><font color="#9A1900">    uint16_t tcrc2 = CRC_INITIAL_VALUE;</font></i>
+<i><font color="#9A1900">    tcrc1 = _crc_ccitt_update (tcrc1, '4');</font></i>
+<i><font color="#9A1900">    tcrc1 = _crc_ccitt_update (tcrc1, '2');</font></i>
+<i><font color="#9A1900">    tcrc1 = _crc_ccitt_update (tcrc1, '\n');</font></i>
+<i><font color="#9A1900">    tcrc2 = crc_ccitt_update (tcrc2, '4');</font></i>
+<i><font color="#9A1900">    tcrc2 = crc_ccitt_update (tcrc2, '2');</font></i>
+<i><font color="#9A1900">    tcrc2 = crc_ccitt_update (tcrc2, '\n');</font></i>
+<i><font color="#9A1900">    if ( tcrc1 == tcrc2 ) {</font></i>
+<i><font color="#9A1900">      CHKP_PD4 ();</font></i>
+<i><font color="#9A1900">    }</font></i>
+<i><font color="#9A1900">    if ( tcrc1 == 0xf6b4 ) {</font></i>
+<i><font color="#9A1900">      CHKP_PD4 ();</font></i>
+<i><font color="#9A1900">    }</font></i>
+<i><font color="#9A1900">    */</font></i>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> et <font color="#990000">&lt;</font> timeout <font color="#990000">)</font> <font color="#FF0000">{</font>
+
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="wireless_xbee.h.html#335">WX_BYTE_AVAILABLE</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="wireless_xbee.h.html#337">WX_UART_RX_ERROR</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="wireless_xbee.h.html#338">WX_UART_RX_FRAME_ERROR</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+          <b><font color="#000000"><a href="wireless_xbee.h.html#341">WX_UART_FLUSH_RX_BUFFER</a></font></b> <font color="#990000">();</font>
+          <i><font color="#9A1900">// FIXXME: could propagate error from here</font></i>
+        <font color="#FF0000">}</font>
+        <i><font color="#9A1900">// This can actually happen pretty easily if we abort early due</font></i>
+        <i><font color="#9A1900">// to a CRC error (bad or non-frame data) on a previous read.</font></i>
+        <i><font color="#9A1900">// Flushing the buffer here is sort of a weird courtesy particular</font></i>
+        <i><font color="#9A1900">// to this function, and shouldn't be required now given the approach</font></i>
+        <i><font color="#9A1900">// prescribed in the interface (see <a href="wireless_xbee.h.html">wireless_xbee.h</a>).</font></i>
+        <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="wireless_xbee.h.html#339">WX_UART_RX_DATA_OVERRUN_ERROR</a></font></b> <font color="#990000">()</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+          <b><font color="#000000"><a href="wireless_xbee.h.html#341">WX_UART_FLUSH_RX_BUFFER</a></font></b> <font color="#990000">();</font>
+          <i><font color="#9A1900">// FIXXME: could propagate error from here</font></i>
+        <font color="#FF0000">}</font>
+        <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>   <i><font color="#9A1900">// UART says somethig bad happened</font></i>
+      <font color="#FF0000">}</font>
+
+      <font color="#008080">uint8_t</font> cb <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.h.html#340">WX_GET_BYTE</a></font></b> <font color="#990000">();</font>   <i><font color="#9A1900">// Current Byte</font></i>
+
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> cb <font color="#990000">==</font> <a href="wireless_xbee.c.html#325">FRAME_DELIMITER</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <i><font color="#9A1900">// A frame delimiter should only occur unescaped when we aren't</font></i>
+        <i><font color="#9A1900">// already reading a frame.  If we see it elsewhere it means corrupt</font></i>
+        <i><font color="#9A1900">// data.  Since this is an an error from every frame state except</font></i>
+        <i><font color="#9A1900">// one, we check for it just once up front.  In theory the CRC</font></i>
+        <i><font color="#9A1900">// check would catch this anyway since it should only occur due to</font></i>
+        <i><font color="#9A1900">// data corruption.  But it could also be due to a malformed frame,</font></i>
+        <i><font color="#9A1900">// so we check for it explicitly.</font></i>
+        <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> fs <font color="#990000">!=</font> <a href="wireless_xbee.c.html#483">FRAME_STATE_OUTSIDE_FRAME</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+          <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+        <font color="#FF0000">}</font>
+      <font color="#FF0000">}</font>
+      <i><font color="#9A1900">// The XON and XOFF bytes should never occur unescaped in a frame</font></i>
+      <b><font color="#0000FF">else</font></b> <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> fs <font color="#990000">!=</font> <a href="wireless_xbee.c.html#483">FRAME_STATE_OUTSIDE_FRAME</a> <font color="#990000">&amp;&amp;</font> <font color="#990000">(</font>cb <font color="#990000">==</font> <a href="wireless_xbee.c.html#327">XON</a> <font color="#990000">||</font> cb <font color="#990000">==</font> <a href="wireless_xbee.c.html#328">XOFF</a><font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+      <font color="#FF0000">}</font>
+
+      <b><font color="#0000FF">switch</font></b> <font color="#990000">(</font> fs <font color="#990000">)</font> <font color="#FF0000">{</font>
+
+        <b><font color="#0000FF">case</font></b> <a href="wireless_xbee.c.html#483">FRAME_STATE_OUTSIDE_FRAME</a><font color="#990000">:</font>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> cb <font color="#990000">==</font> <a href="wireless_xbee.c.html#325">FRAME_DELIMITER</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+            crc <font color="#990000">=</font> <b><font color="#000000">_crc_ccitt_update</font></b> <font color="#990000">(</font>crc<font color="#990000">,</font> cb<font color="#990000">);</font>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+            fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#484">FRAME_STATE_AT_LENGTH_XORED_FLAG</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+        <b><font color="#0000FF">case</font></b> <a href="wireless_xbee.c.html#484">FRAME_STATE_AT_LENGTH_XORED_FLAG</a><font color="#990000">:</font>
+          crc <font color="#990000">=</font> <b><font color="#000000">_crc_ccitt_update</font></b> <font color="#990000">(</font>crc<font color="#990000">,</font> cb<font color="#990000">);</font>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+          lxorfb <font color="#990000">=</font> cb<font color="#990000">;</font>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> lxorfb <font color="#990000">!=</font> <a href="wireless_xbee.h.html#391">WX_LENGTH_BYTE_XORED</a> <font color="#990000">&amp;&amp;</font>
+               lxorfb <font color="#990000">!=</font> <a href="wireless_xbee.h.html#392">WX_LENGTH_BYTE_NOT_XORED</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+            <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>   <i><font color="#9A1900">// This flag must be one of two possible values</font></i>
+          <font color="#FF0000">}</font>
+          fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#485">FRAME_STATE_AT_LENGTH_ITSELF</a><font color="#990000">;</font>
+          <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+        <b><font color="#0000FF">case</font></b> <a href="wireless_xbee.c.html#485">FRAME_STATE_AT_LENGTH_ITSELF</a><font color="#990000">:</font>
+          crc <font color="#990000">=</font> <b><font color="#000000">_crc_ccitt_update</font></b> <font color="#990000">(</font>crc<font color="#990000">,</font> cb<font color="#990000">);</font>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+          epl <font color="#990000">=</font> cb<font color="#990000">;</font>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> lxorfb <font color="#990000">==</font> <a href="wireless_xbee.h.html#391">WX_LENGTH_BYTE_XORED</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+            epl <font color="#990000">^=</font> <a href="wireless_xbee.c.html#333">ESCAPE_MODIFIER</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#486">FRAME_STATE_AT_LENGTH_CRC_HIGH_BYTE</a><font color="#990000">;</font>
+          <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+        <b><font color="#0000FF">case</font></b> <a href="wireless_xbee.c.html#486">FRAME_STATE_AT_LENGTH_CRC_HIGH_BYTE</a><font color="#990000">:</font>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> cb <font color="#990000">==</font> <a href="wireless_xbee.c.html#326">ESCAPE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+            fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#487">FRAME_STATE_AT_LENGTH_CRC_HIGH_BYTE_ESCAPED</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+            <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> cb <font color="#990000">!=</font> <b><font color="#000000"><a href="util.h.html#269">HIGH_BYTE</a></font></b> <font color="#990000">(</font>crc<font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+              <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>   <i><font color="#9A1900">// CRC of frame delimiter and length failed</font></i>
+            <font color="#FF0000">}</font>
+            fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#488">FRAME_STATE_AT_LENGTH_CRC_LOW_BYTE</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+        <b><font color="#0000FF">case</font></b> <a href="wireless_xbee.c.html#487">FRAME_STATE_AT_LENGTH_CRC_HIGH_BYTE_ESCAPED</a><font color="#990000">:</font>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">(</font>cb <font color="#990000">^</font> <a href="wireless_xbee.c.html#333">ESCAPE_MODIFIER</a><font color="#990000">)</font> <font color="#990000">!=</font> <b><font color="#000000"><a href="util.h.html#269">HIGH_BYTE</a></font></b> <font color="#990000">(</font>crc<font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+            <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#488">FRAME_STATE_AT_LENGTH_CRC_LOW_BYTE</a><font color="#990000">;</font>
+          <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+        <b><font color="#0000FF">case</font></b> <a href="wireless_xbee.c.html#488">FRAME_STATE_AT_LENGTH_CRC_LOW_BYTE</a><font color="#990000">:</font>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> cb <font color="#990000">==</font> <a href="wireless_xbee.c.html#326">ESCAPE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+            fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#489">FRAME_STATE_AT_LENGTH_CRC_LOW_BYTE_ESCAPED</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+            <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> cb <font color="#990000">!=</font> <b><font color="#000000"><a href="util.h.html#271">LOW_BYTE</a></font></b> <font color="#990000">(</font>crc<font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+              <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>   <i><font color="#9A1900">// CRC of frame delimiter and length failed</font></i>
+            <font color="#FF0000">}</font>
+            crc <font color="#990000">=</font> <a href="wireless_xbee.c.html#336">CRC_INITIAL_VALUE</a><font color="#990000">;</font>  <i><font color="#9A1900">// Reset for later use on payload</font></i>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+            <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> epl <font color="#990000">&gt;</font> <font color="#993399">0</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+              fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#490">FRAME_STATE_IN_PAYLOAD</a><font color="#990000">;</font>
+            <font color="#FF0000">}</font>
+            <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+              fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#492">FRAME_STATE_AT_PAYLOAD_CRC_HIGH_BYTE</a><font color="#990000">;</font>
+            <font color="#FF0000">}</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+        <b><font color="#0000FF">case</font></b> <a href="wireless_xbee.c.html#489">FRAME_STATE_AT_LENGTH_CRC_LOW_BYTE_ESCAPED</a><font color="#990000">:</font>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">(</font>cb <font color="#990000">^</font> <a href="wireless_xbee.c.html#333">ESCAPE_MODIFIER</a><font color="#990000">)</font> <font color="#990000">!=</font> <b><font color="#000000"><a href="util.h.html#271">LOW_BYTE</a></font></b> <font color="#990000">(</font>crc<font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+            <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          crc <font color="#990000">=</font> <a href="wireless_xbee.c.html#336">CRC_INITIAL_VALUE</a><font color="#990000">;</font>  <i><font color="#9A1900">// Reset for later use on payload</font></i>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> epl <font color="#990000">&gt;</font> <font color="#993399">0</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+            fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#490">FRAME_STATE_IN_PAYLOAD</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+            fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#492">FRAME_STATE_AT_PAYLOAD_CRC_HIGH_BYTE</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+        <b><font color="#0000FF">case</font></b> <a href="wireless_xbee.c.html#490">FRAME_STATE_IN_PAYLOAD</a><font color="#990000">:</font>
+          crc <font color="#990000">=</font> <b><font color="#000000">_crc_ccitt_update</font></b> <font color="#990000">(</font>crc<font color="#990000">,</font> cb<font color="#990000">);</font>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> cb <font color="#990000">==</font> <a href="wireless_xbee.c.html#326">ESCAPE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+            fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#491">FRAME_STATE_IN_PAYLOAD_ESCAPED</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+            <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> buf<font color="#990000">)[*</font>rfps<font color="#990000">]</font> <font color="#990000">=</font> cb<font color="#990000">;</font>
+            <font color="#990000">(*</font>rfps<font color="#990000">)++;</font>
+          <font color="#FF0000">}</font>
+          epbr<font color="#990000">++;</font>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> epbr <font color="#990000">==</font> epl <font color="#990000">)</font> <font color="#FF0000">{</font>
+            fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#492">FRAME_STATE_AT_PAYLOAD_CRC_HIGH_BYTE</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">else</font></b> <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">*</font>rfps <font color="#990000">==</font> mfps <font color="#990000">)</font> <font color="#FF0000">{</font>
+            <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>   <i><font color="#9A1900">// Frame exceeded caller-supplied max size</font></i>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+        <b><font color="#0000FF">case</font></b> <a href="wireless_xbee.c.html#491">FRAME_STATE_IN_PAYLOAD_ESCAPED</a><font color="#990000">:</font>
+          crc <font color="#990000">=</font> <b><font color="#000000">_crc_ccitt_update</font></b> <font color="#990000">(</font>crc<font color="#990000">,</font> cb<font color="#990000">);</font>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+          <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> buf<font color="#990000">)[*</font>rfps<font color="#990000">]</font> <font color="#990000">=</font> cb <font color="#990000">^</font> <a href="wireless_xbee.c.html#333">ESCAPE_MODIFIER</a><font color="#990000">;</font>
+          <font color="#990000">(*</font>rfps<font color="#990000">)++;</font>
+          epbr<font color="#990000">++;</font>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> epbr <font color="#990000">==</font> epl <font color="#990000">)</font> <font color="#FF0000">{</font>
+            fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#492">FRAME_STATE_AT_PAYLOAD_CRC_HIGH_BYTE</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          <i><font color="#9A1900">// FIXXME: we could detect this error once we get as far as</font></i>
+          <i><font color="#9A1900">// reading the length in the frame, but wasting a little time</font></i>
+          <i><font color="#9A1900">// reading the frame bytes probably doesn't make much difference</font></i>
+          <i><font color="#9A1900">// at least given our current very coarse error reporting scheme</font></i>
+          <b><font color="#0000FF">else</font></b> <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">*</font>rfps <font color="#990000">==</font> mfps <font color="#990000">)</font> <font color="#FF0000">{</font>
+            <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>   <i><font color="#9A1900">// Frame exceeded caller-supplied max size</font></i>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+            fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#490">FRAME_STATE_IN_PAYLOAD</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+        <b><font color="#0000FF">case</font></b> <a href="wireless_xbee.c.html#492">FRAME_STATE_AT_PAYLOAD_CRC_HIGH_BYTE</a><font color="#990000">:</font>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> cb <font color="#990000">==</font> <a href="wireless_xbee.c.html#326">ESCAPE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+            fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#493">FRAME_STATE_AT_PAYLOAD_CRC_HIGH_BYTE_ESCAPED</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+            <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> cb <font color="#990000">!=</font> <b><font color="#000000"><a href="util.h.html#269">HIGH_BYTE</a></font></b> <font color="#990000">(</font>crc<font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+              <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>   <i><font color="#9A1900">// CRC failed</font></i>
+            <font color="#FF0000">}</font>
+            fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#494">FRAME_STATE_AT_PAYLOAD_CRC_LOW_BYTE</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+        <b><font color="#0000FF">case</font></b> <a href="wireless_xbee.c.html#493">FRAME_STATE_AT_PAYLOAD_CRC_HIGH_BYTE_ESCAPED</a><font color="#990000">:</font>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">(</font>cb <font color="#990000">^</font> <a href="wireless_xbee.c.html#333">ESCAPE_MODIFIER</a><font color="#990000">)</font> <font color="#990000">!=</font> <b><font color="#000000"><a href="util.h.html#269">HIGH_BYTE</a></font></b> <font color="#990000">(</font>crc<font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+            <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#494">FRAME_STATE_AT_PAYLOAD_CRC_LOW_BYTE</a><font color="#990000">;</font>
+          <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+        <b><font color="#0000FF">case</font></b> <a href="wireless_xbee.c.html#494">FRAME_STATE_AT_PAYLOAD_CRC_LOW_BYTE</a><font color="#990000">:</font>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> cb <font color="#990000">==</font> <a href="wireless_xbee.c.html#326">ESCAPE</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+            fs <font color="#990000">=</font> <a href="wireless_xbee.c.html#495">FRAME_STATE_AT_PAYLOAD_CRC_LOW_BYTE_ESCAPED</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+            <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> cb <font color="#990000">!=</font> <b><font color="#000000"><a href="util.h.html#271">LOW_BYTE</a></font></b> <font color="#990000">(</font>crc<font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+              <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>   <i><font color="#9A1900">// CRC failed</font></i>
+            <font color="#FF0000">}</font>
+            <i><font color="#9A1900">// Frame is complete and correct.  Note that we don't ever need</font></i>
+            <i><font color="#9A1900">// to actually set fs to FRAME_STATE_COMPLETE.</font></i>
+            <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+
+        <b><font color="#0000FF">case</font></b> <a href="wireless_xbee.c.html#495">FRAME_STATE_AT_PAYLOAD_CRC_LOW_BYTE_ESCAPED</a><font color="#990000">:</font>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">(</font>cb <font color="#990000">^</font> <a href="wireless_xbee.c.html#333">ESCAPE_MODIFIER</a><font color="#990000">)</font> <font color="#990000">!=</font> <b><font color="#000000"><a href="util.h.html#271">LOW_BYTE</a></font></b> <font color="#990000">(</font>crc<font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+<a href="sd_card_private.h.html#203">crc -> sd_card_private.h:203</a>
+<a href="sd_card_private.h.html#267">crc -> sd_card_private.h:267</a>
+<a href="sd_card_private.h.html#327">crc -> sd_card_private.h:327</a>
+            <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+          <font color="#FF0000">}</font>
+          <i><font color="#9A1900">// Frame is complete and correct.  Note that we don't ever need</font></i>
+          <i><font color="#9A1900">// to actually set fs to FRAME_STATE_COMPLETE.</font></i>
+          <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+
+<b><font color="#008080">        default:</font></b>
+          <b><font color="#000000">assert</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>   <i><font color="#9A1900">// Shouldn't be here</font></i>
+          <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+      <font color="#FF0000">}</font>
+    <font color="#FF0000">}</font>
+
+    <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+      <i><font color="#9A1900">// If there isn't any data ready to read, wait a little bit and</font></i>
+      <i><font color="#9A1900">// try again.  1 ms is reasonably here since it's about the time the</font></i>
+      <i><font color="#9A1900">// serial port takes to receive a character at 9600 baud (see the BUGS</font></i>
+      <i><font color="#9A1900">// AND POTENTIAL WORK-AROUNDS section of the POD text in the usb_xbee</font></i>
+      <i><font color="#9A1900">// perl script for the timing calculations).  Not that it matters much,</font></i>
+      <i><font color="#9A1900">// since it's a busy wait anyway.</font></i>
+      uint16_t <font color="#008080">const</font> poll_interval_ms <font color="#990000">=</font> <font color="#993399">1</font><font color="#990000">;</font>
+      <i><font color="#9A1900">// Because _delay_ms() requires double arguments that are known constant</font></i>
+      <i><font color="#9A1900">// at compile-time to avoid possibly silently working wrong, and I'm</font></i>
+      <i><font color="#9A1900">// paranoid, we get this variable also:</font></i>
+      <font color="#009900">double</font> <b><font color="#0000FF">const</font></b> poll_interval_ms_double <font color="#990000">=</font> <font color="#993399">1.0</font><font color="#990000">;</font>
+      <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>poll_interval_ms_double<font color="#990000">);</font>
+      et <font color="#990000">+=</font> poll_interval_ms<font color="#990000">;</font>    <i><font color="#9A1900">// Elapsed Time</font></i>
+    <font color="#FF0000">}</font>
+
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>   <i><font color="#9A1900">// Timeout</font></i>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="776">wx_get_string_frame</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> msl<font color="#990000">,</font> <font color="#009900">char</font> <font color="#990000">*</font>str<font color="#990000">,</font> <font color="#008080">uint16_t</font> timeout<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#008080">uint8_t</font> bytes_received<font color="#990000">;</font>
+  <font color="#008080">uint8_t</font> sentinel <font color="#990000">=</font> <b><font color="#000000"><a href="wireless_xbee.c.html#519">wx_get_frame</a></font></b> <font color="#990000">(</font>msl <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">,</font> <font color="#990000">&amp;</font>bytes_received<font color="#990000">,</font> str<font color="#990000">,</font> timeout<font color="#990000">);</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <font color="#990000">!</font> sentinel <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> str<font color="#990000">[</font>bytes_received <font color="#990000">-</font> <font color="#993399">1</font><font color="#990000">]</font> <font color="#990000">!=</font> <font color="#FF0000">'</font><font color="#CC33CC">\0</font><font color="#FF0000">'</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> bytes_received <font color="#990000">&gt;</font> msl <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#0000FF">return</font></b> <a href="util.h.html#20">FALSE</a><font color="#990000">;</font>   <i><font color="#9A1900">// Client hasn't provided a big enough buffer str</font></i>
+    <font color="#FF0000">}</font>
+    str<font color="#990000">[</font>bytes_received<font color="#990000">]</font> <font color="#990000">=</font> <font color="#FF0000">'</font><font color="#CC33CC">\0</font><font color="#FF0000">'</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">return</font></b> <a href="util.h.html#19">TRUE</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+</tt></pre>

@@ -1,0 +1,105 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">/* $CSK: lesson13.c,v 1.1 2010/01/09 21:54:37 ckuethe Exp $ */</font></i>
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900"> * Copyright (c) 2010 Chris Kuethe </font></i><u><font color="#0000FF">&lt;chris.kuethe@gmail.com&gt;</font></u>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * Permission to use, copy, modify, and distribute this software for any</font></i>
+<i><font color="#9A1900"> * purpose with or without fee is hereby granted, provided that the above</font></i>
+<i><font color="#9A1900"> * copyright notice and this permission notice appear in all copies.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES</font></i>
+<i><font color="#9A1900"> * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF</font></i>
+<i><font color="#9A1900"> * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR</font></i>
+<i><font color="#9A1900"> * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES</font></i>
+<i><font color="#9A1900"> * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN</font></i>
+<i><font color="#9A1900"> * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF</font></i>
+<i><font color="#9A1900"> * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</font></i>
+<i><font color="#9A1900"> */</font></i>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/wdt.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+
+<i><font color="#9A1900">// WARNING WARNING WARNING: you really shouldn't be depending on the</font></i>
+<i><font color="#9A1900">// watchdog timer for anything without a really careful reading of Atmel</font></i>
+<i><font color="#9A1900">// document AVR132 "Using the Enhanced Watchdog Timer".  And while you're</font></i>
+<i><font color="#9A1900">// at it re-read the above disclaimer as well.</font></i>
+
+<i><font color="#9A1900">// This lesson demonstrates the simnplest kind of use of the watchdog</font></i>
+<i><font color="#9A1900">// timer system: resetting the system if a the watchdog timer isn't reset</font></i>
+<i><font color="#9A1900">// frequently.  Other techniques exist (see the above mentioned document).</font></i>
+
+<i><font color="#9A1900">// Storage for the contents of the MCUSR (which must be cleared during system</font></i>
+<i><font color="#9A1900">// initialization to ensure that continuous watchdog reset doesn't occur; see</font></i>
+<i><font color="#9A1900">// http://www.nongnu.org/avr-libc/user-manual/group__avr__watchdog.html for</font></i>
+<i><font color="#9A1900">// details).  This can be used to investigate the cause of a reset on reboot.</font></i>
+<font color="#008080">uint8_t</font> <font color="#008080"><a name="34">mcusr_mirror</a></font> <b><font color="#000000">__attribute__</font></b> <font color="#990000">((</font><b><font color="#000000">section</font></b> <font color="#990000">(</font><font color="#FF0000">".noinit"</font><font color="#990000">)));</font>
+
+<i><font color="#9A1900">// Backup and clear the MCUSR regester early in the AVR boot process (to</font></i>
+<i><font color="#9A1900">// ensure we don't enter a continual reset loop; see above comment).</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="lesson12.c.html#43">fetch_and_clear_mcusr</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+  <b><font color="#000000">__attribute__</font></b><font color="#990000">((</font>naked<font color="#990000">))</font>
+  <b><font color="#000000">__attribute__</font></b><font color="#990000">((</font><b><font color="#000000">section</font></b><font color="#990000">(</font><font color="#FF0000">".init3"</font><font color="#990000">)));</font>
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="43">fetch_and_clear_mcusr</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <a href="lesson12.c.html#34">mcusr_mirror</a> <font color="#990000">=</font> MCUSR<font color="#990000">;</font>
+  MCUSR <font color="#990000">=</font> <font color="#993399">0x0</font><font color="#990000">;</font>
+  <b><font color="#000000">wdt_disable</font></b> <font color="#990000">();</font>
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">// Quickly blink the LED that is hopefully attached to PORTB5 (assuming</font></i>
+<i><font color="#9A1900">// the port is correctly set up for output).</font></i>
+<b><font color="#0000FF">static</font></b> <font color="#009900">void</font>
+<b><font color="#000000"><a name="53">quick_portb5_blink_sequence</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#009900">int</font> ii<font color="#990000">;</font>
+  <b><font color="#0000FF">const</font></b> <font color="#009900">int</font> blink_count <font color="#990000">=</font> <font color="#993399">5</font><font color="#990000">;</font>
+  <b><font color="#0000FF">const</font></b> <font color="#009900">int</font> blink_time_ms <font color="#990000">=</font> <font color="#993399">50</font><font color="#990000">;</font>
+
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> blink_count <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    PORTB <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PORTB5<font color="#990000">);</font>
+    <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>blink_time_ms<font color="#990000">);</font>
+    PORTB <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PORTB5<font color="#990000">));</font>
+    <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>blink_time_ms<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="68">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font> <font color="#FF0000">{</font>
+
+  <i><font color="#9A1900">// Set PORTB5 for output.</font></i>
+  DDRB <font color="#990000">=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PORTB5<font color="#990000">);</font>
+  PORTB <font color="#990000">=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PORTB5<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Make sure we can tell when a watchdog reset has occurred.</font></i>
+  <b><font color="#000000"><a href="lesson12.c.html#53">quick_portb5_blink_sequence</a></font></b> <font color="#990000">();</font>
+
+  <i><font color="#9A1900">// Enable the watchdog timer.  Note that if the WDTON fuse is programmed,</font></i>
+  <i><font color="#9A1900">// watchdog resets will be enabled (and watchdog interrupts disabled)</font></i>
+  <i><font color="#9A1900">// and calling wdt_enable() is not needed.</font></i>
+  <b><font color="#000000">wdt_enable</font></b> <font color="#990000">(</font>WDTO_2S<font color="#990000">);</font>
+
+  <i><font color="#9A1900">// This delay doesn't cause a problem, since it's shorter than the watchdog</font></i>
+  <i><font color="#9A1900">// timeout value set above.</font></i>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font><font color="#993399">1500</font><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Reset the watchdog timer.</font></i>
+  <b><font color="#000000">wdt_reset</font></b> <font color="#990000">();</font>
+
+  <i><font color="#9A1900">// Now we can safely do some more work, since the timer has been reset.</font></i>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font><font color="#993399">1500</font><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// Here we simulate a software hangup.  Since the resulting delay is longer</font></i>
+  <i><font color="#9A1900">// than the timeout period, a reset will be triggered.  Note that using</font></i>
+  <i><font color="#9A1900">// the watchdog timer to wake from sleep mode via an WDT interrupt (without</font></i>
+  <i><font color="#9A1900">// a reset) is also a common practice, but that method is not covered here.</font></i>
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">1</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+<font color="#FF0000">}</font>
+</tt></pre>

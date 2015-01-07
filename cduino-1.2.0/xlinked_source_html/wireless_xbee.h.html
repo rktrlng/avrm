@@ -1,0 +1,579 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// MaxStream XBee Series 1 (aka XBee 802.15.4) Wireless Module Interface</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Test driver: <a href="wireless_xbee_test.c.html">wireless_xbee_test.c</a>    Implementation: <a href="wireless_xbee.c.html">wireless_xbee.c</a></font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// You really want to read this entire interface file, and maybe the</font></i>
+<i><font color="#9A1900">// referenced material as well.  There are many ways to go wrong.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This module uses the ATmega328P hardware serial port to communicate</font></i>
+<i><font color="#9A1900">// with the XBee.  It features high-level support for a few configuration</font></i>
+<i><font color="#9A1900">// parameters that people are most likely to desire to change, some low-level</font></i>
+<i><font color="#9A1900">// functions for people who need to do more extensive XBee reconfiguration,</font></i>
+<i><font color="#9A1900">// some data Tx and Rx macros which just use the underlying serial interface,</font></i>
+<i><font color="#9A1900">// and a higher-level Tx/Rx interface featuring atomic data frames.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Though this module should not be dependent on any particular shield,</font></i>
+<i><font color="#9A1900">// the Sparkfun XBee Shield (Sparkfun part number WRL-10854) was used for</font></i>
+<i><font color="#9A1900">// development.  It's available on its own, or as part of the Sparkfun "XBee</font></i>
+<i><font color="#9A1900">// Wireless Kit Retail" (Sparkfun part number RTL-11445), which also includes</font></i>
+<i><font color="#9A1900">// the actual XBee modules and a stand-alone miniature USB XBee interface</font></i>
+<i><font color="#9A1900">// board known as an "XBee Explorer USB" (Sparkfun part number WRL-08687)</font></i>
+<i><font color="#9A1900">// as well.  This last is a must-have for development IMO.  Make sure to get</font></i>
+<i><font color="#9A1900">// a USB Type A to USB Mini-B cable as well, it isn't included in the kit.</font></i>
+<i><font color="#9A1900">// Alternatively (if you aren't getting the whole kit) you can grab an XBee</font></i>
+<i><font color="#9A1900">// Explorer Dongle (Sparkfun part number WRL-09819), then you don't need</font></i>
+<i><font color="#9A1900">// the cable.  There is another different Sparkfun USB dongle that didn't</font></i>
+<i><font color="#9A1900">// work for me: see the paragraph on the WRL-09819 in usb_xbee for details.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// It's important to realize that pushing the reset button on the XBee shield</font></i>
+<i><font color="#9A1900">// only resets the Arduino, not the XBee itself.  Same with reprogramming</font></i>
+<i><font color="#9A1900">// the Arduino.  It's possible to wedge the XBee. If things work the first</font></i>
+<i><font color="#9A1900">// time through but not on subsequent attempts, you may need to power</font></i>
+<i><font color="#9A1900">// everything down (or run a line to the XBee RESET input as described</font></i>
+<i><font color="#9A1900">// below and make your program reset the XBee on startup).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// It's possible to use an XBee shield without using the XBee SLEEP_RQ</font></i>
+<i><font color="#9A1900">// or RESET or signals, but in battery powered designs at least you'll</font></i>
+<i><font color="#9A1900">// want to use both.  SLEEP_RQ lets you save power, and RESET is useful</font></i>
+<i><font color="#9A1900">// for ensuring that the XBee always gets reset whenever the ATMega does.</font></i>
+<i><font color="#9A1900">// Unfortunately the sparkfun shield at least doesn't break these XBee lines</font></i>
+<i><font color="#9A1900">// out anywhere, but you can make your own strange wiring to the chip pins</font></i>
+<i><font color="#9A1900">// (or perhaps make your own Arduino-free board :).  This interface supports</font></i>
+<i><font color="#9A1900">// the use of these lines use via two macros: WX_SLEEP_RQ_CONTROL_PIN</font></i>
+<i><font color="#9A1900">// and WX_RESET_CONTROL_PIN.  Clients can define these before including</font></i>
+<i><font color="#9A1900">// this header to enable some other macros for putting the XBee to sleep</font></i>
+<i><font color="#9A1900">// and resetting it.  If you use either, you must use both (IIRC because</font></i>
+<i><font color="#9A1900">// I think I saw the XBee failing to reset when asleep, so an implicit</font></i>
+<i><font color="#9A1900">// wake-up is required).  The <a href="wireless_xbee_test.c.html">wireless_xbee_test.c</a> file has a (commented</font></i>
+<i><font color="#9A1900">// out) snippet at the start of its main() function showing the whole XBee</font></i>
+<i><font color="#9A1900">// initialization procedure when these signals are being used.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// The directory for this module contains a perl script called usb_xbee that</font></i>
+<i><font color="#9A1900">// can be used to configure or send/receive data to/from an XBee Explorer</font></i>
+<i><font color="#9A1900">// or XBee USB dongle.  You can view its documentation using</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//    pod2text usb_xbee  | less</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// or so.  The test driver in <a href="wireless_xbee_test.c.html">wireless_xbee_test.c</a> depends on this script</font></i>
+<i><font color="#9A1900">// for some of its testing.  The list of tested XBee modules given in the</font></i>
+<i><font color="#9A1900">// usb_xbee documentation applies to this interface as well.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Sparkfun has IMO the best information page for XBee modules:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   https://www.sparkfun.com/pages/xbee_guide</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// There are a couple pages on the Arduino site that are worth reading,</font></i>
+<i><font color="#9A1900">// particularly if you need to do more extensive XBee configuration than</font></i>
+<i><font color="#9A1900">// what this interface provides directly.  WARNING: read the comment near</font></i>
+<i><font color="#9A1900">// the DEFAULT_CHANNEL_STRING define in <a href="wireless_xbee_test.c.html">wireless_xbee_test.c</a> for an important</font></i>
+<i><font color="#9A1900">// caveat though.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   http://arduino.cc/en/Main/ArduinoWirelessShield</font></i>
+<i><font color="#9A1900">//   http://arduino.cc/en/Guide/ArduinoWirelessShield</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Because this module uses the hardware serial port to communicate with</font></i>
+<i><font color="#9A1900">// the XBee, the edit-compile-debug process is easier if you use in-system</font></i>
+<i><font color="#9A1900">// programming for upload, rather than the serial port.  There are some clues</font></i>
+<i><font color="#9A1900">// about how to do this near the CHKP_PD4() macro in <a href="wireless_xbee_test.c.html">wireless_xbee_test.c</a></font></i>
+<i><font color="#9A1900">// Otherwise, make sure to take note of the tiny switch on the WRL-10854</font></i>
+<i><font color="#9A1900">// XBee Shield: it needs to be in the DLINE position for serial programming</font></i>
+<i><font color="#9A1900">// to work, and the UART position for communication between the Arduino</font></i>
+<i><font color="#9A1900">// and the XBee to work.  So you'll end up toggling the switch twice and</font></i>
+<i><font color="#9A1900">// pushing the reset button once per edit-compile-debug cycle.  I believe</font></i>
+<i><font color="#9A1900">// the same goes for many other XBee shields, including the official</font></i>
+<i><font color="#9A1900">// Arduino one, though it gives the switch positions different names (see</font></i>
+<i><font color="#9A1900">// http://arduino.cc/en/Main/ArduinoWirelessShield).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// At least for the Sparkfun shield, when the switch is in the DLINE</font></i>
+<i><font color="#9A1900">// position, the data input and output signals (DOUT and DIN) of the XBee</font></i>
+<i><font color="#9A1900">// end up connected (through a level shifter) to the Digital 2 and Digital 3</font></i>
+<i><font color="#9A1900">// Arduino pins (PD2 and PD3 on the ATMega328P).  This isn't useful for this</font></i>
+<i><font color="#9A1900">// library, since it doesn't support over-the-air programming of the Arduino.</font></i>
+<i><font color="#9A1900">// But of course it can screw things up if you're trying to use those pins</font></i>
+<i><font color="#9A1900">// for some other purpose, so it's something to be aware of.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This module doesn't do anything with the DTR/RTS lines of the XBee.</font></i>
+<i><font color="#9A1900">// Sending data too fast can overwhelm the XBee.  It's always possible to</font></i>
+<i><font color="#9A1900">// send an entire frame without causing any overflow though (assuming the</font></i>
+<i><font color="#9A1900">// queue was clear to start with).  See the XBee datasheet for details.</font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="wireless_xbee.h.html#101">WIRELESS_XBEE_H</a>
+<b><font color="#000080">#define</font></b> <a name="101">WIRELESS_XBEE_H</a>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;inttypes.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="dio.h.html">dio.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="uart.h.html">uart.h</a>"</font>
+
+
+<i><font color="#9A1900">///////////////////////////////////////////////////////////////////////////////</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// About Errror Handling</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This module really doesn't do much of it.  It just returns true on</font></i>
+<i><font color="#9A1900">// succes, and false otherwise.  If the macro WX_ASSERT_SUCCESS is defined</font></i>
+<i><font color="#9A1900">// it mostly doesn't even do that: it simply calls assert() internally</font></i>
+<i><font color="#9A1900">// if something fails.  In this case, all the function descriptions which</font></i>
+<i><font color="#9A1900">// indicate sentinel return values are wrong unless otherwise noted.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// For all the AT command mode functions, a false result almost certainly</font></i>
+<i><font color="#9A1900">// means something isn't set up right and you're not talking to the XBee</font></i>
+<i><font color="#9A1900">// at all, or else there's a bug.  For more details about where exactly</font></i>
+<i><font color="#9A1900">// things are failing, you'll need to instrument the source code for this</font></i>
+<i><font color="#9A1900">// module with CHKP() or CHKP_PD4() or something similar.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// It *might* be worth retrying some functions in some cases on account of</font></i>
+<i><font color="#9A1900">// noise or traffic.  Maybe.  But I don't know when exactly.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Note that the actual over-the-air transmission (normally resulting from</font></i>
+<i><font color="#9A1900">// WX_PUT_BYTE() or one of its callers) does not by itself involve any</font></i>
+<i><font color="#9A1900">// feedback at all about whether the transmission was actually received</font></i>
+<i><font color="#9A1900">// anywhere.  In the default point-to-multipoint XBee configuration, all</font></i>
+<i><font color="#9A1900">// nearby modules with the same network ID (see wx_ensure_network_id_set_to())</font></i>
+<i><font color="#9A1900">// and channel (see wx_ensure_channel_set_to()) will hopefully receive</font></i>
+<i><font color="#9A1900">// the transmission, but it's up to you to arrange for them to send back</font></i>
+<i><font color="#9A1900">// something saying they have if you really want to know.  No radio system</font></i>
+<i><font color="#9A1900">// is entirely immune to noise.  Also, in the default configuration the</font></i>
+<i><font color="#9A1900">// RF data rate is greater than the serial interface data rate, and all</font></i>
+<i><font color="#9A1900">// nodes recieve any transmission (point-to-multipoint), so if many nodes</font></i>
+<i><font color="#9A1900">// decide to talk at once the receiving buffers will likely overflow and</font></i>
+<i><font color="#9A1900">// some transmitted data will fail to make its way via the serial port out</font></i>
+<i><font color="#9A1900">// of the receiving XBee module(s).</font></i>
+<i><font color="#9A1900">//</font></i>
+
+<i><font color="#9A1900">// Serial communication rate at which we talk to the XBee.  Because our</font></i>
+<i><font color="#9A1900">// underlying serial module always communicates at this rate, this value isn't</font></i>
+<i><font color="#9A1900">// easy to change.</font></i>
+<b><font color="#000080">#define</font></b> <a name="147">WX_BAUD</a> <font color="#993399">9600</font>
+
+<i><font color="#9A1900">// Clients can define this macro to an IO pin from <a href="dio.h.html">dio.h</a> (e.g. DIO_PIN_PB1)</font></i>
+<i><font color="#9A1900">// before including this header to enable some macros to control explicit</font></i>
+<i><font color="#9A1900">// XBee sleep requests via the XBee SLEEP_RQ pin.  For this to work, the</font></i>
+<i><font color="#9A1900">// XBee must be configured to use a sleep mode that honors the SLEEP_RQ pin</font></i>
+<i><font color="#9A1900">// (e.g. with wx_at_command_expect_ok("SM1")).  See also the general notes</font></i>
+<i><font color="#9A1900">// above where this macro is mentioned.</font></i>
+<b><font color="#000080">#ifdef</font></b> WX_SLEEP_RQ_CONTROL_PIN
+
+   <i><font color="#9A1900">// Some pins we set as input without pullups a lot of the time to be</font></i>
+   <i><font color="#9A1900">// sure they don't waste power, but not the sleep request line that's</font></i>
+   <i><font color="#9A1900">// responsible for putting the XBee to sleep.  We want that configured</font></i>
+   <i><font color="#9A1900">// as an output always.  We may not really need to delay after setting</font></i>
+   <i><font color="#9A1900">// the line (using WX_WAKE() for convenience), but it's a conservative</font></i>
+   <i><font color="#9A1900">// thing to do.</font></i>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="163">WX_SLEEP_RQ_CONTROL_PIN_INIT</a></font></b><font color="#990000">()</font> <font color="#990000">\</font>
+     <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+       <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font>WX_SLEEP_RQ_CONTROL_PIN<font color="#990000">,</font> <a href="dio.h.html#184">DIO_OUTPUT</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">,</font> <a href="util.h.html#16">LOW</a><font color="#990000">);</font> <font color="#990000">\</font>
+       <b><font color="#000000"><a href="wireless_xbee.h.html#184">WX_WAKE</a></font></b> <font color="#990000">();</font> <font color="#990000">\</font>
+     <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+
+   <i><font color="#9A1900">// Ensure that the XBee is set on the path towards sleep.  The datasheet</font></i>
+   <i><font color="#9A1900">// states that any transmission that is in progress is completed before</font></i>
+   <i><font color="#9A1900">// the device goes to sleep.</font></i>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="172">WX_SLEEP</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="dio.h.html#236">DIO_SET_HIGH</a></font></b> <font color="#990000">(</font>WX_SLEEP_RQ_CONTROL_PIN<font color="#990000">)</font>
+
+   <i><font color="#9A1900">// Wake the XBee from sleep.</font></i>
+   <i><font color="#9A1900">//</font></i>
+   <i><font color="#9A1900">// WARNING: it takes the XBee some time to wake up.  The XBee datasheet</font></i>
+   <i><font color="#9A1900">// says that the module needs 13.2 ms to wake from hibernate (XBee</font></i>
+   <i><font color="#9A1900">// configuration parameter SM=1).  It also says the XBee will by ready</font></i>
+   <i><font color="#9A1900">// for transmission two 'byte times' after it takes its CTS line low.</font></i>
+   <i><font color="#9A1900">// This interface doesn't require the CTS line to be monitored, and</font></i>
+   <i><font color="#9A1900">// transmissions do indeed get scrambled up if you rush things, so we</font></i>
+   <i><font color="#9A1900">// give it a full 20 ms.  XBee doze mode (SM=2) is worth considering if</font></i>
+   <i><font color="#9A1900">// you need faster wake-up (at the cost of more power of course).</font></i>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="184">WX_WAKE</a></font></b><font color="#990000">()</font> <font color="#990000">\</font>
+     <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+     <b><font color="#000000"><a href="dio.h.html#225">DIO_SET_LOW</a></font></b> <font color="#990000">(</font>WX_SLEEP_RQ_CONTROL_PIN<font color="#990000">);</font> <font color="#990000">\</font>
+     <font color="#009900">float</font> XxX_wakeup_time_ms <font color="#990000">=</font> <font color="#993399">20.0</font><font color="#990000">;</font> <font color="#990000">\</font>
+     <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>XxX_wakeup_time_ms<font color="#990000">);</font> <font color="#990000">\</font>
+   <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+
+<b><font color="#000080">#endif</font></b>
+
+<i><font color="#9A1900">// Clients can define this macro to an IO pin from <a href="dio.h.html">dio.h</a> (e.g. DIO_PIN_PD6)</font></i>
+<i><font color="#9A1900">// before including this header to enable a macro to reset the XBee module</font></i>
+<i><font color="#9A1900">// using its RESET line.  The WX_SLEEP_RQ_CONTROL_PIN must also be defined</font></i>
+<i><font color="#9A1900">// if this macro is defined.  See also the general notes above where this</font></i>
+<i><font color="#9A1900">// macro is mentioned.</font></i>
+<b><font color="#000080">#ifdef</font></b> WX_RESET_CONTROL_PIN
+
+   <i><font color="#9A1900">// If the RESET pin is going to be used, we require the SLEEP_RQ pin</font></i>
+   <i><font color="#9A1900">// to be set up as well.  If I recall correctly, this is because RESET</font></i>
+   <i><font color="#9A1900">// doesn't work when the device is sleeping, so we want to do an implict</font></i>
+   <i><font color="#9A1900">// wake before resetting.</font></i>
+<b><font color="#000080">#  ifndef</font></b> WX_SLEEP_RQ_CONTROL_PIN
+<b><font color="#000080">#    </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> WX_RESET_CONTROL_PIN is defined <font color="#008080">but</font> WX_SLEEP_RQ_CONTROL_PIN is not
+<b><font color="#000080">#  endif</font></b>
+
+   <i><font color="#9A1900">// WARNING: WX_SLEEP_RQ_CONTROL_PIN_INIT() must be called before using</font></i>
+   <i><font color="#9A1900">// this macro.  Reset the XBee.  I don't actually know how long it takes</font></i>
+   <i><font color="#9A1900">// to boot up because the datasheet doesn't do a good job of saying,</font></i>
+   <i><font color="#9A1900">// so we give it plenty of time.  We reconfigure the control pin as an</font></i>
+   <i><font color="#9A1900">// input when we're not using it out of paranoia about power waste (this</font></i>
+   <i><font color="#9A1900">// is why there is no seperate macro to initialized the reset control pin).</font></i>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="214">WX_RESET</a></font></b><font color="#990000">()</font> <font color="#990000">\</font>
+     <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font> <font color="#990000">\</font>
+       <b><font color="#000000"><a href="wireless_xbee.h.html#184">WX_WAKE</a></font></b> <font color="#990000">();</font> <font color="#990000">\</font>
+       <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font>WX_RESET_CONTROL_PIN<font color="#990000">,</font> <a href="dio.h.html#184">DIO_OUTPUT</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">,</font> <a href="util.h.html#16">LOW</a><font color="#990000">);</font> <font color="#990000">\</font>
+       <font color="#009900">float</font> XxX_reset_hold_time_us <font color="#990000">=</font> <font color="#993399">142.0</font><font color="#990000">;</font> <font color="#990000">\</font>
+       <b><font color="#000000">_delay_us</font></b> <font color="#990000">(</font>XxX_reset_hold_time_us<font color="#990000">);</font> <font color="#990000">\</font>
+       <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font> <font color="#990000">\</font>
+         WX_RESET_CONTROL_PIN<font color="#990000">,</font> <font color="#990000">\</font>
+         <a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <font color="#990000">\</font>
+         <a href="dio.h.html#186">DIO_DISABLE_PULLUP</a><font color="#990000">,</font> <font color="#990000">\</font>
+         <a href="dio.h.html#187">DIO_DONT_CARE</a> <font color="#990000">);</font> <font color="#990000">\</font>
+      <font color="#009900">float</font> XxX_reboot_time_ms <font color="#990000">=</font> <font color="#993399">42.0</font><font color="#990000">;</font> <font color="#990000">\</font>
+      <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>XxX_reboot_time_ms<font color="#990000">);</font> <font color="#990000">\</font>
+    <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+
+<b><font color="#000080">#endif</font></b>
+
+<i><font color="#9A1900">// Initialize the interface to the XBee.  Currently this interface only</font></i>
+<i><font color="#9A1900">// supports talking to XBee devices over the hardware serial port at WX_BAUD</font></i>
+<i><font color="#9A1900">// Baud, with eight data bits, no parity, and one stop bit (8-N-1 format).</font></i>
+<i><font color="#9A1900">// So the serial port is initialized with those parameters, and that's</font></i>
+<i><font color="#9A1900">// all this routine does.  Note that this routine doesn't use the XBee</font></i>
+<i><font color="#9A1900">// RESET line at all.  You aren't even required to have a connection to</font></i>
+<i><font color="#9A1900">// that line.  However, if you do have it connected (see the reference to</font></i>
+<i><font color="#9A1900">// WX_RESET_CONTROL_PIN above), you likely want use the WX_RESET() macro</font></i>
+<i><font color="#9A1900">// before calling this function.  The ATMega328P datasheet says that USART0</font></i>
+<i><font color="#9A1900">// must be reinitialized after waking from sleep.  In practive I haven't</font></i>
+<i><font color="#9A1900">// found it to need this, but this function is guaranteed to be callable</font></i>
+<i><font color="#9A1900">// in this situation just in case (it will reinitialize USART0).</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="wireless_xbee.c.html#27">wx_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Uncomment this or otherwise arrange for this macro to be defined to</font></i>
+<i><font color="#9A1900">// enable simplified error handling.  See "About Error Handling" above.</font></i>
+<i><font color="#9A1900">//#define WX_ASSERT_SUCCESS</font></i>
+
+<i><font color="#9A1900">// All functions that require an AT command to be executed (except</font></i>
+<i><font color="#9A1900">// wx_enter_at_command_mode()) will fail if they don't get a complete</font></i>
+<i><font color="#9A1900">// response within about this amount of time after sending the request.</font></i>
+<i><font color="#9A1900">// They might fail more quickly.  WARNING: for at least one XBee command,</font></i>
+<i><font color="#9A1900">// ED (energy scan), this won't be long enough, and you may need to define</font></i>
+<i><font color="#9A1900">// a higher limit yourself before including this header, or propagate the</font></i>
+<i><font color="#9A1900">// timeout mechanics in the implementation in <a href="wireless_xbee.c.html">wireless_xbee.c</a> up to the</font></i>
+<i><font color="#9A1900">// interface level.</font></i>
+<b><font color="#000080">#ifndef</font></b> WX_AT_COMMAND_RESPONSE_TIME_LIMIE_MS
+<b><font color="#000080">#  define</font></b> <a name="259">WX_AT_COMMAND_RESPONSE_TIME_LIMIT_MS</a> <font color="#993399">200</font>
+<b><font color="#000080">#endif</font></b>
+
+<i><font color="#9A1900">// Enter AT command mode.  We do this by doing the sleep-send_+++-sleep</font></i>
+<i><font color="#9A1900">// ritual, thouroughly flushing the receive buffer, and then sending a blank</font></i>
+<i><font color="#9A1900">// command and expecting an "OK\r" response.  Note that if some fiend is</font></i>
+<i><font color="#9A1900">// sending an endless string of "OK\r" strings on the network_id/channel</font></i>
+<i><font color="#9A1900">// the XBee is configured to use, we might be fooled into thinking we've</font></i>
+<i><font color="#9A1900">// made it to command mode when we haven't.  This routine returns TRUE if it</font></i>
+<i><font color="#9A1900">// thinks AT command mode has been entered successfully, or FALSE otherwise.</font></i>
+uint8_t
+<b><font color="#000000"><a href="wireless_xbee.c.html#109">wx_enter_at_command_mode</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Leave command mode (by sending the AT CN command).</font></i>
+uint8_t
+<b><font color="#000000"><a href="wireless_xbee.c.html#154">wx_exit_at_command_mode</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Require the XBee module to be in AT command mode (see</font></i>
+<i><font color="#9A1900">// wx_enter_at_command_mode()).  Check if the XBee network ID (ID parameter)</font></i>
+<i><font color="#9A1900">// is set to id, and if not, set it to id and save the settings.  The new</font></i>
+<i><font color="#9A1900">// setting is saved to saved to non-volatile memory when this command is</font></i>
+<i><font color="#9A1900">// issued, but doesn't actually take effect until AT command mode is exited</font></i>
+<i><font color="#9A1900">// (or an 'AC' command is issued).  Valid id values are 0x00 - 0xffff.</font></i>
+<i><font color="#9A1900">// NOTE: this command may permanently alter the XBee configuration (it can</font></i>
+<i><font color="#9A1900">// be restored using wx_restore_defaults().</font></i>
+uint8_t
+<b><font color="#000000"><a href="wireless_xbee.c.html#223">wx_ensure_network_id_set_to</a></font></b> <font color="#990000">(</font><font color="#008080">uint16_t</font> id<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Require the XBee module to be in AT command mode (see</font></i>
+<i><font color="#9A1900">// wx_enter_at_command_mode()).  Check if the XBee channel (CH parameter)</font></i>
+<i><font color="#9A1900">// is set to channel, and if not, set it to channel and save the settings.</font></i>
+<i><font color="#9A1900">// The new setting is saved to saved to non-volatile memory when the command</font></i>
+<i><font color="#9A1900">// is issued, but doesn't actually take effect until AT command mode is</font></i>
+<i><font color="#9A1900">// exited (or an 'AC' command is issued).  Valid channel values are 0x0b</font></i>
+<i><font color="#9A1900">// - 0x1a.  NOTE: this command may permanently alter the XBee configuration</font></i>
+<i><font color="#9A1900">// (it can be restored using wx_restore_defaults()).</font></i>
+uint8_t
+<b><font color="#000000"><a href="wireless_xbee.c.html#259">wx_ensure_channel_set_to</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> channel<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Require the XBee module to be in AT command mode (see</font></i>
+<i><font color="#9A1900">// wx_enter_at_command_mode()).  Restore the XBee factory default</font></i>
+<i><font color="#9A1900">// configuration, and save the settings.</font></i>
+uint8_t
+<b><font color="#000000"><a href="wireless_xbee.c.html#299">wx_restore_defaults</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// I don't think the Sparkfun WRL-10854 gives us any connection to the</font></i>
+<i><font color="#9A1900">// SLEEP_RQ pin of the XBee module, so FIXXME: this is unimplemented.</font></i>
+<i><font color="#9A1900">// However, hibernating is probably the first thing you'll want to do for</font></i>
+<i><font color="#9A1900">// a battery operated device, so it's too bad we can't easily prototype it</font></i>
+<i><font color="#9A1900">// using the Arduino.  A few hints:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Setting the SM parameter to 1 (using wx_com_expect_ok() once to set</font></i>
+<i><font color="#9A1900">//     the parameter and again to save the parameters) and then using</font></i>
+<i><font color="#9A1900">//     the WX_SLEEP() macro (which requires WX_SLEEP_RQ_CONTROL_PIN to</font></i>
+<i><font color="#9A1900">//     be defined first) from this interfaces gives a very simple way to</font></i>
+<i><font color="#9A1900">//     cut Xbee module power consumption to about 10 uA, with the only</font></i>
+<i><font color="#9A1900">//     disadvantage being that the sleepy node will have to wake itself up</font></i>
+<i><font color="#9A1900">//     (it cannot be called awake from a coordinator).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * An all-software solution which reduces power consumption to about 50 uA</font></i>
+<i><font color="#9A1900">//     is also possible, but it requires significantly more module</font></i>
+<i><font color="#9A1900">//     confiruation in order to establish a coordinator node, end devices</font></i>
+<i><font color="#9A1900">//     nodes, etc.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * The XBee Product manual version v1.xEx (a copy is in this module's</font></i>
+<i><font color="#9A1900">//     directory) has a description of the sleep mode options on page 23.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//void</font></i>
+<i><font color="#9A1900">//wx_hibernate (void);</font></i>
+
+<i><font color="#9A1900">// To actually send/receive bytes over the air with the default XBee</font></i>
+<i><font color="#9A1900">// configuration, you can just send them to the serial port.  See the</font></i>
+<i><font color="#9A1900">// corresponding UART_*() in <a href="uart.h.html">uart.h</a> for details.  If you want your</font></i>
+<i><font color="#9A1900">// transmissions to arrive atomically (not interleaved with other</font></i>
+<i><font color="#9A1900">// transmissions) see the wx_put_*_frame() routines.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="334">WX_PUT_BYTE</a></font></b><font color="#990000">(</font>byte<font color="#990000">)</font>               <b><font color="#000000"><a href="uart.h.html#32">UART_PUT_BYTE</a></font></b> <font color="#990000">(</font>byte<font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="335">WX_BYTE_AVAILABLE</a></font></b><font color="#990000">()</font>             <b><font color="#000000"><a href="uart.h.html#41">UART_BYTE_AVAILABLE</a></font></b><font color="#990000">()</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="336">WX_WAIT_FOR_BYTE</a></font></b><font color="#990000">()</font>              <b><font color="#000000"><a href="uart.h.html#45">UART_WAIT_FOR_BYTE</a></font></b><font color="#990000">()</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="337">WX_UART_RX_ERROR</a></font></b><font color="#990000">()</font>              <b><font color="#000000"><a href="uart.h.html#58">UART_RX_ERROR</a></font></b><font color="#990000">()</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="338">WX_UART_RX_FRAME_ERROR</a></font></b><font color="#990000">()</font>        <b><font color="#000000"><a href="uart.h.html#62">UART_RX_FRAME_ERROR</a></font></b><font color="#990000">()</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="339">WX_UART_RX_DATA_OVERRUN_ERROR</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="uart.h.html#67">UART_RX_DATA_OVERRUN_ERROR</a></font></b><font color="#990000">()</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="340">WX_GET_BYTE</a></font></b><font color="#990000">()</font>                   <b><font color="#000000"><a href="uart.h.html#74">UART_GET_BYTE</a></font></b><font color="#990000">()</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="341">WX_UART_FLUSH_RX_BUFFER</a></font></b><font color="#990000">()</font>       <b><font color="#000000"><a href="uart.h.html#78">UART_FLUSH_RX_BUFFER</a></font></b><font color="#990000">()</font>
+
+<i><font color="#9A1900">///////////////////////////////////////////////////////////////////////////////</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Simple Frame Interface (NOT using XBee API mode)</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This section contains constants and routines that let you bundle data into</font></i>
+<i><font color="#9A1900">// short frames which:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * are guaranteed to arrive at recievers not interleaved with other data</font></i>
+<i><font color="#9A1900">//   * include CRC values</font></i>
+<i><font color="#9A1900">//   * can be conveniently received and verified (using wx_get_frame())</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Transmission can fail for a variety of reasons and acknowledgement</font></i>
+<i><font color="#9A1900">// messages, retries, etc. are the responsibility of clients of this</font></i>
+<i><font color="#9A1900">// interface.</font></i>
+
+<i><font color="#9A1900">// This interface assumes the XBee is being used in transparent mode, with</font></i>
+<i><font color="#9A1900">// the packetization timeout configuration parameter (R0) set to its default</font></i>
+<i><font color="#9A1900">// value.  Under these circumstances, small amounts of data sent quickly</font></i>
+<i><font color="#9A1900">// and continuously to the XBee will be lumped into single radio packets.</font></i>
+<i><font color="#9A1900">// Complete packets shorter than WX_TRANSPARENT_MODE_MAX_PACKET_SIZE</font></i>
+<i><font color="#9A1900">// bytes can be transmitted simply by not sending any bytes for at least</font></i>
+<i><font color="#9A1900">// WX_TRANSPARENT_MODE_PACKETIZATION_TIMEOUT_BYTES worth of time.</font></i>
+<b><font color="#000080">#define</font></b> <a name="365">WX_TRANSPARENT_MODE_MAX_PACKET_SIZE</a> <font color="#993399">100</font>
+<b><font color="#000080">#define</font></b> <a name="366">WX_TRANSPARENT_MODE_PACKETIZATION_TIMEOUT_BYTES</a> <font color="#993399">0x03</font>
+
+<i><font color="#9A1900">// The CRC and payload portions of frames will have the following byte</font></i>
+<i><font color="#9A1900">// values prefixed by an escape byte when they occur: 0x7E (ASCII '~'),</font></i>
+<i><font color="#9A1900">// 0x7D (ASCII '}'), 0x11 (ASCII device control 1, and 0x13 (ASCII device</font></i>
+<i><font color="#9A1900">// control 3).  If the data supplied to the frame transmission function</font></i>
+<i><font color="#9A1900">// contains many values that need to be escaped, the escaped frame size can</font></i>
+<i><font color="#9A1900">// end up exceeding WX_TRANSPARENT_MODE_MAX_PACKET_SIZE bytes.  However, the</font></i>
+<i><font color="#9A1900">// size of escaped data is at most twice its unescaped size.  We therefore</font></i>
+<i><font color="#9A1900">// have maximum safe sizes for unescaped payloads, and for unescaped payloads</font></i>
+<i><font color="#9A1900">// that include no bytes that need to be escaped.</font></i>
+<b><font color="#000080">#define</font></b> <a name="377">WX_FRAME_DELIMITER_LENGTH</a> <font color="#993399">1</font>   <i><font color="#9A1900">// Leading frame delimiter isn't escaped</font></i>
+<b><font color="#000080">#define</font></b> <a name="378">WX_FRAME_LENGTH_FIELD_LENGTH</a> <font color="#993399">2</font>
+<b><font color="#000080">#define</font></b> <a name="379">WX_FRAME_MAX_CRC_BYTES_WITH_ESCAPES</a> <font color="#993399">8</font>
+<b><font color="#000080">#define</font></b> <a name="380">WX_FRAME_MAX_PAYLOAD_ESCAPE_EXPANSION_FACTOR</a> <font color="#993399">2</font>
+<b><font color="#000080">#define</font></b> <a name="381">WX_FRAME_SAFE_PAYLOAD_LENGTH_WITH_NO_BYTES_REQUIRING_ESCAPE</a> <font color="#990000">\</font>
+  <font color="#990000">(</font>   <a href="wireless_xbee.h.html#365">WX_TRANSPARENT_MODE_MAX_PACKET_SIZE</a> <font color="#990000">\</font>
+    <font color="#990000">-</font> <a href="wireless_xbee.h.html#377">WX_FRAME_DELIMITER_LENGTH</a> <font color="#990000">\</font>
+    <font color="#990000">-</font> <a href="wireless_xbee.h.html#378">WX_FRAME_LENGTH_FIELD_LENGTH</a> <font color="#990000">\</font>
+    <font color="#990000">-</font> <a href="wireless_xbee.h.html#379">WX_FRAME_MAX_CRC_BYTES_WITH_ESCAPES</a> <font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <a name="386">WX_FRAME_SAFE_UNESCAPED_PAYLOAD_LENGTH</a> <font color="#990000">\</font>
+  <font color="#990000">(</font> <a href="wireless_xbee.h.html#381">WX_FRAME_SAFE_PAYLOAD_LENGTH_WITH_NO_BYTES_REQUIRING_ESCAPE</a> <font color="#990000">/</font> <font color="#990000">\</font>
+    <a href="wireless_xbee.h.html#380">WX_FRAME_MAX_PAYLOAD_ESCAPE_EXPANSION_FACTOR</a> <font color="#990000">)</font>
+
+<i><font color="#9A1900">// See below for details on these (you may not need to know)</font></i>
+<b><font color="#000080">#define</font></b> <a name="391">WX_LENGTH_BYTE_XORED</a>     <font color="#993399">0xff</font>
+<b><font color="#000080">#define</font></b> <a name="392">WX_LENGTH_BYTE_NOT_XORED</a> <font color="#993399">0x00</font>
+
+<i><font color="#9A1900">// Put count bytes of data out from buf out over the air as a single radio</font></i>
+<i><font color="#9A1900">// packet containing a simple frame format.  This frame format features a</font></i>
+<i><font color="#9A1900">// delimiter, length metadata, and CRC protection.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Besides taking some care that data segments don't get too long due to</font></i>
+<i><font color="#9A1900">// escaping (see comments above WX_FRAME_SAFE_UNESCAPED_PAYLOAD_LENGTH),</font></i>
+<i><font color="#9A1900">// you shouldn't need to know the gruesome details of this frame format if</font></i>
+<i><font color="#9A1900">// you'll be reading it with wx_get_frame().  But in case you aren't, here</font></i>
+<i><font color="#9A1900">// are the details:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Certain byte values will need to be escaped when they occur (except</font></i>
+<i><font color="#9A1900">// the delimiter when it appears as the delimiter), which usually involves</font></i>
+<i><font color="#9A1900">// expanding them into two byte sequences (but see below).  The entire escaped</font></i>
+<i><font color="#9A1900">// byte sequence must not be longer than WX_TRANSPARENT_MODE_MAX_PACKET_SIZE</font></i>
+<i><font color="#9A1900">// bytes long.  This frame format and escaping scheme is like the one used by</font></i>
+<i><font color="#9A1900">// the XBee in API mode (see the API Operation section of the XBee Product</font></i>
+<i><font color="#9A1900">// Manual), with the following differences:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * The length field is two bytes long, but the first byte is just a flag</font></i>
+<i><font color="#9A1900">//     indicating whether the second byte should be xor'ed in XBee API mode.</font></i>
+<i><font color="#9A1900">//     The flag byte has value WX_LENGTH_BYTE_XORED if the next byte has</font></i>
+<i><font color="#9A1900">//     been xor'ed, or WX_LENGTH_BYTE_NOT_XORED otherwise.  The purpose of</font></i>
+<i><font color="#9A1900">//     this arrangement is to help avoid undetected errors that can result</font></i>
+<i><font color="#9A1900">//     from corruption in the payload length field.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Immediately following the length field is a two-byte CRC computed from</font></i>
+<i><font color="#9A1900">//     the frame delimiter and the length bytes (the escape flag and the</font></i>
+<i><font color="#9A1900">//     possibly xor'ed length-indicating byte itself).  Corrupted lengh</font></i>
+<i><font color="#9A1900">//     bytes are by far the weakest point in most implementations that</font></i>
+<i><font color="#9A1900">//     use checksums or CRCs, including probably the one available</font></i>
+<i><font color="#9A1900">//     in XBee API mode; see http://www.ece.cmu.edu/~koopman/pubs/</font></i>
+<i><font color="#9A1900">//     01oct2013_koopman_faa_final_presentation.pdf.  Note that the bytes</font></i>
+<i><font color="#9A1900">//     of this CRC might themselves need to be escaped, if so this is done</font></i>
+<i><font color="#9A1900">//     as described in the XBee API mode documentation (resulting in a</font></i>
+<i><font color="#9A1900">//     sequence of up to four bytes).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * The payload checksum is two bytes long, and is computed from the</font></i>
+<i><font color="#9A1900">//     escaped payload contents using the 16 bit CRC-CCITT calculation</font></i>
+<i><font color="#9A1900">//     described in the util/crc16.h header of AVR libc.  Note that the</font></i>
+<i><font color="#9A1900">//     individual bytes of this CRC might themselves need to be escaped,</font></i>
+<i><font color="#9A1900">//     resulting in a sequence of up to four bytes.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// The data is first scanned to determine its length after escape bytes</font></i>
+<i><font color="#9A1900">// are added.  If the escaped data sequence is too long to go in a single</font></i>
+<i><font color="#9A1900">// radio packet, nothing is transmitted and false is returned (unless</font></i>
+<i><font color="#9A1900">// WX_ASSERT_SUCCESS is defined, in which case an assertion violation</font></i>
+<i><font color="#9A1900">// is triggered).  Otherwise the packet is transmitted and true is returned.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// These frames are not in any way compatible with the XBee API mode frames.</font></i>
+<i><font color="#9A1900">//</font></i>
+uint8_t
+<b><font color="#000000"><a href="wireless_xbee.c.html#379">wx_put_frame</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> count<font color="#990000">,</font> <font color="#009900">void</font> <b><font color="#0000FF">const</font></b> <font color="#990000">*</font>buf<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Convenience wrappar around wx_put_frame().  If NUL-terminated string str</font></i>
+<i><font color="#9A1900">// is longer than UINT8_MAX - 1 (which is too long to go in one of our frames</font></i>
+<i><font color="#9A1900">// anyway) an assertion violation will be triggered.  The str argument must</font></i>
+<i><font color="#9A1900">// be NUL-terminated, but the trailing NUL is not transmitted as part of</font></i>
+<i><font color="#9A1900">// the data frame (the frame knows how long it is by other means anyway).</font></i>
+<i><font color="#9A1900">// See the description of the underlying wx_put_frame() for more details.</font></i>
+uint8_t
+<b><font color="#000000"><a href="wireless_xbee.c.html#455">wx_put_string_frame</a></font></b> <font color="#990000">(</font><font color="#009900">char</font> <b><font color="#0000FF">const</font></b> <font color="#990000">*</font>str<font color="#990000">);</font>
+
+
+<i><font color="#9A1900">// FIXME: put somewhere better or remove or something</font></i>
+<b><font color="#000080">#ifndef</font></b> __GNUC__
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> __GNUC__ not defined
+<b><font color="#000080">#endif</font></b>
+
+<i><font color="#9A1900">// Convenience wrapper around wx_put_string_frame().  The expanded string</font></i>
+<i><font color="#9A1900">// must not be longer than WX_FRAME_SAFE_UNESCAPED_PAYLOAD_LENGTH bytes.</font></i>
+<i><font color="#9A1900">// Returns TRUE on success, or FALSE on error.</font></i>
+<i><font color="#9A1900">// FIXME: printf_P version?</font></i>
+uint8_t
+<b><font color="#000000"><a href="wireless_xbee.c.html#466">wx_put_string_frame_printf</a></font></b> <font color="#990000">(</font><font color="#009900">char</font> <b><font color="#0000FF">const</font></b> <font color="#990000">*</font>format<font color="#990000">,</font> <font color="#990000">...)</font>
+  <b><font color="#000000">__attribute__</font></b> <font color="#990000">((</font><b><font color="#000000">format</font></b> <font color="#990000">(</font>printf<font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">,</font> <font color="#993399">2</font><font color="#990000">)));</font>
+
+<i><font color="#9A1900">// Spend up to about timeout milliseconds trying to receive a frame with up</font></i>
+<i><font color="#9A1900">// to mfps (Maximum Frame Payload Size) unescaped payload bytes into buf.</font></i>
+<i><font color="#9A1900">// The size of the payload received is returned in *rfps (Received Frame</font></i>
+<i><font color="#9A1900">// Payload Size).  Regardless of the definedness of WX_ASSERT_SUCCESS,</font></i>
+<i><font color="#9A1900">// this routine returns TRUE if a full frame is successfully received,</font></i>
+<i><font color="#9A1900">// and false otherwise.  Any partial or corrupt frame data received from</font></i>
+<i><font color="#9A1900">// the XBee is effectively discarded, though some of it might end up getting</font></i>
+<i><font color="#9A1900">// written into *buf.  This function grabs a slice of incoming data starting</font></i>
+<i><font color="#9A1900">// when called and ending when either a valid frame is received, or a frame</font></i>
+<i><font color="#9A1900">// that has been started (due to the appearance of a frame delimiter in</font></i>
+<i><font color="#9A1900">// the data stream) turns out to be invalid or times out.  Therefore:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Callers must be prepared to retry.  A frame could cross the</font></i>
+<i><font color="#9A1900">//     timeout boundry, or be corrupted.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Transmitters must be prepared to resend their message (presumably</font></i>
+<i><font color="#9A1900">//     until they get some sort of acknowledgement).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Leading non-frame (or partial fram) data may be discarded even if a</font></i>
+<i><font color="#9A1900">//     frame is eventually received successfully.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Leading non-frame data that contains a frame delimiter byte (0x7E) will</font></i>
+<i><font color="#9A1900">//     inevitably result in what looks like a malformed frame, causing this</font></i>
+<i><font color="#9A1900">//     routine to attempt to read a frame and fail.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * If this function fails, it probably a good idea to call</font></i>
+<i><font color="#9A1900">//     WX_UART_FLUSH_RX_BUFFER() before attempting to receive any additional</font></i>
+<i><font color="#9A1900">//     data.  A data overrun can easily occur after such a failure,</font></i>
+<i><font color="#9A1900">//     which will leave WX_UART_RX_ERROR() true, which might confuse</font></i>
+<i><font color="#9A1900">//     other functions that check for errors when a byte is available.</font></i>
+<i><font color="#9A1900">//     Well-written functions should flush the buffer themselves when</font></i>
+<i><font color="#9A1900">//     they encounter a UART receiver error, but the results can still</font></i>
+<i><font color="#9A1900">//     be confusing since that other function will be seeing an error</font></i>
+<i><font color="#9A1900">//     that's left over from the aftermath of a call to this function.</font></i>
+<i><font color="#9A1900">//     Note that the actual return from this function doesn't take much</font></i>
+<i><font color="#9A1900">//     time on success or failure (its fast enough that successive calls</font></i>
+<i><font color="#9A1900">//     can pick up successive frames sent in the same radio packet).</font></i>
+<i><font color="#9A1900">//     It's just that when failure occurs, other things tend to be need</font></i>
+<i><font color="#9A1900">//     doing that cause enough delay that a serial overrun occurs.  The same</font></i>
+<i><font color="#9A1900">//     thing can happen with success if there's extra radio data floating</font></i>
+<i><font color="#9A1900">//     around and your polling loop isn't tight enough.  In other words,</font></i>
+<i><font color="#9A1900">//     this is just a particularly likely instance of the general class of</font></i>
+<i><font color="#9A1900">//     problems that can occurn when you don't poll fast enough and fail</font></i>
+<i><font color="#9A1900">//     to flush the receiver buffer and clear error flags after a failure.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * It's reasonable to first use WX_BYTE_AVAILABLE() from a polling loop to</font></i>
+<i><font color="#9A1900">//     determine when it might be worthwhile to call this routine.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Using short timeout values is asking for trouble.  Although the serial</font></i>
+<i><font color="#9A1900">// connection to the XBee goes at about one byte per millisecond, and</font></i>
+<i><font color="#9A1900">// the XBee to XBee RF link is theoretically even faster, it's probably</font></i>
+<i><font color="#9A1900">// a bad idea to depend on these rates.  Who knows what the XBee does?</font></i>
+<i><font color="#9A1900">// It may be laggy at the start of transmissions, or have RF packetization</font></i>
+<i><font color="#9A1900">// overhead, or take longer when there's noise.  Using WX_BYTE_AVAILABLE()</font></i>
+<i><font color="#9A1900">// before trying this function improves the success rate for a given timeout</font></i>
+<i><font color="#9A1900">// setting, because it ensures that none of the timeout period is wasted</font></i>
+<i><font color="#9A1900">// before the frame even starts.</font></i>
+<i><font color="#9A1900">//</font></i>
+uint8_t
+<b><font color="#000000"><a href="wireless_xbee.c.html#519">wx_get_frame</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> mfps<font color="#990000">,</font> <font color="#008080">uint8_t</font> <font color="#990000">*</font>rfps<font color="#990000">,</font> <font color="#009900">void</font> <font color="#990000">*</font>buf<font color="#990000">,</font> <font color="#008080">uint16_t</font> timeout<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Spend up to about timeout milliseconds trying to receive a frame containing</font></i>
+<i><font color="#9A1900">// a string of up to msl characters into str.  A trailing NUL byte is</font></i>
+<i><font color="#9A1900">// automatically added if the incoming string doesn't already end with one.</font></i>
+<i><font color="#9A1900">// The memory pointed to by str should be at least msl + 1 bytes long (for</font></i>
+<i><font color="#9A1900">// the possible trailing NUL).  This is a thin wrapper around wx_get_frame().</font></i>
+uint8_t
+<b><font color="#000000"><a href="wireless_xbee.c.html#776">wx_get_string_frame</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> msl<font color="#990000">,</font> <font color="#009900">char</font> <font color="#990000">*</font>str<font color="#990000">,</font> <font color="#008080">uint16_t</font> timeout<font color="#990000">);</font>
+
+<i><font color="#9A1900">///////////////////////////////////////////////////////////////////////////////</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Low Level/Extension Interface</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// The remaining functions in this header are only useful if you need to</font></i>
+<i><font color="#9A1900">// change the XBee module configuration significantly.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Note that there are many changes you can make to the XBee configuration</font></i>
+<i><font color="#9A1900">// which will violate the assumptions made by other parts of the interface.</font></i>
+
+<i><font color="#9A1900">// Maximum Command Output String Length (in bytes).  This includes any</font></i>
+<i><font color="#9A1900">// trailing carriage return ('\r') or NUL bytes that may be involved,</font></i>
+<i><font color="#9A1900">// and so is a safe size of buffer to use with wx_at_command().</font></i>
+<b><font color="#000080">#define</font></b> <a name="552">WX_MCOSL</a> <font color="#993399">15</font>
+
+<i><font color="#9A1900">// Require the XBee module to be in AT command mode (see</font></i>
+<i><font color="#9A1900">// wx_enter_at_command_mode()).  Execute the given AT command with an</font></i>
+<i><font color="#9A1900">// "AT" prefix and "\r" postfix implicitly added (e.g. "BD9600" becomes</font></i>
+<i><font color="#9A1900">// "ATBD9600"), place the command output in output, stip the trailing carriage</font></i>
+<i><font color="#9A1900">// return ("\r") from output, and finally return TRUE if all that succeeded.</font></i>
+<i><font color="#9A1900">// Both command and output should be pointers to at least WX_MCOSL bytes of</font></i>
+<i><font color="#9A1900">// storage.  It's ok to pass the same pointer for both command and output,</font></i>
+<i><font color="#9A1900">// in which case the command string is overwritten with the command output</font></i>
+<i><font color="#9A1900">// (saving a few bytes of RAM).  The command string should be NUL-terminated,</font></i>
+<i><font color="#9A1900">// and the output will be NUL-terminated.</font></i>
+uint8_t
+<b><font color="#000000"><a href="wireless_xbee.c.html#188">wx_at_command</a></font></b> <font color="#990000">(</font><font color="#009900">char</font> <font color="#990000">*</font><a href="lcd.c.html#112">command</a><font color="#990000">,</font> <font color="#009900">char</font> <font color="#990000">*</font>output<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Require the XBee module to be in AT command mode (see</font></i>
+<i><font color="#9A1900">// wx_enter_at_command_mode()).  Calls wx_at_command(), and the given</font></i>
+<i><font color="#9A1900">// command is expected to ouput "OK".  Return true iff everything wx_com()</font></i>
+<i><font color="#9A1900">// would do works and we get an OK back.</font></i>
+uint8_t
+<b><font color="#000000"><a href="wireless_xbee.c.html#205">wx_at_command_expect_ok</a></font></b> <font color="#990000">(</font><font color="#009900">char</font> <b><font color="#0000FF">const</font></b> <font color="#990000">*</font><a href="lcd.c.html#112">command</a><font color="#990000">);</font>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// WIRELESS_XBEE_H</font></i>
+</tt></pre>

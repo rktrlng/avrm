@@ -1,0 +1,115 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Implementation of the interface described in <a href="spi.h.html">spi.h</a></font></i>
+
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900"> * Copyright (c) 2010 by Cristian Maglie </font></i><u><font color="#0000FF">&lt;c.maglie@bug.st&gt;</font></u>
+<i><font color="#9A1900"> * SPI Master library for arduino.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * This file is free software; you can redistribute it and/or modify</font></i>
+<i><font color="#9A1900"> * it under the terms of either the GNU General Public License version 2</font></i>
+<i><font color="#9A1900"> * or the GNU Lesser General Public License version 2.1, both as</font></i>
+<i><font color="#9A1900"> * published by the Free Software Foundation.</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;assert.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;inttypes.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdlib.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="dio.h.html">dio.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="spi.h.html">spi.h</a>"</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="22">spi_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Initialize the SS pin for ouput with a HIGH value</font></i>
+  <b><font color="#000000"><a href="spi.h.html#145">SPI_SS_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#184">DIO_OUTPUT</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">,</font> <a href="util.h.html#15">HIGH</a><font color="#990000">);</font>
+
+  <i><font color="#9A1900">// This is our default SPI hardware configuration:</font></i>
+  <i><font color="#9A1900">// </font></i>
+  <i><font color="#9A1900">//   * Interrupts are disabled (~SPIE)</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">//   * Data order is MSB first (~DORD), the data mode is 0 (~CPOL</font></i>
+  <i><font color="#9A1900">//     and ~CPHA), meaning the the clock is active-high (~CPOL) and sampled</font></i>
+  <i><font color="#9A1900">//     at the leading edge of the clock cycle</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">//   * SPI is master-mode (SPIE)</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">//   * A SPI clock frequency of F_CPU / 4 is used (SPR1, SPR0, and ~SPI2X)</font></i>
+  <i><font color="#9A1900">//</font></i>
+  <i><font color="#9A1900">// These are the default setting for the SPCR and SPSR registers, except that</font></i>
+  <i><font color="#9A1900">// that SPI is enabled (SPE) and set to master mode (MSTR)</font></i>
+  <i><font color="#9A1900">//</font></i>
+  SPCR <font color="#990000">&amp;=</font> <font color="#990000">~(</font>
+      <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>SPIE<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>DORD<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>CPOL<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>CPHA<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>SPR1<font color="#990000">)</font> <font color="#990000">|</font> 
+      <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>SPR0<font color="#990000">)</font> <font color="#990000">);</font>
+  SPCR <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>MSTR<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>SPE<font color="#990000">);</font> 
+  SPSR <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>SPI2X<font color="#990000">));</font>
+
+  <i><font color="#9A1900">// Set the SCK and MOSI pins as OUTPUTS.  The MISO pin automatically</font></i>
+  <i><font color="#9A1900">// overrides to act as an input, but according to the ATMega328P datasheet</font></i>
+  <i><font color="#9A1900">// we still control the status of the pull-up resistor.  I believe we</font></i>
+  <i><font color="#9A1900">// probably never want this pull-up enabled for SPI operation, so we</font></i>
+  <i><font color="#9A1900">// go ahead and call SPI_MISO_INIT for the pull-up disabling effect.</font></i>
+  <i><font color="#9A1900">// By doing this AFTER enabling SPI, we avoid accidentally clocking in</font></i>
+  <i><font color="#9A1900">// a single bit since the lines go directly from "input" to SPI control.</font></i>
+  <i><font color="#9A1900">// http://code.google.com/p/arduino/issues/detail?id=888</font></i>
+  <b><font color="#000000"><a href="spi.h.html#155">SPI_SCK_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#184">DIO_OUTPUT</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">,</font> <a href="util.h.html#16">LOW</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="spi.h.html#156">SPI_MOSI_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#184">DIO_OUTPUT</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">,</font> <a href="util.h.html#16">LOW</a><font color="#990000">);</font>
+  <b><font color="#000000"><a href="spi.h.html#157">SPI_MISO_INIT</a></font></b> <font color="#990000">(</font><a href="dio.h.html#183">DIO_INPUT</a><font color="#990000">,</font> <a href="dio.h.html#186">DIO_DISABLE_PULLUP</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="62">spi_set_data_order</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="spi.h.html#111">spi_data_order_t</a></font> data_order<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#0000FF">switch</font></b> <font color="#990000">(</font> data_order <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">case</font></b> <a href="spi.h.html#109">SPI_DATA_ORDER_LSB_FIRST</a><font color="#990000">:</font>
+      SPCR <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>DORD<font color="#990000">);</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="spi.h.html#110">SPI_DATA_ORDER_MSB_FIRST</a><font color="#990000">:</font>
+      SPCR <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>DORD<font color="#990000">));</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+<b><font color="#008080">    default:</font></b>
+      <b><font color="#000000">assert</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>   <i><font color="#9A1900">// Shouldn't be here</font></i>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#000080">#define</font></b> <a name="77">SPI_MODE_MASK</a> <font color="#993399">0x0C</font>  <i><font color="#9A1900">// CPOL = bit 3, CPHA = bit 2 on SPCR</font></i>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="80">spi_set_data_mode</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="spi.h.html#134">spi_data_mode_t</a></font> data_mode<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  SPCR <font color="#990000">=</font> <font color="#990000">(</font>SPCR <font color="#990000">&amp;</font> <font color="#990000">~</font><a href="spi.c.html#77">SPI_MODE_MASK</a><font color="#990000">)</font> <font color="#990000">|</font> <font color="#990000">((</font>uint8_t<font color="#990000">)</font> data_mode<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#000080">#define</font></b> <a name="85">SPI_CLOCK_MASK</a> <font color="#993399">0x03</font>  <i><font color="#9A1900">// SPR1 = bit 1, SPR0 = bit 0 on SPCR</font></i>
+<b><font color="#000080">#define</font></b> <a name="86">SPI_2XCLOCK_MASK</a> <font color="#993399">0x01</font>  <i><font color="#9A1900">// SPI2X = bit 0 on SPSR</font></i>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="89">spi_set_clock_divider</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="spi.h.html#122">spi_clock_divider_t</a></font> divider<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  SPCR <font color="#990000">=</font> <font color="#990000">(</font>SPCR <font color="#990000">&amp;</font> <font color="#990000">~</font><a href="spi.c.html#85">SPI_CLOCK_MASK</a><font color="#990000">)</font> <font color="#990000">|</font> <font color="#990000">(((</font>uint8_t<font color="#990000">)</font> divider<font color="#990000">)</font> <font color="#990000">&amp;</font> <a href="spi.c.html#85">SPI_CLOCK_MASK</a><font color="#990000">);</font>
+  SPSR <font color="#990000">=</font> <font color="#990000">(</font>SPSR <font color="#990000">&amp;</font> <font color="#990000">~</font><a href="spi.c.html#86">SPI_2XCLOCK_MASK</a><font color="#990000">)</font> <font color="#990000">|</font> 
+         <font color="#990000">((((</font>uint8_t<font color="#990000">)</font> divider<font color="#990000">)</font> <font color="#990000">&gt;&gt;</font> <font color="#993399">2</font><font color="#990000">)</font> <font color="#990000">&amp;</font> <a href="spi.c.html#86">SPI_2XCLOCK_MASK</a><font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+uint8_t
+<b><font color="#000000"><a name="97">spi_transfer</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> data<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  SPDR <font color="#990000">=</font> data<font color="#990000">;</font>
+
+  <b><font color="#000000">loop_until_bit_is_set</font></b> <font color="#990000">(</font>SPSR<font color="#990000">,</font> SPIF<font color="#990000">);</font>
+
+  <b><font color="#0000FF">return</font></b> SPDR<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="107">spi_shutdown</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  SPCR <font color="#990000">&amp;=</font> <font color="#990000">~</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>SPE<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+</tt></pre>

@@ -1,0 +1,295 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Interface to SD card (via SPI controller).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Test driver: <a href="sd_card_test.c.html">sd_card_test.c</a>    Implementation: <a href="sd_card.c.html">sd_card.c</a></font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="sd_card.h.html#6">SD_CARD_H</a>
+<b><font color="#000080">#define</font></b> <a name="6">SD_CARD_H</a>
+
+<i><font color="#9A1900">// See the description of this define in the Makefile for this module.</font></i>
+<b><font color="#000080">#ifdef</font></b> SD_CARD_USE_TIMER0_FOR_TIMEOUTS
+<b><font color="#000080">#  include</font></b> <font color="#FF0000">"<a href="timer0_stopwatch.h.html">timer0_stopwatch.h</a>"</font>
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// SD_CARD_USE_TIMER0_FOR_TIMEOUTS</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="sd_card_private.h.html">sd_card_private.h</a>"</font>
+
+<i><font color="#9A1900">// WARNING: despite being ubiquitous, many SD cards are utter junk.</font></i>
+<i><font color="#9A1900">// They lack any underlying wear leveling for the flash memory and are</font></i>
+<i><font color="#9A1900">// horribly intolerant of asynchronous shutdown (power cuts).  If you're</font></i>
+<i><font color="#9A1900">// doing anything remotely serious you must invest in an "industrial"</font></i>
+<i><font color="#9A1900">// SD card.  I've used the Apacer AP-MSD04GCS4P-1TM with good results.</font></i>
+<i><font color="#9A1900">// It is still highly advisable to use an uninterruptible power supply</font></i>
+<i><font color="#9A1900">// and/or reliable internal battery backup hardware.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This module assumes that communication with the SD card is reliable, and</font></i>
+<i><font color="#9A1900">// doesn't use the CRC functionality that may be available on the SD card.</font></i>
+<i><font color="#9A1900">// If this is not the case, perhaps you would like to use the hardware</font></i>
+<i><font color="#9A1900">// watchdog on the ATMega or perhaps add CRC support to this module :)</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This module has been tested with the SD card</font></i>
+<i><font color="#9A1900">// hardware on the official Arduino Ethernet/SD Card shield, Rev. 3</font></i>
+<i><font color="#9A1900">// (http://arduino.cc/en/Main/ArduinoEthernetShield).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This module always checks for card support of supply voltages in the 2.7V</font></i>
+<i><font color="#9A1900">// - 3.6V range.  It's possible that incorrect support for a lower voltage</font></i>
+<i><font color="#9A1900">// might be indicated (though of course for the test hardware mentioned</font></i>
+<i><font color="#9A1900">// above this isn't an issue).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// This interface supports using the card simply as a large memory.</font></i>
+<i><font color="#9A1900">// FAT filesystem support belongs in a seperate module (FIXXME: not done yet).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Basic use looks about like this:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   // Specify the IO pin which is being used for SD card SPI slave selection</font></i>
+<i><font color="#9A1900">//   #define SD_CARD_SPI_SLAVE_SELEC_PIN DIO_PIN_DIGITAL_4</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   #define SAMPLE_COUNT 42</font></i>
+<i><font color="#9A1900">//   uint8_t buf[SAMPLE_COUNT];</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   get_samples_from_somewhere (buf);</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   uint8_t sentinel = sd_card_init (SD_CARD_FULL_SPEED);</font></i>
+<i><font color="#9A1900">//   assert (sentinel);</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   uint32_t some_block = 42;</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   sentinel = sd_card_write_partial_block (some_block, SAMPLE_COUNT, buf);</font></i>
+<i><font color="#9A1900">//   assert (sentinel);</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   // Time passes...</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   sentinel = sd_card_read_partial_block (some_block, SAMPLE_COUNT, buf);</font></i>
+<i><font color="#9A1900">//   assert (sentinel);</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// For more details see the rest of this header and the test/demo driver</font></i>
+<i><font color="#9A1900">// in sd_cart_test.c.</font></i>
+
+
+<i><font color="#9A1900">/* Arduino Sd2Card Library</font></i>
+<i><font color="#9A1900"> * Copyright (C) 2009 by William Greiman</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * This file is part of the Arduino Sd2Card Library</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * This Library is free software: you can redistribute it and/or modify</font></i>
+<i><font color="#9A1900"> * it under the terms of the GNU General Public License as published by</font></i>
+<i><font color="#9A1900"> * the Free Software Foundation, either version 3 of the License, or</font></i>
+<i><font color="#9A1900"> * (at your option) any later version.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * This Library is distributed in the hope that it will be useful,</font></i>
+<i><font color="#9A1900"> * but WITHOUT ANY WARRANTY; without even the implied warranty of</font></i>
+<i><font color="#9A1900"> * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</font></i>
+<i><font color="#9A1900"> * GNU General Public License for more details.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * You should have received a copy of the GNU General Public License</font></i>
+<i><font color="#9A1900"> * along with the Arduino Sd2Card Library.  If not, see</font></i>
+<i><font color="#9A1900"> * </font></i><u><font color="#0000FF">&lt;http://www.gnu.org/licenses/&gt;</font></u><i><font color="#9A1900">.</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<i><font color="#9A1900">// Clients must specify the SPI slave select pin being used at compile</font></i>
+<i><font color="#9A1900">// time, but the other SPI lines (MISO, MOSI, and SCK) are fixed by the</font></i>
+<i><font color="#9A1900">// spi module implementation.</font></i>
+<b><font color="#000080">#ifndef</font></b> SD_CARD_SPI_SLAVE_SELECT_PIN
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> <font color="#008080">The</font> SD_CARD_SPI_SLAVE_SELEC_PIN which is supposed to <font color="#008080">specify</font> the <font color="#990000">\</font>
+         pin to use to select the SD card controller SPI slave is <font color="#008080">not</font> set<font color="#990000">.</font> <font color="#990000">\</font>
+         See the example in the Makefile in <font color="#008080">the</font> sd_card <font color="#008080">module</font> directory<font color="#990000">.</font>
+<b><font color="#000080">#endif</font></b>
+
+<i><font color="#9A1900">// All SDHC cards at least (I don't know about SD1 or SD2 types) always</font></i>
+<i><font color="#9A1900">// write blocks or this size at a time.</font></i>
+<b><font color="#000080">#define</font></b> <a name="98">SD_CARD_BLOCK_SIZE</a> <font color="#993399">512</font>
+
+<i><font color="#9A1900">// Protect block zero from write if nonzero</font></i>
+<b><font color="#000080">#define</font></b> <a name="101">SD_CARD_PROTECT_BLOCK_ZERO</a> <font color="#993399">1</font>
+
+<i><font color="#9A1900">// Timeouts for various SD card operations.  The actual worst-case time</font></i>
+<i><font color="#9A1900">// required for these operations appears to be much smaller for the 4GB</font></i>
+<i><font color="#9A1900">// Class 10 Apacer Industrial SD card (part number AP-MSD04GCS4P-1TM)</font></i>
+<i><font color="#9A1900">// used for testing: these values have a factor of safety of 5 or more.</font></i>
+<i><font color="#9A1900">// These values are at least as large as those inherited from the original</font></i>
+<i><font color="#9A1900">// Arduino code.  If SD_CARD_USE_TIMER0_FOR_TIMEOUTS isn't enabled (which</font></i>
+<i><font color="#9A1900">// by default it is not) an even more conservative timeout estimation is</font></i>
+<i><font color="#9A1900">// used to account for possible compiler variation in loop optimization.</font></i>
+<i><font color="#9A1900">// In general, expect multi-second (maybe even 30 seconds or more) delays</font></i>
+<i><font color="#9A1900">// in cases where real timeouts are happening (due essentially to a broken</font></i>
+<i><font color="#9A1900">// or failing card).</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="114">SD_CARD_PRECMD_TIMEOUT</a></font></b> <font color="#990000">((</font><font color="#008080">uint16_t</font> <b><font color="#0000FF">const</font></b><font color="#990000">)</font> <font color="#993399">500</font><font color="#990000">)</font>     <i><font color="#9A1900">// Pre-cmd timeout ms</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="115">SD_CARD_INIT_TIMEOUT</a></font></b>   <font color="#990000">((</font><font color="#008080">uint16_t</font> <b><font color="#0000FF">const</font></b><font color="#990000">)</font> <font color="#993399">2000</font><font color="#990000">)</font>    <i><font color="#9A1900">// Init timeout ms</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="116">SD_CARD_ERASE_TIMEOUT</a></font></b>  <font color="#990000">((</font><font color="#008080">uint16_t</font> <b><font color="#0000FF">const</font></b><font color="#990000">)</font> <font color="#993399">10000</font><font color="#990000">)</font>   <i><font color="#9A1900">// Erase timeout ms</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="117">SD_CARD_READ_TIMEOUT</a></font></b>   <font color="#990000">((</font><font color="#008080">uint16_t</font> <b><font color="#0000FF">const</font></b><font color="#990000">)</font> <font color="#993399">500</font><font color="#990000">)</font>     <i><font color="#9A1900">// Read timeout ms</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="118">SD_CARD_WRITE_TIMEOUT</a></font></b>  <font color="#990000">((</font><font color="#008080">uint16_t</font> <b><font color="#0000FF">const</font></b><font color="#990000">)</font> <font color="#993399">600</font><font color="#990000">)</font>     <i><font color="#9A1900">// Write timeout ms</font></i>
+
+<i><font color="#9A1900">// Errors that can occur when trying to talk to the SD card.  See the</font></i>
+<i><font color="#9A1900">// implementation of the sd_card_error_description() function in <a href="sd_card.c.html">sd_card.c</a></font></i>
+<i><font color="#9A1900">// for the meanings.  These are probably not generally recoverable or</font></i>
+<i><font color="#9A1900">// indeed useful, beyond knowing that an error occurred.  But who knows,</font></i>
+<i><font color="#9A1900">// maybe you can do something with them in some situations.</font></i>
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="126">SD_CARD_ERROR_NONE_OR_UNSET</a>      <font color="#990000">=</font> <font color="#993399">0x00</font><font color="#990000">,</font>
+  <a name="127">SD_CARD_ERROR_CMD0_TIMEOUT</a>       <font color="#990000">=</font> <font color="#993399">0x01</font><font color="#990000">,</font>
+  <a name="128">SD_CARD_ERROR_CMD8</a>               <font color="#990000">=</font> <font color="#993399">0x02</font><font color="#990000">,</font>
+  <a name="129">SD_CARD_ERROR_CMD17</a>              <font color="#990000">=</font> <font color="#993399">0x03</font><font color="#990000">,</font>
+  <a name="130">SD_CARD_ERROR_CMD24</a>              <font color="#990000">=</font> <font color="#993399">0x04</font><font color="#990000">,</font>
+  <a name="131">SD_CARD_ERROR_CMD25</a>              <font color="#990000">=</font> <font color="#993399">0x05</font><font color="#990000">,</font>
+  <a name="132">SD_CARD_ERROR_CMD58</a>              <font color="#990000">=</font> <font color="#993399">0x06</font><font color="#990000">,</font>
+  <a name="133">SD_CARD_ERROR_ACMD23</a>             <font color="#990000">=</font> <font color="#993399">0x07</font><font color="#990000">,</font>
+  <a name="134">SD_CARD_ERROR_ACMD41</a>             <font color="#990000">=</font> <font color="#993399">0x08</font><font color="#990000">,</font>
+  <a name="135">SD_CARD_ERROR_BAD_CSD</a>            <font color="#990000">=</font> <font color="#993399">0x09</font><font color="#990000">,</font>
+  <a name="136">SD_CARD_ERROR_ERASE</a>              <font color="#990000">=</font> <font color="#993399">0x0A</font><font color="#990000">,</font>
+  <a name="137">SD_CARD_ERROR_ERASE_SINGLE_BLOCK</a> <font color="#990000">=</font> <font color="#993399">0x0B</font><font color="#990000">,</font>
+  <a name="138">SD_CARD_ERROR_ERASE_TIMEOUT</a>      <font color="#990000">=</font> <font color="#993399">0x0C</font><font color="#990000">,</font>
+  <a name="139">SD_CARD_ERROR_READ</a>               <font color="#990000">=</font> <font color="#993399">0x0D</font><font color="#990000">,</font>
+  <a name="140">SD_CARD_ERROR_READ_REG</a>           <font color="#990000">=</font> <font color="#993399">0x0E</font><font color="#990000">,</font>
+  <a name="141">SD_CARD_ERROR_READ_TIMEOUT</a>       <font color="#990000">=</font> <font color="#993399">0x0F</font><font color="#990000">,</font>
+  <a name="142">SD_CARD_ERROR_STOP_TRAN</a>          <font color="#990000">=</font> <font color="#993399">0x10</font><font color="#990000">,</font>
+  <a name="143">SD_CARD_ERROR_WRITE</a>              <font color="#990000">=</font> <font color="#993399">0x11</font><font color="#990000">,</font>
+  <a name="144">SD_CARD_ERROR_WRITE_BLOCK_ZERO</a>   <font color="#990000">=</font> <font color="#993399">0x12</font><font color="#990000">,</font>
+  <a name="145">SD_CARD_ERROR_WRITE_MULTIPLE</a>     <font color="#990000">=</font> <font color="#993399">0x13</font><font color="#990000">,</font>
+  <a name="146">SD_CARD_ERROR_WRITE_PROGRAMMING</a>  <font color="#990000">=</font> <font color="#993399">0x14</font><font color="#990000">,</font>
+  <a name="147">SD_CARD_ERROR_WRITE_TIMEOUT</a>      <font color="#990000">=</font> <font color="#993399">0x15</font><font color="#990000">,</font>
+  <a name="148">SD_CARD_ERROR_SCK_RATE</a>           <font color="#990000">=</font> <font color="#993399">0x16</font>
+<font color="#FF0000">}</font> <a name="149">sd_card_error_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// Return error code for last error.  Many other functions in this interface</font></i>
+<i><font color="#9A1900">// set an internal error code but only return a generic "failure" sentinel</font></i>
+<i><font color="#9A1900">// value on error.  This method will return a code that describes the most</font></i>
+<i><font color="#9A1900">// recent error more precisely.  NOTE: not all functions set this value</font></i>
+<i><font color="#9A1900">// even on failure, so once a call into this interface fails, subsequent</font></i>
+<i><font color="#9A1900">// failures might leave this method returing a misleading value.</font></i>
+<a href="sd_card.h.html#149">sd_card_error_t</a>
+<b><font color="#000000"><a href="sd_card.c.html#344">sd_card_last_error</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Return any error data associated with the last error.  In practice</font></i>
+<i><font color="#9A1900">// I believe this always means the most recent byte received from the</font></i>
+<i><font color="#9A1900">// SD card controller.  This may not be anything relevant, depending on</font></i>
+<i><font color="#9A1900">// the error, and will probably require inspection of the source code to</font></i>
+<i><font color="#9A1900">// interpret usefully.  The status codes are defined in <a href="sd_card_private.h.html">sd_card_private.h</a>.</font></i>
+uint8_t
+<b><font color="#000000"><a href="sd_card.c.html#350">sd_card_last_error_data</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// It's potentially convenient to be able to retrieve a textual description</font></i>
+<i><font color="#9A1900">// of an error, but it burns about 1k or program memory space so we don't</font></i>
+<i><font color="#9A1900">// build it unless requested.</font></i>
+<b><font color="#000080">#ifdef</font></b> SD_CARD_BUILD_ERROR_DESCRIPTION_FUNCTION
+
+<i><font color="#9A1900">// Maximum string length of error description returned by</font></i>
+<i><font color="#9A1900">// sd_card_error_description, not including trailing '\0'.</font></i>
+<b><font color="#000080">#  define</font></b> <a name="175">SD_CARD_ERROR_DESCRIPTION_MAX_LENGTH</a> <font color="#993399">47</font>
+
+<i><font color="#9A1900">// Put a textual description of the error in buf.  The buf argument must point</font></i>
+<i><font color="#9A1900">// to a memory space large enough to hold SD_CARD_ERROR_DESCRIPTION_MAX_LENGTH</font></i>
+<i><font color="#9A1900">// + 1 bytes.  Using this function will make your program quite a bit bigger.</font></i>
+<i><font color="#9A1900">// As a convenience, buf is returned.</font></i>
+<font color="#009900">char</font> <font color="#990000">*</font>
+<b><font color="#000000"><a href="sd_card.c.html#358">sd_card_error_description</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="sd_card.h.html#149">sd_card_error_t</a></font> <a href="sd_card.c.html#114">error</a><font color="#990000">,</font> <font color="#009900">char</font> <font color="#990000">*</font>buf<font color="#990000">);</font>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// #ifdef SD_CARD_BUILD_ERROR_DESCRIPTION_FUNCTION</font></i>
+
+<i><font color="#9A1900">// Communication speed between microcontroller and SD card.</font></i>
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="188">SD_CARD_SPI_SPEED_UNSET</a>   <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">,</font>   <i><font color="#9A1900">// Speed hasn't been set yet.</font></i>
+  <a name="189">SD_CARD_SPI_SPEED_FULL</a>    <font color="#990000">=</font> <font color="#993399">2</font><font color="#990000">,</font>   <i><font color="#9A1900">// Maximum speed of F_CPU / 2.</font></i>
+  <a name="190">SD_CARD_SPI_SPEED_HALF</a>    <font color="#990000">=</font> <font color="#993399">4</font><font color="#990000">,</font>   <i><font color="#9A1900">// F_CPU / 4.</font></i>
+  <a name="191">SD_CARD_SPI_SPEED_QUARTER</a> <font color="#990000">=</font> <font color="#993399">8</font>    <i><font color="#9A1900">// F_CPU / 8.</font></i>
+<font color="#FF0000">}</font> <a name="192">sd_card_spi_speed_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// SPI communication speed that we set (at sd_card_init()-time).</font></i>
+<b><font color="#0000FF">extern</font></b> <font color="#008080"><a href="sd_card.h.html#192">sd_card_spi_speed_t</a></font> <a href="sd_card.c.html#95">speed</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// Initialize an SD flash card and this interface.  The speed argument sets</font></i>
+<i><font color="#9A1900">// the SPI communcation rate between card and microcontroller.  Returns TRUE</font></i>
+<i><font color="#9A1900">// on success and zero on error (in which case sd_card_last_error() can</font></i>
+<i><font color="#9A1900">// be called).  If SD_CARD_USE_TIMER0_FOR_TIMEOUTS is defined, this calls</font></i>
+<i><font color="#9A1900">// time0_stopwatch_init() from the <a href="timer0_stopwatch.h.html">timer0_stopwatch.h</a> interface, which</font></i>
+<i><font color="#9A1900">// uses an interrupt.  It also call spi_init() from the <a href="spi.h.html">spi.h</a> interface,</font></i>
+<i><font color="#9A1900">// with the SPI settings required for communicating with an SD card.</font></i>
+<i><font color="#9A1900">// If you're talking to multiple SPI devices, you may need to change the</font></i>
+<i><font color="#9A1900">// SPI settings to talk to them, then call this function again when you want</font></i>
+<i><font color="#9A1900">// to talk to the SD card more.  This should work fine.  Hopefully :) Note</font></i>
+<i><font color="#9A1900">// also that the choice of speed here seems to not make much difference to</font></i>
+<i><font color="#9A1900">// how fast reads/writes go (I guess the underlying flash read/write time</font></i>
+<i><font color="#9A1900">// requirements dominate, rather than SPI bus communication).</font></i>
+uint8_t
+<b><font color="#000000"><a href="sd_card.c.html#539">sd_card_init</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="sd_card.h.html#192">sd_card_spi_speed_t</a></font> <a href="sd_card.c.html#95">speed</a><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Return the size of the card in SD_CARD_BLOCK_SIZE byte blocks, or zero</font></i>
+<i><font color="#9A1900">// if an error occurs.</font></i>
+uint32_t
+<b><font color="#000000"><a href="sd_card.c.html#447">sd_card_size</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Card types.</font></i>
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="220">SD_CARD_TYPE_INDETERMINATE</a> <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">,</font>   <i><font color="#9A1900">// Card type not known (yet).</font></i>
+  <a name="221">SD_CARD_TYPE_SD1</a>           <font color="#990000">=</font> <font color="#993399">1</font><font color="#990000">,</font>   <i><font color="#9A1900">// SD V1</font></i>
+  <a name="222">SD_CARD_TYPE_SD2</a>           <font color="#990000">=</font> <font color="#993399">2</font><font color="#990000">,</font>   <i><font color="#9A1900">// SD V2</font></i>
+  <a name="223">SD_CARD_TYPE_SDHC</a>          <font color="#990000">=</font> <font color="#993399">3</font><font color="#990000">,</font>   <i><font color="#9A1900">// SDHC</font></i>
+<font color="#FF0000">}</font> <a name="224">sd_card_type_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// Return the card type.</font></i>
+<a href="sd_card.h.html#224">sd_card_type_t</a>
+<b><font color="#000000"><a href="sd_card.c.html#441">sd_card_type</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Read a cards CID register. The CID contains card identification</font></i>
+<i><font color="#9A1900">// information such as manufacturer ID, product name, product serial number</font></i>
+<i><font color="#9A1900">// and manufacturing date.  Returns TRUE on success, and FALSE on failure</font></i>
+<i><font color="#9A1900">// (in which case sd_card_last_error() can be called).</font></i>
+uint8_t
+<b><font color="#000000"><a href="sd_card.c.html#848">sd_card_read_cid</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="sd_card_private.h.html#204">sd_card_cid_t</a></font> <font color="#990000">*</font>cid<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Read a cards CSD register. The CSD contains card-specific data that</font></i>
+<i><font color="#9A1900">// provides information regarding access to the card's contents.  Returne TRUE</font></i>
+<i><font color="#9A1900">// on success, and FALSE on failure (in which case sd_card_last_error()</font></i>
+<i><font color="#9A1900">// can be called).</font></i>
+uint8_t
+<b><font color="#000000"><a href="sd_card.c.html#857">sd_card_read_csd</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="sd_card_private.h.html#334">sd_card_csd_t</a></font> <font color="#990000">*</font>csd<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Read a block of data.  The block argument is the logical block to</font></i>
+<i><font color="#9A1900">// read, and the data read is stores at dst (which must be at least</font></i>
+<i><font color="#9A1900">// SD_CARD_BLOCK_SIZE bytes long).  On success, TRUE is returned, otherwise</font></i>
+<i><font color="#9A1900">// FALSE is returned (in which case sd_card_last_error() may be called.</font></i>
+<i><font color="#9A1900">// See also sd_card_read_partial_block().</font></i>
+uint8_t
+<b><font color="#000000"><a href="sd_card.c.html#780">sd_card_read_block</a></font></b> <font color="#990000">(</font><font color="#008080">uint32_t</font> block<font color="#990000">,</font> <font color="#008080">uint8_t</font> <font color="#990000">*</font>dst<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Write a block of data (but see SD_CARD_PROTECT_BLOCK_ZERO).  The block</font></i>
+<i><font color="#9A1900">// argument is the logical block to write, and the data to write is</font></i>
+<i><font color="#9A1900">// taken from location src (which must be at least SD_CARD_BLOCK_SIZE</font></i>
+<i><font color="#9A1900">// bytes long.  On success, TRUE is returned, otherwise FALSE</font></i>
+<i><font color="#9A1900">// is returned and sd_card_last_error() may be called.  See also</font></i>
+<i><font color="#9A1900">// sd_card_write_partial_block().</font></i>
+uint8_t
+<b><font color="#000000"><a href="sd_card.c.html#786">sd_card_write_block</a></font></b> <font color="#990000">(</font><font color="#008080">uint32_t</font> block<font color="#990000">,</font> <font color="#008080">uint8_t</font> <b><font color="#0000FF">const</font></b> <font color="#990000">*</font>src<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Like sd_card_read_block(), but src only needs to be cnt bytes long,</font></i>
+<i><font color="#9A1900">// and the remainder of the data read from the SD card is thrown away.</font></i>
+<i><font color="#9A1900">// This function lets you trade storage efficiency on the SD card for RAM</font></i>
+<i><font color="#9A1900">// on the AVR (because the memory space pointed to by src can be smaller).</font></i>
+<i><font color="#9A1900">// NOTE: because SDHC cards *always* read/write (and send via SPI) full</font></i>
+<i><font color="#9A1900">// blocks, it will take just as long to retrieve a partial block as it does</font></i>
+<i><font color="#9A1900">// to retrieve a full one.</font></i>
+uint8_t
+<b><font color="#000000"><a href="sd_card.c.html#792">sd_card_read_partial_block</a></font></b> <font color="#990000">(</font><font color="#008080">uint32_t</font> block<font color="#990000">,</font> <font color="#008080">uint16_t</font> cnt<font color="#990000">,</font> <font color="#008080">uint8_t</font> <font color="#990000">*</font>dst<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Analagous to sd_card_read_partial_block().  Garbage data is written for</font></i>
+<i><font color="#9A1900">// (0-indexed) bytes cnt through SD_CARD_BLOCK_SIZE - 1.  NOTE: because SDHC</font></i>
+<i><font color="#9A1900">// cards *always* read/write (and send via SPI) full blocks, it will take</font></i>
+<i><font color="#9A1900">// just as long to retrieve a partial block as it does to retrieve a full one.</font></i>
+uint8_t
+<b><font color="#000000"><a href="sd_card.c.html#798">sd_card_write_partial_block</a></font></b> <font color="#990000">(</font><font color="#008080">uint32_t</font> block<font color="#990000">,</font> <font color="#008080">uint16_t</font> cnt<font color="#990000">,</font> <font color="#008080">uint8_t</font> <b><font color="#0000FF">const</font></b> <font color="#990000">*</font>src<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Returns TRUE iff the SD card provides an erase operation for individual</font></i>
+<i><font color="#9A1900">// blocks.  Note that it's always possible to simply overwrite blocks.</font></i>
+uint8_t
+<b><font color="#000000"><a href="sd_card.c.html#485">sd_card_single_block_erase_supported</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Erase a range of blocks.  This method requires that</font></i>
+<i><font color="#9A1900">// sd_card_single_block_erase_supported() return TRUE.  The data on the</font></i>
+<i><font color="#9A1900">// card after this operation may be either zeros or ones, depending on the</font></i>
+<i><font color="#9A1900">// card vendor.</font></i>
+uint8_t
+<b><font color="#000000"><a href="sd_card.c.html#492">sd_card_erase_blocks</a></font></b> <font color="#990000">(</font><font color="#008080">uint32_t</font> first_block<font color="#990000">,</font> <font color="#008080">uint32_t</font> last_block<font color="#990000">);</font>
+
+<b><font color="#000080">#endif</font></b>  <i><font color="#9A1900">// SD_CARD_H</font></i>
+</tt></pre>

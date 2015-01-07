@@ -1,0 +1,103 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">/* $CSK: <a href="lesson8.c.html">lesson8.c</a>,v 1.3 2009/05/17 06:22:44 ckuethe Exp $ */</font></i>
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900"> * Copyright (c) 2009 Chris Kuethe </font></i><u><font color="#0000FF">&lt;chris.kuethe@gmail.com&gt;</font></u>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * Permission to use, copy, modify, and distribute this software for any</font></i>
+<i><font color="#9A1900"> * purpose with or without fee is hereby granted, provided that the above</font></i>
+<i><font color="#9A1900"> * copyright notice and this permission notice appear in all copies.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES</font></i>
+<i><font color="#9A1900"> * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF</font></i>
+<i><font color="#9A1900"> * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR</font></i>
+<i><font color="#9A1900"> * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES</font></i>
+<i><font color="#9A1900"> * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN</font></i>
+<i><font color="#9A1900"> * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF</font></i>
+<i><font color="#9A1900"> * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdio.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/pgmspace.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+<b><font color="#000080">#ifndef</font></b> F_CPU
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> F_CPU is <font color="#008080">not</font> defined<font color="#990000">,</font> but <font color="#008080">the</font> util_setbaud<font color="#990000">.</font>h header requires it to be
+<b><font color="#000080">#endif</font></b>
+<b><font color="#000080">#define</font></b> <a name="25">BAUD</a> <font color="#993399">9600</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/setbaud.h&gt;</font>
+
+<i><font color="#9A1900">/* let the compiler do some of this, to avoid malloc */</font></i>
+<b><font color="#0000FF">static</font></b> <font color="#009900">int</font> <b><font color="#000000"><a href="lesson8.c.html#35">cput</a></font></b><font color="#990000">(</font><font color="#009900">char</font> c<font color="#990000">,</font> <font color="#008080">FILE</font> <font color="#990000">*</font>f<font color="#990000">);</font>
+<b><font color="#0000FF">static</font></b> <font color="#009900">int</font> <b><font color="#000000"><a href="lesson8.c.html#45">cget</a></font></b><font color="#990000">(</font><font color="#008080">FILE</font> <font color="#990000">*</font>f<font color="#990000">);</font>
+<b><font color="#0000FF">static</font></b> <font color="#008080">FILE</font> <a name="31">OUTFP</a> <font color="#990000">=</font> <b><font color="#000000">FDEV_SETUP_STREAM</font></b><font color="#990000">(</font><a href="lesson8.c.html#35">cput</a><font color="#990000">,</font> NULL<font color="#990000">,</font> _FDEV_SETUP_WRITE<font color="#990000">);</font>
+<b><font color="#0000FF">static</font></b> <font color="#008080">FILE</font> <a name="32">INFP</a>  <font color="#990000">=</font> <b><font color="#000000">FDEV_SETUP_STREAM</font></b><font color="#990000">(</font>NULL<font color="#990000">,</font> <a href="lesson8.c.html#45">cget</a><font color="#990000">,</font> _FDEV_SETUP_READ <font color="#990000">);</font>
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">int</font>
+<b><font color="#000000"><a name="35">cput</a></font></b> <font color="#990000">(</font><font color="#009900">char</font> c<font color="#990000">,</font> <font color="#008080">FILE</font> <font color="#990000">*</font>f<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  f <font color="#990000">=</font> f<font color="#990000">;</font>   <i><font color="#9A1900">// Compiler reassurance (we don't need to use f in this case).</font></i>
+
+  <b><font color="#000000">loop_until_bit_is_set</font></b><font color="#990000">(</font>UCSR0A<font color="#990000">,</font> UDRE0<font color="#990000">);</font>
+  UDR0 <font color="#990000">=</font> c<font color="#990000">;</font>
+  <b><font color="#0000FF">return</font></b> <font color="#993399">0</font><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">int</font>
+<b><font color="#000000"><a name="45">cget</a></font></b> <font color="#990000">(</font><font color="#008080">FILE</font> <font color="#990000">*</font>f<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  f <font color="#990000">=</font> f<font color="#990000">;</font>   <i><font color="#9A1900">// Compiler reassurance (we don't need to use f in this case).</font></i>
+
+  <b><font color="#000000">loop_until_bit_is_set</font></b><font color="#990000">(</font>UCSR0A<font color="#990000">,</font> RXC0<font color="#990000">);</font>
+  <b><font color="#0000FF">return</font></b> UDR0<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="54">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#008080">uint8_t</font> cidx <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>   <i><font color="#9A1900">// Character index</font></i>
+  <font color="#009900">char</font> str<font color="#990000">[</font><font color="#993399">80</font><font color="#990000">];</font>       <i><font color="#9A1900">// String</font></i>
+  <font color="#009900">int</font> sn<font color="#990000">;</font>             <i><font color="#9A1900">// Some Number</font></i>
+
+  <i><font color="#9A1900">// Use program space (flash) to store these, to avoid wasting RAM</font></i>
+  <font color="#008080">PGM_P</font> pn <font color="#990000">=</font> <font color="#FF0000">"please enter (blind type) a number: "</font><font color="#990000">;</font>
+  <font color="#008080">PGM_P</font> ps <font color="#990000">=</font> <font color="#FF0000">"please enter (blind type) a string: "</font><font color="#990000">;</font>
+  <font color="#008080">PGM_P</font> rn <font color="#990000">=</font> <font color="#FF0000">"twice %d is %d</font><font color="#CC33CC">\r\n</font><font color="#FF0000">"</font><font color="#990000">;</font>
+  <font color="#008080">PGM_P</font> rs <font color="#990000">=</font> <font color="#FF0000">"changed case: %s</font><font color="#CC33CC">\r\n</font><font color="#FF0000">"</font><font color="#990000">;</font>
+  
+  <i><font color="#9A1900">// Set up stdio </font></i>
+  UBRR0H <font color="#990000">=</font> UBRRH_VALUE<font color="#990000">;</font>   <i><font color="#9A1900">// This value is computed in util/setbaud.h</font></i>
+  UBRR0L <font color="#990000">=</font> UBRRL_VALUE<font color="#990000">;</font>   <i><font color="#9A1900">// This value is computed in util/setbaud.h</font></i>
+  UCSR0C <font color="#990000">=</font> <b><font color="#000000">_BV</font></b><font color="#990000">(</font>UCSZ01<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b><font color="#990000">(</font>UCSZ00<font color="#990000">);</font>
+  UCSR0B <font color="#990000">=</font> <b><font color="#000000">_BV</font></b><font color="#990000">(</font>RXEN0<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b><font color="#990000">(</font>TXEN0<font color="#990000">);</font>
+  stdout <font color="#990000">=</font> <font color="#990000">&amp;</font><a href="lesson8.c.html#31">OUTFP</a><font color="#990000">;</font>
+  stdin  <font color="#990000">=</font> <font color="#990000">&amp;</font><a href="lesson8.c.html#32">INFP</a><font color="#990000">;</font>
+
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">1</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+
+    <i><font color="#9A1900">// Prompt for a number, double it and print it back out</font></i>
+    <b><font color="#000000">printf</font></b> <font color="#990000">(</font>pn<font color="#990000">);</font>
+    <b><font color="#000000">scanf</font></b> <font color="#990000">(</font><font color="#FF0000">"%d"</font><font color="#990000">,</font> <font color="#990000">&amp;</font>sn<font color="#990000">);</font>
+    <b><font color="#000000">printf</font></b> <font color="#990000">(</font>rn<font color="#990000">,</font> sn<font color="#990000">,</font> <font color="#993399">2</font> <font color="#990000">*</font> sn<font color="#990000">);</font>
+  
+    <i><font color="#9A1900">// Prompt for a string, and swap the case of the letters</font></i>
+    <b><font color="#000000">printf</font></b> <font color="#990000">(</font>ps<font color="#990000">);</font>
+    <b><font color="#000000">scanf</font></b> <font color="#990000">(</font><font color="#FF0000">"%s"</font><font color="#990000">,</font> str<font color="#990000">);</font>
+    cidx <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+    <i><font color="#9A1900">// Change the case of the input string</font></i>
+    <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> str<font color="#990000">[</font>cidx<font color="#990000">]</font> <font color="#990000">!=</font> <font color="#FF0000">'</font><font color="#CC33CC">\0</font><font color="#FF0000">'</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> str<font color="#990000">[</font>cidx<font color="#990000">]</font> <font color="#990000">&gt;=</font> <font color="#FF0000">'a'</font> <font color="#990000">&amp;&amp;</font> str<font color="#990000">[</font>cidx<font color="#990000">]</font> <font color="#990000">&lt;=</font> <font color="#FF0000">'z'</font><font color="#990000">)</font>
+        str<font color="#990000">[</font>cidx<font color="#990000">]</font> <font color="#990000">-=</font> <font color="#993399">0x20</font><font color="#990000">;</font>
+      <b><font color="#0000FF">else</font></b> <b><font color="#0000FF">if</font></b> <font color="#990000">(</font>str<font color="#990000">[</font>cidx<font color="#990000">]</font> <font color="#990000">&gt;=</font> <font color="#FF0000">'A'</font> <font color="#990000">&amp;&amp;</font> str<font color="#990000">[</font>cidx<font color="#990000">]</font> <font color="#990000">&lt;=</font> <font color="#FF0000">'Z'</font><font color="#990000">)</font>
+        str<font color="#990000">[</font>cidx<font color="#990000">]</font> <font color="#990000">+=</font> <font color="#993399">0x20</font><font color="#990000">;</font>
+        cidx<font color="#990000">++;</font>
+      <font color="#FF0000">}</font>
+      <b><font color="#000000">printf</font></b> <font color="#990000">(</font>rs<font color="#990000">,</font> str<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">return</font></b> <font color="#993399">0</font><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+</tt></pre>

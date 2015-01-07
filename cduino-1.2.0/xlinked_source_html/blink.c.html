@@ -1,0 +1,69 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Blink a led attached to pin PB5 on an off.</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="util.h.html">util.h</a>"</font>
+
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Assumptions:</font></i>
+<i><font color="#9A1900">// 	- LED connected to PORTB (arduino boards have LED L onboard)</font></i>
+<i><font color="#9A1900">// 	- F_CPU is defined to be your cpu speed (preprocessor define)</font></i>
+<i><font color="#9A1900">//</font></i>
+
+<i><font color="#9A1900">// WARNING: this technique doesn't translate to all the other IO pins on a</font></i>
+<i><font color="#9A1900">// typical arduino, because the arduino bootloader uses some of them for its</font></i>
+<i><font color="#9A1900">// own purposes (e.g. PD0 is set up as the RX pin for serial communication,</font></i>
+<i><font color="#9A1900">// which precludes its use as an output).  The unconnected IO pins are</font></i>
+<i><font color="#9A1900">// presumably ok to use, or you can just nuke the bootloader with an</font></i>
+<i><font color="#9A1900">// AVRISPmkII or similar device.</font></i>
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">void</font>
+<b><font color="#000000"><a name="22">set_pin_pb5_for_output</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> initial_value<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  DDRB <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>DDB5<font color="#990000">);</font>
+  <b><font color="#000000">loop_until_bit_is_set</font></b> <font color="#990000">(</font>DDRB<font color="#990000">,</font> DDB5<font color="#990000">);</font>
+
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> initial_value <font color="#990000">==</font> <a href="util.h.html#15">HIGH</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    PORTB <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PORTB5<font color="#990000">);</font>
+    <b><font color="#000000">loop_until_bit_is_set</font></b> <font color="#990000">(</font>PORTB<font color="#990000">,</font> PORTB5<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+    PORTB <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PORTB5<font color="#990000">));</font>
+    <b><font color="#000000">loop_until_bit_is_clear</font></b> <font color="#990000">(</font>PORTB<font color="#990000">,</font> PORTB5<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">void</font>
+<b><font color="#000000"><a name="38">set_pin_pb5</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> value<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> value <font color="#990000">==</font> <a href="util.h.html#15">HIGH</a> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    PORTB <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PORTB5<font color="#990000">);</font>
+    <b><font color="#000000">loop_until_bit_is_set</font></b> <font color="#990000">(</font>PORTB<font color="#990000">,</font> PORTB5<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+    PORTB <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PORTB5<font color="#990000">));</font>
+    <b><font color="#000000">loop_until_bit_is_clear</font></b> <font color="#990000">(</font>PORTB<font color="#990000">,</font> PORTB5<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="51">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="blink.c.html#22">set_pin_pb5_for_output</a></font></b> <font color="#990000">(</font><a href="util.h.html#15">HIGH</a><font color="#990000">);</font>
+
+  <b><font color="#0000FF">const</font></b> <font color="#009900">double</font> blink_time_ms <font color="#990000">=</font> <font color="#993399">400</font><font color="#990000">;</font>
+
+  <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">1</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>blink_time_ms<font color="#990000">);</font>
+    <b><font color="#000000"><a href="blink.c.html#38">set_pin_pb5</a></font></b> <font color="#990000">(</font><a href="util.h.html#16">LOW</a><font color="#990000">);</font>
+    <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font>blink_time_ms<font color="#990000">);</font>
+    <b><font color="#000000"><a href="blink.c.html#38">set_pin_pb5</a></font></b> <font color="#990000">(</font><a href="util.h.html#15">HIGH</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+</tt></pre>

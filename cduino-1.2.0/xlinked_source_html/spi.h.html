@@ -1,0 +1,211 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Interface to hardware SPI controller (master mode only).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Test driver: <a href="spi_test.c.html">spi_test.c</a>    Implementation: <a href="spi.c.html">spi.c</a></font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="spi.h.html#6">SPI_H</a>
+<b><font color="#000080">#define</font></b> <a name="6">SPI_H</a>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdio.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/pgmspace.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="dio.h.html">dio.h</a>"</font>
+
+<i><font color="#9A1900">///////////////////////////////////////////////////////////////////////////////</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// How This Interface Works</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// You have to ensure that the slave select line for the device you want to</font></i>
+<i><font color="#9A1900">// talk to is brought low before you talk to it (of course this line should</font></i>
+<i><font color="#9A1900">// normally be high).  It may be convenient to define macros like this:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">/*   #define MY_SPI_SLAVE_1_SELECT_INIT() \</font></i>
+<i><font color="#9A1900">//     SPI_SS_INIT(DIO_OUTPUT, DIO_DONT_CARE, HIGH)</font></i>
+<i><font color="#9A1900">//   #define MY_SPI_SLAVE_1_SELECT_SET_LOW SPI_SS_SET_LOW</font></i>
+<i><font color="#9A1900">//   #define MY_SPI_SLAVE_1_SELECT_SET_HIGH SPI_SS_SET_HIGH</font></i>
+<i><font color="#9A1900">*/</font></i>
+<i><font color="#9A1900">//   MY_SPI_SLAVE_1_SELECT_INIT ();</font></i>
+<i><font color="#9A1900">//   spi_init ();</font></i>
+<i><font color="#9A1900">//   spi_set_data_order (SPI_BIT_ORDER_LSB_FIRST);</font></i>
+<i><font color="#9A1900">//   spi_set_data_mode (SPI_DATA_MODE_0);</font></i>
+<i><font color="#9A1900">//   spi_set_clock_divider (SPI_CLOCK_DIVIDER_DIV4);</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   MY_SPI_SLAVE_1_SELECT_SET_LOW ();</font></i>
+<i><font color="#9A1900">//   uint8_t input_byte1 = spi_transfer (output_byte1);</font></i>
+<i><font color="#9A1900">//   uint8_t input_byte2 = spi_transfer (output_byte2);</font></i>
+<i><font color="#9A1900">//   //...</font></i>
+<i><font color="#9A1900">//   MY_SPI_SLAVE_1_SELECT_SET_HIGH ();</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   spi_shutdown ();   // Possibly</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// See <a href="spi_test.c.html">spi_test.c</a> for a complete example using a single slave.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// The spi_init() function will automatically initialize the SS pin (aka PB2,</font></i>
+<i><font color="#9A1900">// aka DIGITAL_10) for output.  The ATMega requires this for correct SPI</font></i>
+<i><font color="#9A1900">// master mode operation.  The SS pin is also usually a logical choice to</font></i>
+<i><font color="#9A1900">// use to control the first SPI slave device, and is the only one you'll need</font></i>
+<i><font color="#9A1900">// to use if you're talking to just one slave.  This is all I've tested myself.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// LIKELY UNTESTEDNESS WARNING: I have a vague memory of having tried out</font></i>
+<i><font color="#9A1900">// the below multi-slave approach out once upon a time, and having it work.</font></i>
+<i><font color="#9A1900">// But I might be imagining it.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// It's possible to use another digital output to control a SPI slave,</font></i>
+<i><font color="#9A1900">// however.  If there are multiple slaves, you'll need to use a different</font></i>
+<i><font color="#9A1900">// output pin for each of them.  All that is required is that the output</font></i>
+<i><font color="#9A1900">// pin to be used be initialized for output, and that you take the pin for</font></i>
+<i><font color="#9A1900">// the device you want to talk to low before talking.  The example given</font></i>
+<i><font color="#9A1900">// at the top of this file could change to look like this:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">/*   #define MY_SPI_SLAVE_1_SELECT_INIT() \</font></i>
+<i><font color="#9A1900">//     SPI_SS_INIT (DIO_OUTPUT, DIO_DONT_CARE, HIGH)</font></i>
+<i><font color="#9A1900">//   #define MY_SPI_SLAVE_1_SELECT_SET_LOW SPI_SS_SET_LOW</font></i>
+<i><font color="#9A1900">//   #define MY_SPI_SLAVE_1_SELECT_SET_HIGH SPI_SS_SET_HIGH</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   #define MY_SPI_SLAVE_2_SELECT_INIT() \</font></i>
+<i><font color="#9A1900">//     DIO_INIT_DIGITAL_4 (DIO_OUTPUT, DIO_DONT_CARE, HIGH)</font></i>
+<i><font color="#9A1900">//   #define MY_SPI_SLAVE_2_SELECT_SET_LOW DIO_SET_DIGITAL_4_LOW</font></i>
+<i><font color="#9A1900">//   #define MY_SPI_SLAVE_2_SELECT_SET_HIGH DIO_SET_DIGITAL_4_HIGH</font></i>
+<i><font color="#9A1900">*/</font></i>
+<i><font color="#9A1900">//   MY_SPI_SLAVE_1_SELECT_INIT ();</font></i>
+<i><font color="#9A1900">//   MY_SPI_SLAVE_2_SELECT_INIT ();</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   spi_init ();</font></i>
+<i><font color="#9A1900">//   spi_set_data_order (SPI_BIT_ORDER_LSB_FIRST);</font></i>
+<i><font color="#9A1900">//   spi_set_data_mode (SPI_DATA_MODE_0);</font></i>
+<i><font color="#9A1900">//   spi_set_clock_divider (SPI_CLOCK_DIVIDER_DIV4);</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   // Talk to first slave device</font></i>
+<i><font color="#9A1900">//   MY_SPI_SLAVE_1_SELECT_SET_LOW ();</font></i>
+<i><font color="#9A1900">//   uint8_t input_byte1 = spi_transfer (output_byte1);</font></i>
+<i><font color="#9A1900">//   uint8_t input_byte2 = spi_transfer (output_byte2);</font></i>
+<i><font color="#9A1900">//   //...</font></i>
+<i><font color="#9A1900">//   MY_SPI_SLAVE_1_SELECT_SET_HIGH ();</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   // Talk to second slave device</font></i>
+<i><font color="#9A1900">//   MY_SPI_SLAVE_2_SELECT_SET_LOW ();</font></i>
+<i><font color="#9A1900">//   uint8_t input_byte1 = spi_transfer (output_byte1);</font></i>
+<i><font color="#9A1900">//   uint8_t input_byte2 = spi_transfer (output_byte2);</font></i>
+<i><font color="#9A1900">//   //...</font></i>
+<i><font color="#9A1900">//   MY_SPI_SLAVE_2_SELECT_SET_HIGH ();</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   spi_shutdown ();   // Possibly</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Of course, it might also be necessary to change SPI data order, data</font></i>
+<i><font color="#9A1900">// mode, and/or clock rate settings between different slaves (which should</font></i>
+<i><font color="#9A1900">// be possible using the functions in this interface).</font></i>
+
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900"> * Copyright (c) 2010 by Cristian Maglie </font></i><u><font color="#0000FF">&lt;c.maglie@bug.st&gt;</font></u>
+<i><font color="#9A1900"> * SPI Master library for arduino.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * This file is free software; you can redistribute it and/or modify</font></i>
+<i><font color="#9A1900"> * it under the terms of either the GNU General Public License version 2</font></i>
+<i><font color="#9A1900"> * or the GNU Lesser General Public License version 2.1, both as</font></i>
+<i><font color="#9A1900"> * published by the Free Software Foundation.</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<i><font color="#9A1900">// Bit order expected by the connected device</font></i>
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="109">SPI_DATA_ORDER_LSB_FIRST</a><font color="#990000">,</font>
+  <a name="110">SPI_DATA_ORDER_MSB_FIRST</a>
+<font color="#FF0000">}</font> <a name="111">spi_data_order_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// Clock divider to use for communication</font></i>
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="115">SPI_CLOCK_DIVIDER_DIV4</a>   <font color="#990000">=</font> <font color="#993399">0x00</font><font color="#990000">,</font>
+  <a name="116">SPI_CLOCK_DIVIDER_DIV16</a>  <font color="#990000">=</font> <font color="#993399">0x01</font><font color="#990000">,</font>
+  <a name="117">SPI_CLOCK_DIVIDER_DIV64</a>  <font color="#990000">=</font> <font color="#993399">0x02</font><font color="#990000">,</font>
+  <a name="118">SPI_CLOCK_DIVIDER_DIV128</a> <font color="#990000">=</font> <font color="#993399">0x03</font><font color="#990000">,</font>
+  <a name="119">SPI_CLOCK_DIVIDER_DIV2</a>   <font color="#990000">=</font> <font color="#993399">0x04</font><font color="#990000">,</font>
+  <a name="120">SPI_CLOCK_DIVIDER_DIV8</a>   <font color="#990000">=</font> <font color="#993399">0x05</font><font color="#990000">,</font>
+  <a name="121">SPI_CLOCK_DIVIDER_DIV32</a>  <font color="#990000">=</font> <font color="#993399">0x06</font>
+<font color="#FF0000">}</font> <a name="122">spi_clock_divider_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// Clock polarity and phase (often called CPOL and CPHA) expected</font></i>
+<i><font color="#9A1900">// by the connected device.  It may be necessary to look at the</font></i>
+<i><font color="#9A1900">// device timing diagram to determine these, since they don't always</font></i>
+<i><font color="#9A1900">// explicitly mention the mode number, CPOL or CPHA values.  See</font></i>
+<i><font color="#9A1900">// wikipedia.org/wiki/Serial_Peripheral_Interface_Bus#Clock_polarity_and_phase.</font></i>
+<b><font color="#0000FF">typedef</font></b> <b><font color="#0000FF">enum</font></b> <font color="#FF0000">{</font>
+  <a name="130">SPI_DATA_MODE_0</a> <font color="#990000">=</font> <font color="#993399">0x00</font><font color="#990000">,</font>   <i><font color="#9A1900">// CPOL == 0, CPHA == 1</font></i>
+  <a name="131">SPI_DATA_MODE_1</a> <font color="#990000">=</font> <font color="#993399">0x04</font><font color="#990000">,</font>   <i><font color="#9A1900">// CPOL == 0, CPHA == 1</font></i>
+  <a name="132">SPI_DATA_MODE_2</a> <font color="#990000">=</font> <font color="#993399">0x08</font><font color="#990000">,</font>   <i><font color="#9A1900">// CPOL == 1, CPHA == 0</font></i>
+  <a name="133">SPI_DATA_MODE_3</a> <font color="#990000">=</font> <font color="#993399">0x0C</font><font color="#990000">,</font>   <i><font color="#9A1900">// CPOL == 1, CPHA == 1</font></i>
+<font color="#FF0000">}</font> <a name="134">spi_data_mode_t</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// The SS pin (aka PB2, aka DIGITAL_10) will *always* be initialized for</font></i>
+<i><font color="#9A1900">// output with a HIGH value, even it it isn't used as a slave select line</font></i>
+<i><font color="#9A1900">// (usually it's reasonable to use it as a slave select line).  The ATMega</font></i>
+<i><font color="#9A1900">// requires this in order for SPI master mode to operate correctly.</font></i>
+<i><font color="#9A1900">// See comments at the top of this file for details on how to use other</font></i>
+<i><font color="#9A1900">// pins instead of or in addition to SS as slave select pins.</font></i>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="142">SPI_SS_PIN</a></font> <a href="dio.h.html#594">DIO_PIN_DIGITAL_10</a>
+<i><font color="#9A1900">// Note that it's possible to use pins other than DIGITAL_10 for the SS line</font></i>
+<i><font color="#9A1900">// (see comment above).</font></i>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="145">SPI_SS_INIT</a></font> <a href="dio.h.html#609">DIO_INIT_DIGITAL_10</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="146">SPI_SS_SET_LOW</a></font> <a href="dio.h.html#624">DIO_SET_DIGITAL_10_LOW</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="147">SPI_SS_SET_HIGH</a></font> <a href="dio.h.html#639">DIO_SET_DIGITAL_10_HIGH</a>
+
+<i><font color="#9A1900">// This interface assumes that the SCK and MOSI pins are always used as the</font></i>
+<i><font color="#9A1900">// clock and Master Out Slave In pins.  I've never tried anything else,</font></i>
+<i><font color="#9A1900">// though I have a vague idea that it might be possible.  The MISO pin</font></i>
+<i><font color="#9A1900">// (aka PB4, aka DIGITAL_12) will automatically override to act as an input</font></i>
+<i><font color="#9A1900">// when spi_init() is called, but we still control the status of the MISO</font></i>
+<i><font color="#9A1900">// internal pull-up resistor.  This interface always disables this pull-up.</font></i>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="155">SPI_SCK_INIT</a></font> <a href="dio.h.html#612">DIO_INIT_DIGITAL_13</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="156">SPI_MOSI_INIT</a></font> <a href="dio.h.html#610">DIO_INIT_DIGITAL_11</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="157">SPI_MISO_INIT</a></font> <a href="dio.h.html#611">DIO_INIT_DIGITAL_12</a>
+
+<i><font color="#9A1900">// Initialize hardware SPI interface.  This function initializes the SS (aka</font></i>
+<i><font color="#9A1900">// PB2, aka DIGITAL_10) pin for output, which is always required for correct</font></i>
+<i><font color="#9A1900">// SPI master mode operation regardless of which pin is actually used for</font></i>
+<i><font color="#9A1900">// slave selection.  See the comments at the top of this file for information</font></i>
+<i><font color="#9A1900">// on how to use different or multiple pins for SPI slave selection.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// The default SPI hardware configuration is as follows:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Interrupts are disabled</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Master mode is enabled</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Data order is MSB first</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * Data mode is 0 (~CPOL and ~CPHA), meaning the the clock is active-high</font></i>
+<i><font color="#9A1900">//     (~CPOL) and sampled at the leading edge of the clock cycle (~CPHA).</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   * A SPI clock frequency of F_CPU / 4 is used (SPR1, SPR0, and ~SPI2X)</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// These are the default settings for the SPCR and SPSR registers, except that</font></i>
+<i><font color="#9A1900">// that SPI is enabled (SPE) and set to master mode (MSTR).  It's possible</font></i>
+<i><font color="#9A1900">// to change the data order, data mode, and SPI clock frequency using other</font></i>
+<i><font color="#9A1900">// methods in this interface.</font></i>
+<i><font color="#9A1900">//</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="spi.c.html#22">spi_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<i><font color="#9A1900">// Set data (bit) order to use.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="spi.c.html#62">spi_set_data_order</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="spi.h.html#111">spi_data_order_t</a></font> data_order<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Set data mode to use.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="spi.c.html#80">spi_set_data_mode</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="spi.h.html#134">spi_data_mode_t</a></font> data_mode<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Set clock divider to use.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="spi.c.html#89">spi_set_clock_divider</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="spi.h.html#122">spi_clock_divider_t</a></font> divider<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Transfer data (in both directions, either of which might be meaningless).</font></i>
+uint8_t
+<b><font color="#000000"><a href="spi.c.html#97">spi_transfer</a></font></b> <font color="#990000">(</font><font color="#008080">uint8_t</font> data<font color="#990000">);</font>
+
+<i><font color="#9A1900">// Shut down hardware SPI interface.</font></i>
+<font color="#009900">void</font>
+<b><font color="#000000"><a href="spi.c.html#107">spi_shutdown</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">);</font>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// SPI_H</font></i>
+</tt></pre>

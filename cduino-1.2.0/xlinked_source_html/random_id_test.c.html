@@ -1,0 +1,67 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Test/demo for the write_random_id_to_eeprom target in generic.mk.</font></i>
+
+<i><font color="#9A1900">// This module just demonstrates/exercises some functionality from the</font></i>
+<i><font color="#9A1900">// build system.  See the target mentioned above for more details.</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/eeprom.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;inttypes.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="term_io.h.html">term_io.h</a>"</font>
+
+<i><font color="#9A1900">// There are no external hardware requirements other than an arduino and a USB</font></i>
+<i><font color="#9A1900">// cable to connect it to the computer.  It should be possible to run</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   make -rR run_screen</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// or so from the module directory to see it do its thing.</font></i>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="20">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="term_io.c.html#166">term_io_init</a></font></b> <font color="#990000">();</font>
+
+  <i><font color="#9A1900">// Delay a bit at startup to give use time to launch screen and watch the</font></i>
+  <i><font color="#9A1900">// initial values of thigs after reprogramming or changing the ID.</font></i>
+  <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font><font color="#993399">3042</font><font color="#990000">);</font>
+
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#990000">;</font> <font color="#990000">;</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+
+    <font color="#009900">void</font> <b><font color="#0000FF">const</font></b>   <font color="#990000">*</font>id_address <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>   <i><font color="#9A1900">// ID is at start of EEPROM</font></i>
+    size_t <font color="#008080">const</font>  id_size    <font color="#990000">=</font> <font color="#993399">8</font><font color="#990000">;</font>   <i><font color="#9A1900">// ID is this many bytes long</font></i>
+    <font color="#008080">uint64_t</font>      id<font color="#990000">;</font>               <i><font color="#9A1900">// ID itself (to be read)</font></i>
+
+    <b><font color="#000000">eeprom_read_block</font></b> <font color="#990000">(&amp;</font>id<font color="#990000">,</font> id_address<font color="#990000">,</font> id_size<font color="#990000">);</font>
+
+    <i><font color="#9A1900">// Print the ID value one byte at a time.  WARNING: endianness can cause</font></i>
+    <i><font color="#9A1900">// confusion when you interpret id as a single uint64_t.  For example,</font></i>
+    <i><font color="#9A1900">// if your ID happens to be 0x0123456789abcdef, then to declare a</font></i>
+    <i><font color="#9A1900">// literal uint64_t that will compare equal to it you would need to write</font></i>
+    <i><font color="#9A1900">// '0xefcdab8967452301ULL' (or 'UINT64_C (0xefcdab8967452301)' if you're</font></i>
+    <i><font color="#9A1900">// using the better integer literal macros from stdint.h).  WARNING:</font></i>
+    <i><font color="#9A1900">// also, AVR libc doesn't support 64 bit printf/scanf conversions.</font></i>
+    <b><font color="#000000">printf</font></b> <font color="#990000">(</font><font color="#FF0000">"ID: "</font><font color="#990000">);</font>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> ii <font color="#990000">&lt;</font> id_size <font color="#990000">;</font> ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#000000">printf</font></b> <font color="#990000">(</font><font color="#FF0000">"%02"</font> PRIx8<font color="#990000">,</font> <font color="#990000">((</font>uint8_t <font color="#990000">*)</font> <font color="#990000">(&amp;</font>id<font color="#990000">))[</font>ii<font color="#990000">]</font> <font color="#990000">);</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#000000">printf</font></b> <font color="#990000">(</font><font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">);</font>
+
+    <i><font color="#9A1900">// This block is used to verify that writing the first 8 bytes of the</font></i>
+    <i><font color="#9A1900">// flash doesn't change the others: after running this program, then</font></i>
+    <i><font color="#9A1900">// changing the ID with the make target, then restarting this program,</font></i>
+    <i><font color="#9A1900">// the value should still be 42 the first time we hit this point.</font></i>
+    <font color="#008080">uint8_t</font> <font color="#990000">*</font>byte_8_offset <font color="#990000">=</font> <font color="#990000">(</font>uint8_t <font color="#990000">*)</font> <font color="#993399">8</font><font color="#990000">;</font>
+    <font color="#008080">uint8_t</font> byte_offset_8_value <font color="#990000">=</font> <b><font color="#000000">eeprom_read_byte</font></b> <font color="#990000">(</font>byte_8_offset<font color="#990000">);</font>
+    <b><font color="#000000">printf</font></b> <font color="#990000">(</font>
+        <font color="#FF0000">"Current value of byte at offset 8: %"</font> PRIu8 <font color="#FF0000">"</font><font color="#CC33CC">\n</font><font color="#FF0000">"</font><font color="#990000">,</font>
+        byte_offset_8_value <font color="#990000">);</font>
+    <b><font color="#000000">eeprom_write_byte</font></b> <font color="#990000">(</font>byte_8_offset<font color="#990000">,</font> <font color="#993399">42</font><font color="#990000">);</font>
+
+    <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font><font color="#993399">1042</font><font color="#990000">);</font>   <i><font color="#9A1900">// Delay a little bit between repetitions of the ID</font></i>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+</tt></pre>

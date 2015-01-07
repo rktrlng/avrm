@@ -1,0 +1,180 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Implementation of the interface described in <a href="dc_motor.h.html">dc_motor.h</a>.</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;assert.h&gt;</font>
+<i><font color="#9A1900">// FIXME: remove this if all it's needed for is assert once assert.h is fixed</font></i>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdlib.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="adc.h.html">adc.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="dc_motor.h.html">dc_motor.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="dio.h.html">dio.h</a>"</font>
+
+<b><font color="#000080">#define</font></b> <a name="12">DC_MOTOR_DIRECTION_FORWARD</a> <a href="util.h.html#15">HIGH</a>
+<b><font color="#000080">#define</font></b> <a name="13">DC_MOTOR_DIRECTION_REVERSE</a> <a href="util.h.html#16">LOW</a>
+
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="15">DC_MOTOR_CHANNEL_A_SET_DIRECTION</a></font></b><font color="#990000">(</font>dir<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dc_motor.h.html#13">DC_MOTOR_CHANNEL_A_DIRECTION_DIO_PIN</a><font color="#990000">,</font> dir<font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="17">DC_MOTOR_CHANNEL_B_SET_DIRECTION</a></font></b><font color="#990000">(</font>dir<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="dio.h.html#249">DIO_SET</a></font></b> <font color="#990000">(</font><a href="dc_motor.h.html#14">DC_MOTOR_CHANNEL_B_DIRECTION_DIO_PIN</a><font color="#990000">,</font> dir<font color="#990000">)</font>
+
+<b><font color="#000080">#define</font></b> <a name="20">DC_MOTOR_BREAK_OFF</a> <a href="util.h.html#16">LOW</a>
+<b><font color="#000080">#define</font></b> <a name="21">DC_MOTOR_BREAK_ON</a>  <a href="util.h.html#15">HIGH</a>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="24">dc_motor_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Configure direction line control registers</font></i>
+  <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font>
+        <a href="dc_motor.h.html#13">DC_MOTOR_CHANNEL_A_DIRECTION_DIO_PIN</a><font color="#990000">,</font>
+        <a href="dio.h.html#184">DIO_OUTPUT</a><font color="#990000">,</font>
+        <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">,</font>
+        <a href="dc_motor.c.html#12">DC_MOTOR_DIRECTION_FORWARD</a> <font color="#990000">);</font>
+    <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font>
+        <a href="dc_motor.h.html#14">DC_MOTOR_CHANNEL_B_DIRECTION_DIO_PIN</a><font color="#990000">,</font>
+        <a href="dio.h.html#184">DIO_OUTPUT</a><font color="#990000">,</font>
+        <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">,</font>
+        <a href="dc_motor.c.html#12">DC_MOTOR_DIRECTION_FORWARD</a> <font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Configure brake line control registers</font></i>
+  <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font>
+        <a href="dc_motor.h.html#15">DC_MOTOR_CHANNEL_A_BRAKE_DIO_PIN</a><font color="#990000">,</font>
+        <a href="dio.h.html#184">DIO_OUTPUT</a><font color="#990000">,</font>
+        <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">,</font>
+        <a href="dc_motor.c.html#20">DC_MOTOR_BREAK_OFF</a> <font color="#990000">);</font>
+    <b><font color="#000000"><a href="dio.h.html#268">DIO_INIT</a></font></b> <font color="#990000">(</font>
+        <a href="dc_motor.h.html#16">DC_MOTOR_CHANNEL_B_BRAKE_DIO_PIN</a><font color="#990000">,</font>
+        <a href="dio.h.html#184">DIO_OUTPUT</a><font color="#990000">,</font>
+        <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">,</font>
+        <a href="dc_motor.c.html#20">DC_MOTOR_BREAK_OFF</a> <font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Configure the ADC and ADC input pins</font></i>
+  <font color="#FF0000">{</font>
+    <b><font color="#000000"><a href="adc.c.html#10">adc_init</a></font></b> <font color="#990000">(</font><a href="dc_motor.h.html#47">DC_MOTOR_ADC_REFERENCE</a><font color="#990000">);</font>
+    <b><font color="#000000"><a href="adc.c.html#52">adc_pin_init</a></font></b> <font color="#990000">(</font><a href="dc_motor.h.html#24">DC_MOTOR_CHANNEL_A_CURRENT_SENSE_ADC_PIN</a><font color="#990000">);</font>
+    <b><font color="#000000"><a href="adc.c.html#52">adc_pin_init</a></font></b> <font color="#990000">(</font><a href="dc_motor.h.html#25">DC_MOTOR_CHANNEL_B_CURRENT_SENSE_ADC_PIN</a><font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Configure timer/counter2 hardware, with clocking stopped</font></i>
+  <font color="#FF0000">{</font>
+    PRR <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PRTIM2<font color="#990000">));</font>   <i><font color="#9A1900">// Ensure timer/counter2 not shut down</font></i>
+
+    <i><font color="#9A1900">// Clear OC2A/B on compare match when up-counting, set OC2A/B on</font></i>
+    <i><font color="#9A1900">// compare match when down-counting.  Count to TOP before reversing.</font></i>
+    <i><font color="#9A1900">// See ATmega328P datasheet Table 17-4.</font></i>
+    TCCR2A <font color="#990000">=</font>  <font color="#993399">0x00</font><font color="#990000">;</font>
+    TCCR2A <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>COM2A1<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>COM2B1<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>WGM20<font color="#990000">);</font>
+    TCCR2A <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>COM2A0<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>COM2B0<font color="#990000">));</font>
+    <i><font color="#9A1900">// This assignment sets WMG22 as desired to specify phase-correct</font></i>
+    <i><font color="#9A1900">// operation with the direction change at TOP, and also set bits CS22:0</font></i>
+    <i><font color="#9A1900">// all to zero which disconnects the clock and stops the timer (as</font></i>
+    <i><font color="#9A1900">// desired at this point).</font></i>
+    TCCR2B <font color="#990000">=</font>  <font color="#993399">0x00</font><font color="#990000">;</font>
+
+    <i><font color="#9A1900">// We don't use timer interrupts in this application, or</font></i>
+    <i><font color="#9A1900">// asynchronout clocking.</font></i>
+    TIMSK2 <font color="#990000">=</font> <font color="#993399">0x00</font><font color="#990000">;</font>
+    ASSR <font color="#990000">=</font> <font color="#993399">0x00</font><font color="#990000">;</font>
+
+    <i><font color="#9A1900">// FIXXME: The ATmega328P datasheet Section 17.5.3 contains some</font></i>
+    <i><font color="#9A1900">// mumbo-jumbo about how OC2x setup should be performed using a FOC2X</font></i>
+    <i><font color="#9A1900">// strobe from Normal mode, which would have to be done before the mode</font></i>
+    <i><font color="#9A1900">// is set (it says OC2x keep their value accross modes.  But that sounds</font></i>
+    <i><font color="#9A1900">// like a pain and it seems that OC2x should be low at the start anyway.</font></i>
+    <i><font color="#9A1900">// I guess if we changed out of the mode, OC2A/B might stay high,</font></i>
+    <i><font color="#9A1900">// so we might need to worry about this on shutdown (which we haven't</font></i>
+    <i><font color="#9A1900">// implemented yet)?</font></i>
+  <font color="#FF0000">}</font>
+
+  TCNT2 <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>   <i><font color="#9A1900">// Set counter value to 0</font></i>
+
+  <i><font color="#9A1900">// Set the data direction of the PWM pins to output as the ATmega requires</font></i>
+  <font color="#FF0000">{</font>
+    <i><font color="#9A1900">// Probably these loop_until_is_set() calls could be replaced with a</font></i>
+    <i><font color="#9A1900">// single no-op, which the newer avr-libc's have.</font></i>
+
+    PORTB <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PORTB3<font color="#990000">));</font>   <i><font color="#9A1900">// Make sure output is initialized low.</font></i>
+    <b><font color="#000000">loop_until_bit_is_clear</font></b> <font color="#990000">(</font>PORTB<font color="#990000">,</font> PORTB3<font color="#990000">);</font>
+    DDRB <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>DDB3<font color="#990000">);</font>
+    <b><font color="#000000">loop_until_bit_is_set</font></b> <font color="#990000">(</font>DDRB<font color="#990000">,</font> DDB3<font color="#990000">);</font>
+
+    PORTD <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PORTD3<font color="#990000">));</font>   <i><font color="#9A1900">// Make sure output is initialized low.</font></i>
+    <b><font color="#000000">loop_until_bit_is_clear</font></b> <font color="#990000">(</font>PORTD<font color="#990000">,</font> PORTD3<font color="#990000">);</font>
+    DDRD <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>DDD3<font color="#990000">);</font>
+    <b><font color="#000000">loop_until_bit_is_set</font></b> <font color="#990000">(</font>DDRD<font color="#990000">,</font> DDD3<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">// Start the clock.  We don't use any prescaler here, so the counter runs</font></i>
+  <i><font color="#9A1900">// at full F_CPU speed.  Given that the phase-correct PWM output ends up</font></i>
+  <i><font color="#9A1900">// generating one pulse per full count-up-count-down cycle, then ends up</font></i>
+  <i><font color="#9A1900">// amounting to a PWM frequency of 16 MHz / ((256 - 1) * 2) = ~31.37 kHz</font></i>
+  <i><font color="#9A1900">// at the pins, which should be fast enough to prevent motor hum but not</font></i>
+  <i><font color="#9A1900">// so fast that the transistors in the motor driver can't switch along.</font></i>
+  TCCR2B <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>CS20<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">// Map an argument in the range [0, 100] onto the range [0, 255].</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="120">DC_MOTOR_SPEED_MAP</a></font></b><font color="#990000">(</font>arg<font color="#990000">)</font> <font color="#990000">(((</font>uint16_t<font color="#990000">)</font> arg <font color="#990000">*</font> <font color="#993399">255</font><font color="#990000">)</font> <font color="#990000">/</font> <font color="#993399">100</font><font color="#990000">)</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="123">dc_motor_set_speed</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="dc_motor.h.html#43">dc_motor_channel_t</a></font> channel<font color="#990000">,</font> <font color="#008080">int8_t</font> <a href="sd_card.c.html#95">speed</a><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(-</font><font color="#993399">100</font> <font color="#990000">&lt;=</font> <a href="sd_card.c.html#95">speed</a><font color="#990000">);</font>
+  <b><font color="#000000">assert</font></b> <font color="#990000">(</font><a href="sd_card.c.html#95">speed</a> <font color="#990000">&lt;=</font> <font color="#993399">100</font><font color="#990000">);</font>
+
+  <b><font color="#0000FF">switch</font></b> <font color="#990000">(</font> channel <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">case</font></b> <a href="dc_motor.h.html#41">DC_MOTOR_CHANNEL_A</a><font color="#990000">:</font>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <a href="sd_card.c.html#95">speed</a> <font color="#990000">&gt;=</font> <font color="#993399">0</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#000000"><a href="dc_motor.c.html#15">DC_MOTOR_CHANNEL_A_SET_DIRECTION</a></font></b> <font color="#990000">(</font><a href="dc_motor.c.html#12">DC_MOTOR_DIRECTION_FORWARD</a><font color="#990000">);</font>
+        <a href="dc_motor.h.html#37">DC_MOTOR_CHANNEL_A_OCR_REGISTER</a> <font color="#990000">=</font> <b><font color="#000000"><a href="dc_motor.c.html#120">DC_MOTOR_SPEED_MAP</a></font></b> <font color="#990000">(</font><a href="sd_card.c.html#95">speed</a><font color="#990000">);</font>
+      <font color="#FF0000">}</font>
+      <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font> <i><font color="#9A1900">// ( speed &lt; 0 )</font></i>
+        <b><font color="#000000"><a href="dc_motor.c.html#15">DC_MOTOR_CHANNEL_A_SET_DIRECTION</a></font></b> <font color="#990000">(</font><a href="dc_motor.c.html#13">DC_MOTOR_DIRECTION_REVERSE</a><font color="#990000">);</font>
+        <a href="dc_motor.h.html#37">DC_MOTOR_CHANNEL_A_OCR_REGISTER</a> <font color="#990000">=</font> <b><font color="#000000"><a href="dc_motor.c.html#120">DC_MOTOR_SPEED_MAP</a></font></b> <font color="#990000">(-</font><a href="sd_card.c.html#95">speed</a><font color="#990000">);</font>
+      <font color="#FF0000">}</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="dc_motor.h.html#42">DC_MOTOR_CHANNEL_B</a><font color="#990000">:</font>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <a href="sd_card.c.html#95">speed</a> <font color="#990000">&gt;=</font> <font color="#993399">0</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+        <b><font color="#000000"><a href="dc_motor.c.html#17">DC_MOTOR_CHANNEL_B_SET_DIRECTION</a></font></b> <font color="#990000">(</font><a href="dc_motor.c.html#12">DC_MOTOR_DIRECTION_FORWARD</a><font color="#990000">);</font>
+        <a href="dc_motor.h.html#38">DC_MOTOR_CHANNEL_B_OCR_REGISTER</a> <font color="#990000">=</font> <b><font color="#000000"><a href="dc_motor.c.html#120">DC_MOTOR_SPEED_MAP</a></font></b> <font color="#990000">(</font><a href="sd_card.c.html#95">speed</a><font color="#990000">);</font>
+      <font color="#FF0000">}</font>
+      <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font> <i><font color="#9A1900">// ( speed &lt; 0 )</font></i>
+        <b><font color="#000000"><a href="dc_motor.c.html#17">DC_MOTOR_CHANNEL_B_SET_DIRECTION</a></font></b> <font color="#990000">(</font><a href="dc_motor.c.html#13">DC_MOTOR_DIRECTION_REVERSE</a><font color="#990000">);</font>
+        <a href="dc_motor.h.html#38">DC_MOTOR_CHANNEL_B_OCR_REGISTER</a> <font color="#990000">=</font> <b><font color="#000000"><a href="dc_motor.c.html#120">DC_MOTOR_SPEED_MAP</a></font></b> <font color="#990000">(-</font><a href="sd_card.c.html#95">speed</a><font color="#990000">);</font>
+      <font color="#FF0000">}</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+<b><font color="#008080">    default:</font></b>
+      <b><font color="#000000">assert</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>   <i><font color="#9A1900">// Shouldn't be here</font></i>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">float</font>
+<b><font color="#000000"><a name="156">dc_motor_load_current</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="dc_motor.h.html#43">dc_motor_channel_t</a></font> channel<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#008080">uint8_t</font> adc_pin<font color="#990000">;</font>
+
+  <b><font color="#0000FF">switch</font></b> <font color="#990000">(</font> channel <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">case</font></b> <a href="dc_motor.h.html#41">DC_MOTOR_CHANNEL_A</a><font color="#990000">:</font>
+      adc_pin <font color="#990000">=</font> <a href="dc_motor.h.html#24">DC_MOTOR_CHANNEL_A_CURRENT_SENSE_ADC_PIN</a><font color="#990000">;</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <b><font color="#0000FF">case</font></b> <a href="dc_motor.h.html#42">DC_MOTOR_CHANNEL_B</a><font color="#990000">:</font>
+      adc_pin <font color="#990000">=</font> <a href="dc_motor.h.html#25">DC_MOTOR_CHANNEL_B_CURRENT_SENSE_ADC_PIN</a><font color="#990000">;</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+<b><font color="#008080">    default:</font></b>
+      <b><font color="#000000">assert</font></b> <font color="#990000">(</font><font color="#993399">0</font><font color="#990000">);</font>   <i><font color="#9A1900">// Shouldn't be here</font></i>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">return</font></b>
+    <a href="dc_motor.h.html#95">DC_MOTOR_CURRENT_SENSE_AMPS_PER_VOLT</a> <font color="#990000">*</font>
+    <b><font color="#000000"><a href="adc.c.html#86">adc_read_voltage</a></font></b> <font color="#990000">(</font>adc_pin<font color="#990000">,</font> <a href="dc_motor.h.html#90">DC_MOTOR_ADC_REFERENCE_VOLTAGE</a><font color="#990000">);</font>
+<font color="#FF0000">}</font>
+</tt></pre>

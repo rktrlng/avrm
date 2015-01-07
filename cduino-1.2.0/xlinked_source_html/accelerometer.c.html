@@ -1,0 +1,77 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Implementation of the interface described in <a href="accelerometer.h.html">accelerometer.h</a>.</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="accelerometer.h.html">accelerometer.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="lis331dlh_driver_private.h.html">lis331dlh_driver_private.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="spi.h.html">spi.h</a>"</font>
+
+<i><font color="#9A1900">// SPI-related initialization macro as described in <a href="spi.h.html">spi.h</a>.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="8">MY_SPI_SLAVE_ACCELEROMETER_SELECT_INIT</a></font></b><font color="#990000">()</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="spi.h.html#145">SPI_SS_INIT</a></font></b><font color="#990000">(</font><a href="dio.h.html#184">DIO_OUTPUT</a><font color="#990000">,</font> <a href="dio.h.html#187">DIO_DONT_CARE</a><font color="#990000">,</font> <a href="util.h.html#15">HIGH</a><font color="#990000">)</font>
+<i><font color="#9A1900">// Note that since all the actual SPI use other than initialization takes</font></i>
+<i><font color="#9A1900">// place in the <a href="lis331dlh_driver_private.c.html">lis331dlh_driver_private.c</a> file (kindly provided by ST</font></i>
+<i><font color="#9A1900">// Microelectronics) the MY_SPI_SLAVE_ACCELEROMETER_SELECT_SET_LOW/HIGH</font></i>
+<i><font color="#9A1900">// macros that <a href="spi.h.html">spi.h</a> implies should exist are defined there.  Letting this</font></i>
+<i><font color="#9A1900">// interface be responsible for SPI initialization keeps the changes</font></i>
+<i><font color="#9A1900">// required in the provided driver file to a minimum (for easy tracking of</font></i>
+<i><font color="#9A1900">// any upstream changes).</font></i>
+
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="18">MY_SPI_SLAVE_ACCELEROMETER_SELECT_SET_LOW</a></font> <a href="spi.h.html#146">SPI_SS_SET_LOW</a>
+<b><font color="#000080">#define</font></b> <font color="#008080"><a name="19">MY_SPI_SLAVE_ACCELEROMETER_SELECT_SET_HIGH</a></font> <a href="spi.h.html#147">SPI_SS_SET_HIGH</a>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="22">accelerometer_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="accelerometer.c.html#8">MY_SPI_SLAVE_ACCELEROMETER_SELECT_INIT</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="spi.c.html#22">spi_init</a></font></b> <font color="#990000">();</font>
+  <b><font color="#000000"><a href="spi.c.html#80">spi_set_data_mode</a></font></b> <font color="#990000">(</font><a href="spi.h.html#133">SPI_DATA_MODE_3</a><font color="#990000">);</font>
+
+  <b><font color="#000000"><a href="accelerometer.c.html#38">accelerometer_power_up</a></font></b> <font color="#990000">();</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="32">accelerometer_power_down</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#208">LIS331DLH_SetMode</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#87">LIS331DLH_POWER_DOWN</a><font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="38">accelerometer_power_up</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#208">LIS331DLH_SetMode</a></font></b><font color="#990000">(</font><a href="lis331dlh_driver_private.h.html#88">LIS331DLH_NORMAL</a><font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="44">accelerometer_set_fullscale</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="accelerometer.h.html#52">accelerometer_fullscale_t</a></font> fs<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#271">LIS331HH_SetFullScale</a></font></b> <font color="#990000">(</font>fs<font color="#990000">);</font>                    
+<font color="#FF0000">}</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="50">accelerometer_set_data_rate</a></font></b> <font color="#990000">(</font><font color="#008080"><a href="accelerometer.h.html#63">accelerometer_data_rate_t</a></font> dr<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#185">LIS331DLH_SetODR</a></font></b> <font color="#990000">(</font>dr<font color="#990000">);</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="56">accelerometer_get_accel</a></font></b> <font color="#990000">(</font><font color="#008080">int16_t</font> <font color="#990000">*</font><a href="accelerometer_test.c.html#42">ax</a><font color="#990000">,</font> <font color="#008080">int16_t</font> <font color="#990000">*</font><a href="accelerometer_test.c.html#42">ay</a><font color="#990000">,</font> <font color="#008080">int16_t</font> <font color="#990000">*</font><a href="accelerometer_test.c.html#42">az</a><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#990000">;</font> <font color="#990000">;</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+    <font color="#008080">uint8_t</font> status_reg_contents<font color="#990000">;</font>
+    <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#1026">LIS331DLH_GetStatusReg</a></font></b> <font color="#990000">(&amp;</font>status_reg_contents<font color="#990000">);</font>
+
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> status_reg_contents <font color="#990000">&amp;</font> <a href="lis331dlh_driver_private.h.html#309">LIS331DLH_DATAREADY_BIT</a><font color="#990000">)</font> <font color="#FF0000">{</font>
+      <b><font color="#0000FF">break</font></b><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+
+  <font color="#008080"><a href="lis331dlh_driver_private.h.html#69">AxesRaw_t</a></font> aclr<font color="#990000">;</font>   <i><font color="#9A1900">// Accelerometer Readings</font></i>
+  <b><font color="#000000"><a href="lis331dlh_driver_private.c.html#1135">LIS331DLH_GetAccAxesRaw</a></font></b> <font color="#990000">(&amp;</font>aclr<font color="#990000">);</font>
+  <font color="#990000">*</font><a href="accelerometer_test.c.html#42">ax</a> <font color="#990000">=</font> aclr<font color="#990000">.</font><a href="lis331dlh_driver_private.h.html#66">AXIS_X</a><font color="#990000">;</font>
+  <font color="#990000">*</font><a href="accelerometer_test.c.html#42">ay</a> <font color="#990000">=</font> aclr<font color="#990000">.</font><a href="lis331dlh_driver_private.h.html#67">AXIS_Y</a><font color="#990000">;</font>
+  <font color="#990000">*</font><a href="accelerometer_test.c.html#42">az</a> <font color="#990000">=</font> aclr<font color="#990000">.</font><a href="lis331dlh_driver_private.h.html#68">AXIS_Z</a><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+</tt></pre>

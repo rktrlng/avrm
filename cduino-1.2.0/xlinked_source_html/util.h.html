@@ -1,0 +1,803 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Generally useful stuff for AVR programming.</font></i>
+
+<i><font color="#9A1900">// vim:foldmethod=marker</font></i>
+
+<b><font color="#000080">#ifndef</font></b> <a href="util.h.html#6">UTIL_H</a>
+<b><font color="#000080">#define</font></b> <a name="6">UTIL_H</a>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/wdt.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;inttypes.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;stdio.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;string.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+
+<b><font color="#000080">#define</font></b> <a name="15">HIGH</a> <font color="#993399">0x01</font>
+<b><font color="#000080">#define</font></b> <a name="16">LOW</a>  <font color="#993399">0x00</font>
+
+<i><font color="#9A1900">// WARNING: of course some contexts might understand things differently...</font></i>
+<b><font color="#000080">#define</font></b> <a name="19">TRUE</a>  <font color="#993399">0x01</font>
+<b><font color="#000080">#define</font></b> <a name="20">FALSE</a> <font color="#993399">0x00</font>
+
+<i><font color="#9A1900">// NOTE: Only F_CPU values of greater that 1MHz with even multiples of 1MHz</font></i>
+<i><font color="#9A1900">// are accurate.  There are some alternate low-frequency macros which are</font></i>
+<i><font color="#9A1900">// pretty close, but haven't been tested.</font></i>
+<b><font color="#000080">#if</font></b> F_CPU <font color="#990000">&gt;=</font> <font color="#993399">1000000L</font>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="26">CLOCK_CYCLES_PER_MICROSECOND</a></font></b><font color="#990000">()</font> <font color="#990000">(</font>F_CPU <font color="#990000">/</font> <font color="#993399">1000000L</font><font color="#990000">)</font>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="27">CLOCK_CYCLES_TO_MICROSECONDS</a></font></b><font color="#990000">(</font>a<font color="#990000">)</font> <font color="#990000">\</font>
+     <font color="#990000">((</font>a<font color="#990000">)</font> <font color="#990000">/</font> <b><font color="#000000"><a href="util.h.html#26">CLOCK_CYCLES_PER_MICROSECOND</a></font></b><font color="#990000">())</font>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="29">MICROSECONDS_TO_CLOCK_CYCLES</a></font></b><font color="#990000">(</font>a<font color="#990000">)</font> <font color="#990000">\</font>
+     <font color="#990000">((</font>a<font color="#990000">)</font> <font color="#990000">*</font> <b><font color="#000000"><a href="util.h.html#26">CLOCK_CYCLES_PER_MICROSECOND</a></font></b><font color="#990000">())</font>
+<b><font color="#000080">#else</font></b>
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> Interface untested <font color="#008080">with</font> low<font color="#990000">-</font><font color="#008080">f</font> clocks<font color="#990000">.</font>  Remove #error <font color="#008080">and</font> <b><font color="#0000FF">try</font></b> <font color="#990000">:)</font>
+<b><font color="#000080">#  warning</font></b> <b><font color="#000000"><a href="util.h.html#26">CLOCK_CYCLES_PER_MICROSECOND</a></font></b><font color="#990000">()</font> would be less than <font color="#993399">1</font> at <font color="#008080">this</font> F_CPU
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="34">CLOCK_CYCLES_TO_MICROSECONDS</a></font></b><font color="#990000">(</font>a<font color="#990000">)</font> <font color="#990000">(((</font>a<font color="#990000">)</font> <font color="#990000">*</font> <font color="#993399">1000L</font><font color="#990000">)</font> <font color="#990000">/</font> <font color="#990000">(</font>F_CPU <font color="#990000">/</font> <font color="#993399">1000L</font><font color="#990000">))</font>
+<b><font color="#000080">#  define</font></b> <b><font color="#000000"><a name="35">MICROSECONDS_TO_CLOCK_CYCLES</a></font></b><font color="#990000">(</font>a<font color="#990000">)</font> <font color="#990000">(((</font>a<font color="#990000">)</font> <font color="#990000">*</font> <font color="#990000">(</font>F_CPU <font color="#990000">/</font> <font color="#993399">1000L</font><font color="#990000">))</font> <font color="#990000">/</font> <font color="#993399">1000L</font><font color="#990000">)</font>
+<b><font color="#000080">#endif</font></b>
+
+<i><font color="#9A1900">// Branch prediction macros.  These let you hint the compiler whether a</font></i>
+<i><font color="#9A1900">// condition is likely to be true or not, so it can generate faster code.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="40">LIKELY</a></font></b><font color="#990000">(</font>condition<font color="#990000">)</font>   <b><font color="#000000">__builtin_expect</font></b> <font color="#990000">(!!(</font>condition<font color="#990000">),</font> <font color="#993399">1</font><font color="#990000">)</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="41">UNLIKELY</a></font></b><font color="#990000">(</font>condition<font color="#990000">)</font> <b><font color="#000000">__builtin_expect</font></b> <font color="#990000">(!!(</font>condition<font color="#990000">),</font> <font color="#993399">0</font><font color="#990000">)</font>
+
+<i><font color="#9A1900">// Blink LEDs at checkpoints, trap points, or assertion violations {{{1</font></i>
+
+<i><font color="#9A1900">// The _delay_ms() and _delay_us() functions of AVR libc *REQUIRE* their</font></i>
+<i><font color="#9A1900">// arguments to be recognizable to GCC as double constants at compile-time.</font></i>
+<i><font color="#9A1900">// If they aren't various weird horrible effects can occur, including</font></i>
+<i><font color="#9A1900">// excessively long randomish delays, etc.  So for safety we have this</font></i>
+<i><font color="#9A1900">// functions as a way to get approximately correct largish delays.  Of course,</font></i>
+<i><font color="#9A1900">// using this for short delays would be insane.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="51">DELAY_APPROX_MS</a></font></b><font color="#990000">(</font>time<font color="#990000">)</font>   <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font>                          <font color="#990000">\</font>
+    <font color="#009900">double</font> XxX_ems <font color="#990000">=</font> <font color="#993399">0.0</font><font color="#990000">;</font>       <font color="#990000">\</font>
+    <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font>                        <font color="#990000">\</font>
+      <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font><font color="#993399">5.0</font><font color="#990000">);</font>          <font color="#990000">\</font>
+      XxX_ems <font color="#990000">+=</font> <font color="#993399">5.0</font><font color="#990000">;</font>           <font color="#990000">\</font>
+    <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> XxX_ems <font color="#990000">&lt;</font> time <font color="#990000">);</font> <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>                 <font color="#990000">\</font>
+
+<i><font color="#9A1900">// NOTE: the CHKP() and BASSERT() macros are probably the most useful in</font></i>
+<i><font color="#9A1900">// this section.  The others let you change which pin drives the LED or</font></i>
+<i><font color="#9A1900">// do other fancy things.  To use a different pin, you generally have to</font></i>
+<i><font color="#9A1900">// do '#undef some_macro' then '#define some_macro' again with the DDRB,</font></i>
+<i><font color="#9A1900">// DDB5, PORTB, and PORB5 argument in the right hand side of the original</font></i>
+<i><font color="#9A1900">// definition replaces as appropriate in the new definition.</font></i>
+
+<i><font color="#9A1900">// Set pin for output low and toggle it high-low bc times, ~mspb ms per cycle.</font></i>
+<i><font color="#9A1900">// Useful for making LEDs blink See CHKP() for an example of how to call</font></i>
+<i><font color="#9A1900">// this macro.  WARNING: no effort has been made to anticipate everything a</font></i>
+<i><font color="#9A1900">// client might have done to put a pin in a state where it can't be properly</font></i>
+<i><font color="#9A1900">// initialized/blinked.  Test this test function first :)</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="72">CHKP_USING</a></font></b><font color="#990000">(</font>ddr<font color="#990000">,</font> ddrb<font color="#990000">,</font> portr<font color="#990000">,</font> portrb<font color="#990000">,</font> mspb<font color="#990000">,</font> bc<font color="#990000">)</font>          <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font>                                                          <font color="#990000">\</font>
+    ddr <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>ddrb<font color="#990000">);</font>                                          <font color="#990000">\</font>
+    <b><font color="#000000">loop_until_bit_is_set</font></b> <font color="#990000">(</font>ddr<font color="#990000">,</font> ddrb<font color="#990000">);</font>                          <font color="#990000">\</font>
+    portr <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>portrb<font color="#990000">));</font>                                   <font color="#990000">\</font>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> XxXcu_ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> XxXcu_ii <font color="#990000">&lt;</font> bc <font color="#990000">;</font> XxXcu_ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font> <font color="#990000">\</font>
+      portr <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>portrb<font color="#990000">);</font>                                    <font color="#990000">\</font>
+      <b><font color="#000000"><a href="util.h.html#51">DELAY_APPROX_MS</a></font></b> <font color="#990000">(</font>mspb <font color="#990000">/</font> <font color="#993399">2.0</font><font color="#990000">);</font>                             <font color="#990000">\</font>
+      portr <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>portrb<font color="#990000">));</font>                                 <font color="#990000">\</font>
+      <b><font color="#000000"><a href="util.h.html#51">DELAY_APPROX_MS</a></font></b> <font color="#990000">(</font>mspb <font color="#990000">/</font> <font color="#993399">2.0</font><font color="#990000">);</font>                             <font color="#990000">\</font>
+    <font color="#FF0000">}</font>                                                           <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+
+<i><font color="#9A1900">// Form a trap point where we blink forever.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="86">BTRAP_USING</a></font></b><font color="#990000">(</font>ddr<font color="#990000">,</font> ddrb<font color="#990000">,</font> portr<font color="#990000">,</font> portrb<font color="#990000">,</font> mspb<font color="#990000">)</font>                      <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font> <b><font color="#000000"><a href="util.h.html#72">CHKP_USING</a></font></b> <font color="#990000">(</font>ddr<font color="#990000">,</font> ddrb<font color="#990000">,</font> portr<font color="#990000">,</font> portrb<font color="#990000">,</font> mspb<font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">);</font> <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <a href="util.h.html#19">TRUE</a> <font color="#990000">)</font>
+
+<i><font color="#9A1900">// WARNING: some shields (e.g. shields which actively use SPI, the official</font></i>
+<i><font color="#9A1900">// Arduino motor shield, version R3) use the pin PB5 (AKA Digital 13 in</font></i>
+<i><font color="#9A1900">// Arduino-speak) for their own purposes, hence using this function will have</font></i>
+<i><font color="#9A1900">// unfortunate effects.  It can easily be redefined to toggle a different pin.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Initialize and blink the on-board LED on PB5 three quick times to</font></i>
+<i><font color="#9A1900">// indicate that we've hit a checkpoint.  WARNING: no effort has been made</font></i>
+<i><font color="#9A1900">// to anticipate everything a client might have done to put PB5 in a state</font></i>
+<i><font color="#9A1900">// where it can't be properly initialized/blinked.  Test this test function</font></i>
+<i><font color="#9A1900">// first :)</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="99">CHKP</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="util.h.html#72">CHKP_USING</a></font></b><font color="#990000">(</font>DDRB<font color="#990000">,</font> DDB5<font color="#990000">,</font> PORTB<font color="#990000">,</font> PORTB5<font color="#990000">,</font> <font color="#993399">300.0</font><font color="#990000">,</font> <font color="#993399">3</font><font color="#990000">)</font>
+
+<i><font color="#9A1900">// Like CHKP(), but blinks a bit faster, forever.  The same caveats apply.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="102">BTRAP</a></font></b><font color="#990000">()</font> <b><font color="#000000"><a href="util.h.html#86">BTRAP_USING</a></font></b> <font color="#990000">(</font>DDRB<font color="#990000">,</font> DDB5<font color="#990000">,</font> PORTB<font color="#990000">,</font> PORTB5<font color="#990000">,</font> <font color="#993399">100.0</font><font color="#990000">)</font>
+
+<i><font color="#9A1900">// Like assert(), but with frantic blinking :) The same caveats that apply</font></i>
+<i><font color="#9A1900">// to CHKP() apply to this macro.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="106">BASSERT</a></font></b><font color="#990000">(</font>condition<font color="#990000">)</font>                                          <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font> <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="util.h.html#41">UNLIKELY</a></font></b> <font color="#990000">(!</font> <font color="#990000">(</font>condition<font color="#990000">))</font> <font color="#990000">)</font> <font color="#FF0000">{</font> <b><font color="#000000">BTRAP</font></b> <font color="#990000">();</font> <font color="#FF0000">}</font> <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+<a href="accelerometer_test.c.html#30">BTRAP -> accelerometer_test.c:30</a>
+<a href="accelerometer_test.c.html#31">BTRAP -> accelerometer_test.c:31</a>
+<a href="lis331dlh_driver_private.c.html#53">BTRAP -> lis331dlh_driver_private.c:53</a>
+<a href="lis331dlh_driver_private.c.html#54">BTRAP -> lis331dlh_driver_private.c:54</a>
+<a href="spi_test.c.html#39">BTRAP -> spi_test.c:39</a>
+<a href="spi_test.c.html#40">BTRAP -> spi_test.c:40</a>
+<a href="util.h.html#102">BTRAP -> util.h:102</a>
+<a href="wireless_xbee.c.html#23">BTRAP -> wireless_xbee.c:23</a>
+<a href="wireless_xbee.c.html#24">BTRAP -> wireless_xbee.c:24</a>
+<a href="wireless_xbee_test.c.html#59">BTRAP -> wireless_xbee_test.c:59</a>
+<a href="wireless_xbee_test.c.html#60">BTRAP -> wireless_xbee_test.c:60</a>
+
+<i><font color="#9A1900">// Do a busy wait for about Delay Time (dt) milliseconds while feeding the</font></i>
+<i><font color="#9A1900">// watchdog timer about every 5 milliseconds.  Useful for some assertion</font></i>
+<i><font color="#9A1900">// stuff we do and probably a sign of profound pathology everywhere else.</font></i>
+<i><font color="#9A1900">// Note that _delay_ms() requires an argument that GCC can identify as</font></i>
+<i><font color="#9A1900">// constant to work correctly.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="114">DELAY_WHILE_FEEDING_WDT</a></font></b><font color="#990000">(</font>dt<font color="#990000">)</font>                                        <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font>                                                                     <font color="#990000">\</font>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint16_t</font> XxXdwfw_ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> XxXdwfw_ii <font color="#990000">&lt;=</font> dt <font color="#990000">;</font> XxXdwfw_ii <font color="#990000">+=</font> <font color="#993399">5</font> <font color="#990000">)</font> <font color="#FF0000">{</font> <font color="#990000">\</font>
+      <b><font color="#000000">_delay_ms</font></b> <font color="#990000">(</font><font color="#993399">5.0</font><font color="#990000">);</font>                                                     <font color="#990000">\</font>
+      <b><font color="#000000">wdt_reset</font></b> <font color="#990000">();</font>                                                        <font color="#990000">\</font>
+    <font color="#FF0000">}</font>                                                                      <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+
+<i><font color="#9A1900">// Like CHKP_USING(), but also calls wdt_reset() about every 5 ms.  Note that</font></i>
+<i><font color="#9A1900">// this routine is specifically designed to defeat the watchdog timer.</font></i>
+<i><font color="#9A1900">// Since it calls wdt_reset(), it might be required that the watchdog</font></i>
+<i><font color="#9A1900">// actually be in use (due to wdt_enable() having been called or the WDTON</font></i>
+<i><font color="#9A1900">// fuse being programmed), though this probably isn't really required.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="127">CHKP_FEEDING_WDT_USING</a></font></b><font color="#990000">(</font>ddr<font color="#990000">,</font> ddrb<font color="#990000">,</font> portr<font color="#990000">,</font> portrb<font color="#990000">,</font> mspb<font color="#990000">,</font> bc<font color="#990000">)</font>    <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font>                                                                <font color="#990000">\</font>
+    ddr <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>ddrb<font color="#990000">);</font>                                                <font color="#990000">\</font>
+    <b><font color="#000000">loop_until_bit_is_set</font></b> <font color="#990000">(</font>ddr<font color="#990000">,</font> ddrb<font color="#990000">);</font>                                <font color="#990000">\</font>
+    portr <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>portrb<font color="#990000">));</font>                                         <font color="#990000">\</font>
+                                                                      <font color="#990000">\</font>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> XxXcfwu_ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> XxXcfwu_ii <font color="#990000">&lt;</font> bc <font color="#990000">;</font> XxXcfwu_ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font> <font color="#990000">\</font>
+      portr <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>portrb<font color="#990000">);</font>                                          <font color="#990000">\</font>
+      <b><font color="#000000"><a href="util.h.html#114">DELAY_WHILE_FEEDING_WDT</a></font></b> <font color="#990000">(</font>mspb <font color="#990000">/</font> <font color="#993399">2.0</font><font color="#990000">);</font>                           <font color="#990000">\</font>
+      portr <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>portrb<font color="#990000">));</font>                                       <font color="#990000">\</font>
+      <b><font color="#000000"><a href="util.h.html#114">DELAY_WHILE_FEEDING_WDT</a></font></b> <font color="#990000">(</font>mspb <font color="#990000">/</font> <font color="#993399">2.0</font><font color="#990000">);</font>                           <font color="#990000">\</font>
+    <font color="#FF0000">}</font>                                                                 <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+
+<i><font color="#9A1900">// Like BTRAP_USING(), but also calls wdt_reset() about every 5 ms.  Note that</font></i>
+<i><font color="#9A1900">// this routine is specifically designed to defeat the watchdog timer.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="143">BTRAP_FEEDING_WDT_USING</a></font></b><font color="#990000">(</font>ddr<font color="#990000">,</font> ddrb<font color="#990000">,</font> portr<font color="#990000">,</font> portrb<font color="#990000">,</font> mspb<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font>                                                          <font color="#990000">\</font>
+    <b><font color="#000000"><a href="util.h.html#127">CHKP_FEEDING_WDT_USING</a></font></b> <font color="#990000">(</font>ddr<font color="#990000">,</font> ddrb<font color="#990000">,</font> portr<font color="#990000">,</font> portrb<font color="#990000">,</font> mspb<font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">);</font> <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <a href="util.h.html#19">TRUE</a> <font color="#990000">)</font>
+
+<i><font color="#9A1900">// Like CHKP(), but also calls wdt_reset() about every 5 ms.</font></i>
+<i><font color="#9A1900">// See CHKP_FEEDING_WDT_USING() for more details.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="150">CHKP_FEEDING_WDT</a></font></b><font color="#990000">()</font>                                    <font color="#990000">\</font>
+  <b><font color="#000000"><a href="util.h.html#127">CHKP_FEEDING_WDT_USING</a></font></b><font color="#990000">(</font>DDRB<font color="#990000">,</font> DDB5<font color="#990000">,</font> PORTB<font color="#990000">,</font> PORTB5<font color="#990000">,</font> <font color="#993399">300.0</font><font color="#990000">,</font> <font color="#993399">3</font><font color="#990000">)</font>
+
+<i><font color="#9A1900">// Like BTRAP(), but also calls wdt_reset() about every 5 ms.</font></i>
+<i><font color="#9A1900">// See CHKP_FEEDING_WDT_USING() for more details.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="155">BTRAP_FEEDING_WDT</a></font></b><font color="#990000">()</font> <font color="#990000">\</font>
+  <b><font color="#000000"><a href="util.h.html#143">BTRAP_FEEDING_WDT_USING</a></font></b> <font color="#990000">(</font>DDRB<font color="#990000">,</font> DDB5<font color="#990000">,</font> PORTB<font color="#990000">,</font> PORTB5<font color="#990000">,</font> <font color="#993399">100.0</font><font color="#990000">)</font>
+
+<i><font color="#9A1900">// Like BASSERT(), but also calls wdt_reset() about every 5 ms.  Note that</font></i>
+<i><font color="#9A1900">// this will defeat the watchdog timer, forever.  I use it for debugging or</font></i>
+<i><font color="#9A1900">// when I have a failure requiring manual intervention to avoid endless resets</font></i>
+<i><font color="#9A1900">// and failure that might trash equipment.  See CHKP_FEEDING_WDT_USING()</font></i>
+<i><font color="#9A1900">// for more details.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="163">BASSERT_FEEDING_WDT</a></font></b><font color="#990000">(</font>condition<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font>                                 <font color="#990000">\</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="util.h.html#41">UNLIKELY</a></font></b> <font color="#990000">(!</font> <font color="#990000">(</font>condition<font color="#990000">))</font> <font color="#990000">)</font> <font color="#FF0000">{</font>  <font color="#990000">\</font>
+      <b><font color="#000000"><a href="util.h.html#155">BTRAP_FEEDING_WDT</a></font></b> <font color="#990000">();</font>            <font color="#990000">\</font>
+    <font color="#FF0000">}</font>                                  <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+
+<i><font color="#9A1900">// Like CHKP_FEEDING_WDT_USING, but with the data direction and port related</font></i>
+<i><font color="#9A1900">// arguments fixed, but the time up to the client.  Possibly useful for</font></i>
+<i><font color="#9A1900">// making your own strange blink patterns, or for redefining such that</font></i>
+<i><font color="#9A1900">// BASSERT_FEEDING_WDT_SHOW_POINT() uses a LED other than one attached to PB5.</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="174">CHKP_FEEDING_WDT_WITH_TIME_AND_COUNT_ONLY</a></font></b><font color="#990000">(</font>mspb<font color="#990000">,</font> bc<font color="#990000">)</font>   <font color="#990000">\</font>
+  <b><font color="#000000"><a href="util.h.html#127">CHKP_FEEDING_WDT_USING</a></font></b> <font color="#990000">(</font>DDRB<font color="#990000">,</font> DDB5<font color="#990000">,</font> PORTB<font color="#990000">,</font> PORTB5<font color="#990000">,</font> mspb<font color="#990000">,</font> bc<font color="#990000">)</font>
+
+<i><font color="#9A1900">// Blink out a representation of an unsigned integer, calling wdt_reset()</font></i>
+<i><font color="#9A1900">// about every 5 ms as we go.  The integer is represented using these steps:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   1.  A short burst of rapid blinks is produced.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   2.  The given number is cast to type uint32_t, and printed to a string</font></i>
+<i><font color="#9A1900">//       using printf format code "%" PRIu32.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   3.  For each digit in the string, a quick flash is produced for the</font></i>
+<i><font color="#9A1900">//       digit 0, or a series of 1-9 slower blinks corresponding to the</font></i>
+<i><font color="#9A1900">//       digit value is produced.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// WARNING: FIXXME: this should have a function core and macro wrapper to</font></i>
+<i><font color="#9A1900">// get the __FILE__ and __LINE__, it makes your program size explode, you</font></i>
+<i><font color="#9A1900">// can't afford to use it everywhere.  Same for some of the other blinky</font></i>
+<i><font color="#9A1900">// macros really.  But this is currently a sourceless header.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// Note that this macro requires CHKP_FEEDING_WDT_WITH_TIME_AND_COUNT_ONLY()</font></i>
+<i><font color="#9A1900">// to first be redefined as appropriate if PB5 isn't the one with the LED.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// That's all clients need to know.</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// The weirdly named variables in this macro have the following meanings:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   XxX_pbbb    Per-Blink-Batch Break</font></i>
+<i><font color="#9A1900">//   XxX_fbc     Fast Blink Count</font></i>
+<i><font color="#9A1900">//   XxX_fbp     Fast Blink Period</font></i>
+<i><font color="#9A1900">//   XxX_sbp     Slow Blink Period</font></i>
+<i><font color="#9A1900">//   lias        Length of (Int As String)</font></i>
+<i><font color="#9A1900">//</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="207">BLINK_OUT_UINT32_FEEDING_WDT</a></font></b><font color="#990000">(</font>value<font color="#990000">)</font>                                <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font>                                                                     <font color="#990000">\</font>
+    uint16_t <font color="#008080">const</font> XxX_pbbb <font color="#990000">=</font> <font color="#993399">942</font><font color="#990000">;</font>                                         <font color="#990000">\</font>
+    uint16_t <font color="#008080">const</font> XxX_fbp  <font color="#990000">=</font> <font color="#993399">100</font><font color="#990000">;</font>                                         <font color="#990000">\</font>
+    uint8_t  <font color="#008080">const</font> XxX_fbc  <font color="#990000">=</font> <font color="#993399">6</font><font color="#990000">;</font>                                           <font color="#990000">\</font>
+    uint16_t <font color="#008080">const</font> XxX_sbp  <font color="#990000">=</font> <font color="#993399">442</font><font color="#990000">;</font>                                         <font color="#990000">\</font>
+    <b><font color="#000000"><a href="util.h.html#174">CHKP_FEEDING_WDT_WITH_TIME_AND_COUNT_ONLY</a></font></b> <font color="#990000">(</font>XxX_fbp<font color="#990000">,</font> XxX_fbc<font color="#990000">);</font>          <font color="#990000">\</font>
+    <b><font color="#000000"><a href="util.h.html#114">DELAY_WHILE_FEEDING_WDT</a></font></b> <font color="#990000">(</font>XxX_pbbb<font color="#990000">);</font>                                    <font color="#990000">\</font>
+    <font color="#009900">char</font> XxX_uint_as_string<font color="#990000">[</font><font color="#993399">11</font><font color="#990000">];</font>                                           <font color="#990000">\</font>
+    <b><font color="#000000">sprintf</font></b> <font color="#990000">(</font>XxX_uint_as_string<font color="#990000">,</font> <font color="#FF0000">"%"</font> PRIu32<font color="#990000">,</font> <font color="#990000">(</font>uint32_t<font color="#990000">)</font> value<font color="#990000">);</font>            <font color="#990000">\</font>
+    <font color="#008080">uint8_t</font> lias <font color="#990000">=</font> <b><font color="#000000">strlen</font></b> <font color="#990000">(</font>XxX_uint_as_string<font color="#990000">);</font>                            <font color="#990000">\</font>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#008080">uint8_t</font> XxXboifw_ii <font color="#990000">=</font> <font color="#993399">0</font> <font color="#990000">;</font> XxXboifw_ii <font color="#990000">&lt;</font> lias <font color="#990000">;</font> XxXboifw_ii<font color="#990000">++</font> <font color="#990000">)</font> <font color="#FF0000">{</font> <font color="#990000">\</font>
+      uint8_t <font color="#008080">const</font> ascii_0 <font color="#990000">=</font> <font color="#993399">48</font><font color="#990000">;</font>                                          <font color="#990000">\</font>
+      <font color="#008080">uint8_t</font> XxX_digit <font color="#990000">=</font> XxX_uint_as_string<font color="#990000">[</font>XxXboifw_ii<font color="#990000">]</font> <font color="#990000">-</font> ascii_0<font color="#990000">;</font>       <font color="#990000">\</font>
+      <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> XxX_digit <font color="#990000">==</font> <font color="#993399">0</font> <font color="#990000">)</font> <font color="#FF0000">{</font>                                              <font color="#990000">\</font>
+        <b><font color="#000000"><a href="util.h.html#174">CHKP_FEEDING_WDT_WITH_TIME_AND_COUNT_ONLY</a></font></b> <font color="#990000">(</font>XxX_fbp<font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">);</font>            <font color="#990000">\</font>
+      <font color="#FF0000">}</font>                                                                    <font color="#990000">\</font>
+      <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>                                                               <font color="#990000">\</font>
+        <b><font color="#000000"><a href="util.h.html#174">CHKP_FEEDING_WDT_WITH_TIME_AND_COUNT_ONLY</a></font></b> <font color="#990000">(</font>XxX_sbp<font color="#990000">,</font> XxX_digit<font color="#990000">);</font>    <font color="#990000">\</font>
+      <font color="#FF0000">}</font>                                                                    <font color="#990000">\</font>
+      <b><font color="#000000"><a href="util.h.html#114">DELAY_WHILE_FEEDING_WDT</a></font></b> <font color="#990000">(</font>XxX_pbbb<font color="#990000">);</font>                                  <font color="#990000">\</font>
+    <font color="#FF0000">}</font>                                                                      <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+
+<i><font color="#9A1900">// Like BASSERT_FEEDING_WDT, but attempts to show using a single LED where</font></i>
+<i><font color="#9A1900">// any assertion violation has occurred, using the following steps:</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   1. Call BLINK_OUT_UINT32_FEEDING_WDT(number_of_chars_in_source_file_name)</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   2. Call BLINK_OUT_UINT32_FEEDING_WDT(__LINE__)</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//   3. Go to step 1</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// WARNING: this macro suffers from the problem afflicting</font></i>
+<i><font color="#9A1900">// BLINK_OUT_UINT32_FEEDING_WDT().</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">// It's usually better to use <a href="term_io.h.html">term_io.h</a> (see the TERM_IO_PTP macro</font></i>
+<i><font color="#9A1900">// in particular) or maybe <a href="wireless_xbee.h.html">wireless_xbee.h</a> to sort out what's going on.</font></i>
+<i><font color="#9A1900">// But if you can't do that (perhaps because the serial port is being used</font></i>
+<i><font color="#9A1900">// to talk to something else) this can be useful.</font></i>
+<i><font color="#9A1900">//</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="248">BASSERT_FEEDING_WDT_SHOW_POINT</a></font></b><font color="#990000">(</font>condition<font color="#990000">)</font> <font color="#990000">\</font>
+  <b><font color="#0000FF">do</font></b> <font color="#FF0000">{</font>                                            <font color="#990000">\</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> <b><font color="#000000"><a href="util.h.html#41">UNLIKELY</a></font></b> <font color="#990000">(!</font> <font color="#990000">(</font>condition<font color="#990000">))</font> <font color="#990000">)</font> <font color="#FF0000">{</font>             <font color="#990000">\</font>
+      <b><font color="#0000FF">for</font></b> <font color="#990000">(</font> <font color="#990000">;</font> <font color="#990000">;</font> <font color="#990000">)</font> <font color="#FF0000">{</font>                               <font color="#990000">\</font>
+        <font color="#008080">size_t</font> XxX_fnl <font color="#990000">=</font> <b><font color="#000000">strlen</font></b> <font color="#990000">(</font>__FILE__<font color="#990000">);</font>       <font color="#990000">\</font>
+        <b><font color="#000000"><a href="util.h.html#207">BLINK_OUT_UINT32_FEEDING_WDT</a></font></b> <font color="#990000">(</font>XxX_fnl<font color="#990000">);</font>   <font color="#990000">\</font>
+        <b><font color="#000000"><a href="util.h.html#207">BLINK_OUT_UINT32_FEEDING_WDT</a></font></b> <font color="#990000">(</font>__LINE__<font color="#990000">);</font>  <font color="#990000">\</font>
+      <font color="#FF0000">}</font>                                           <font color="#990000">\</font>
+    <font color="#FF0000">}</font>                                             <font color="#990000">\</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#993399">0</font> <font color="#990000">)</font>
+
+<i><font color="#9A1900">// }}}1</font></i>
+
+<i><font color="#9A1900">// All non-symbolic constants are evil :)</font></i>
+<b><font color="#000080">#define</font></b> <a name="262">BITS_PER_BYTE</a> <font color="#993399">8</font>
+
+<i><font color="#9A1900">// Really, all of them :)</font></i>
+<b><font color="#000080">#define</font></b> <a name="265">MS_PER_S</a> <font color="#993399">1000</font>
+<b><font color="#000080">#define</font></b> <a name="266">US_PER_S</a> <font color="#993399">1000000</font>
+
+<i><font color="#9A1900">// Get the high or low byte of a two byte value (in a very paranoid way :)</font></i>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="269">HIGH_BYTE</a></font></b><font color="#990000">(</font>two_byte_value<font color="#990000">)</font>                                       <font color="#990000">\</font>
+  <font color="#990000">((</font>uint8_t<font color="#990000">)</font> <font color="#990000">((((</font>uint16_t<font color="#990000">)</font> two_byte_value<font color="#990000">)</font> <font color="#990000">&gt;&gt;</font> <a href="util.h.html#262">BITS_PER_BYTE</a><font color="#990000">)</font> <font color="#990000">&amp;</font> <font color="#993399">0x00ff</font><font color="#990000">))</font>
+<b><font color="#000080">#define</font></b> <b><font color="#000000"><a name="271">LOW_BYTE</a></font></b><font color="#990000">(</font>two_byte_value<font color="#990000">)</font>                                        <font color="#990000">\</font>
+  <font color="#990000">((</font>uint8_t<font color="#990000">)</font> <font color="#990000">(((</font>uint16_t<font color="#990000">)</font> two_byte_value<font color="#990000">)</font> <font color="#990000">&amp;</font> <font color="#993399">0x00ff</font><font color="#990000">))</font>
+
+<i><font color="#9A1900">// Macros for more readable/writable binary bit patterns {{{1</font></i>
+<b><font color="#000080">#define</font></b> <a name="275">B0</a> <font color="#993399">0</font>
+<b><font color="#000080">#define</font></b> <a name="276">B00</a> <font color="#993399">0</font>
+<b><font color="#000080">#define</font></b> <a name="277">B000</a> <font color="#993399">0</font>
+<b><font color="#000080">#define</font></b> <a name="278">B0000</a> <font color="#993399">0</font>
+<b><font color="#000080">#define</font></b> <a name="279">B00000</a> <font color="#993399">0</font>
+<b><font color="#000080">#define</font></b> <a name="280">B000000</a> <font color="#993399">0</font>
+<b><font color="#000080">#define</font></b> <a name="281">B0000000</a> <font color="#993399">0</font>
+<b><font color="#000080">#define</font></b> <a name="282">B00000000</a> <font color="#993399">0</font>
+<b><font color="#000080">#define</font></b> <a name="283">B1</a> <font color="#993399">1</font>
+<b><font color="#000080">#define</font></b> <a name="284">B01</a> <font color="#993399">1</font>
+<b><font color="#000080">#define</font></b> <a name="285">B001</a> <font color="#993399">1</font>
+<b><font color="#000080">#define</font></b> <a name="286">B0001</a> <font color="#993399">1</font>
+<b><font color="#000080">#define</font></b> <a name="287">B00001</a> <font color="#993399">1</font>
+<b><font color="#000080">#define</font></b> <a name="288">B000001</a> <font color="#993399">1</font>
+<b><font color="#000080">#define</font></b> <a name="289">B0000001</a> <font color="#993399">1</font>
+<b><font color="#000080">#define</font></b> <a name="290">B00000001</a> <font color="#993399">1</font>
+<b><font color="#000080">#define</font></b> <a name="291">B10</a> <font color="#993399">2</font>
+<b><font color="#000080">#define</font></b> <a name="292">B010</a> <font color="#993399">2</font>
+<b><font color="#000080">#define</font></b> <a name="293">B0010</a> <font color="#993399">2</font>
+<b><font color="#000080">#define</font></b> <a name="294">B00010</a> <font color="#993399">2</font>
+<b><font color="#000080">#define</font></b> <a name="295">B000010</a> <font color="#993399">2</font>
+<b><font color="#000080">#define</font></b> <a name="296">B0000010</a> <font color="#993399">2</font>
+<b><font color="#000080">#define</font></b> <a name="297">B00000010</a> <font color="#993399">2</font>
+<b><font color="#000080">#define</font></b> <a name="298">B11</a> <font color="#993399">3</font>
+<b><font color="#000080">#define</font></b> <a name="299">B011</a> <font color="#993399">3</font>
+<b><font color="#000080">#define</font></b> <a name="300">B0011</a> <font color="#993399">3</font>
+<b><font color="#000080">#define</font></b> <a name="301">B00011</a> <font color="#993399">3</font>
+<b><font color="#000080">#define</font></b> <a name="302">B000011</a> <font color="#993399">3</font>
+<b><font color="#000080">#define</font></b> <a name="303">B0000011</a> <font color="#993399">3</font>
+<b><font color="#000080">#define</font></b> <a name="304">B00000011</a> <font color="#993399">3</font>
+<b><font color="#000080">#define</font></b> <a name="305">B100</a> <font color="#993399">4</font>
+<b><font color="#000080">#define</font></b> <a name="306">B0100</a> <font color="#993399">4</font>
+<b><font color="#000080">#define</font></b> <a name="307">B00100</a> <font color="#993399">4</font>
+<b><font color="#000080">#define</font></b> <a name="308">B000100</a> <font color="#993399">4</font>
+<b><font color="#000080">#define</font></b> <a name="309">B0000100</a> <font color="#993399">4</font>
+<b><font color="#000080">#define</font></b> <a name="310">B00000100</a> <font color="#993399">4</font>
+<b><font color="#000080">#define</font></b> <a name="311">B101</a> <font color="#993399">5</font>
+<b><font color="#000080">#define</font></b> <a name="312">B0101</a> <font color="#993399">5</font>
+<b><font color="#000080">#define</font></b> <a name="313">B00101</a> <font color="#993399">5</font>
+<b><font color="#000080">#define</font></b> <a name="314">B000101</a> <font color="#993399">5</font>
+<b><font color="#000080">#define</font></b> <a name="315">B0000101</a> <font color="#993399">5</font>
+<b><font color="#000080">#define</font></b> <a name="316">B00000101</a> <font color="#993399">5</font>
+<b><font color="#000080">#define</font></b> <a name="317">B110</a> <font color="#993399">6</font>
+<b><font color="#000080">#define</font></b> <a name="318">B0110</a> <font color="#993399">6</font>
+<b><font color="#000080">#define</font></b> <a name="319">B00110</a> <font color="#993399">6</font>
+<b><font color="#000080">#define</font></b> <a name="320">B000110</a> <font color="#993399">6</font>
+<b><font color="#000080">#define</font></b> <a name="321">B0000110</a> <font color="#993399">6</font>
+<b><font color="#000080">#define</font></b> <a name="322">B00000110</a> <font color="#993399">6</font>
+<b><font color="#000080">#define</font></b> <a name="323">B111</a> <font color="#993399">7</font>
+<b><font color="#000080">#define</font></b> <a name="324">B0111</a> <font color="#993399">7</font>
+<b><font color="#000080">#define</font></b> <a name="325">B00111</a> <font color="#993399">7</font>
+<b><font color="#000080">#define</font></b> <a name="326">B000111</a> <font color="#993399">7</font>
+<b><font color="#000080">#define</font></b> <a name="327">B0000111</a> <font color="#993399">7</font>
+<b><font color="#000080">#define</font></b> <a name="328">B00000111</a> <font color="#993399">7</font>
+<b><font color="#000080">#define</font></b> <a name="329">B1000</a> <font color="#993399">8</font>
+<b><font color="#000080">#define</font></b> <a name="330">B01000</a> <font color="#993399">8</font>
+<b><font color="#000080">#define</font></b> <a name="331">B001000</a> <font color="#993399">8</font>
+<b><font color="#000080">#define</font></b> <a name="332">B0001000</a> <font color="#993399">8</font>
+<b><font color="#000080">#define</font></b> <a name="333">B00001000</a> <font color="#993399">8</font>
+<b><font color="#000080">#define</font></b> <a name="334">B1001</a> <font color="#993399">9</font>
+<b><font color="#000080">#define</font></b> <a name="335">B01001</a> <font color="#993399">9</font>
+<b><font color="#000080">#define</font></b> <a name="336">B001001</a> <font color="#993399">9</font>
+<b><font color="#000080">#define</font></b> <a name="337">B0001001</a> <font color="#993399">9</font>
+<b><font color="#000080">#define</font></b> <a name="338">B00001001</a> <font color="#993399">9</font>
+<b><font color="#000080">#define</font></b> <a name="339">B1010</a> <font color="#993399">10</font>
+<b><font color="#000080">#define</font></b> <a name="340">B01010</a> <font color="#993399">10</font>
+<b><font color="#000080">#define</font></b> <a name="341">B001010</a> <font color="#993399">10</font>
+<b><font color="#000080">#define</font></b> <a name="342">B0001010</a> <font color="#993399">10</font>
+<b><font color="#000080">#define</font></b> <a name="343">B00001010</a> <font color="#993399">10</font>
+<b><font color="#000080">#define</font></b> <a name="344">B1011</a> <font color="#993399">11</font>
+<b><font color="#000080">#define</font></b> <a name="345">B01011</a> <font color="#993399">11</font>
+<b><font color="#000080">#define</font></b> <a name="346">B001011</a> <font color="#993399">11</font>
+<b><font color="#000080">#define</font></b> <a name="347">B0001011</a> <font color="#993399">11</font>
+<b><font color="#000080">#define</font></b> <a name="348">B00001011</a> <font color="#993399">11</font>
+<b><font color="#000080">#define</font></b> <a name="349">B1100</a> <font color="#993399">12</font>
+<b><font color="#000080">#define</font></b> <a name="350">B01100</a> <font color="#993399">12</font>
+<b><font color="#000080">#define</font></b> <a name="351">B001100</a> <font color="#993399">12</font>
+<b><font color="#000080">#define</font></b> <a name="352">B0001100</a> <font color="#993399">12</font>
+<b><font color="#000080">#define</font></b> <a name="353">B00001100</a> <font color="#993399">12</font>
+<b><font color="#000080">#define</font></b> <a name="354">B1101</a> <font color="#993399">13</font>
+<b><font color="#000080">#define</font></b> <a name="355">B01101</a> <font color="#993399">13</font>
+<b><font color="#000080">#define</font></b> <a name="356">B001101</a> <font color="#993399">13</font>
+<b><font color="#000080">#define</font></b> <a name="357">B0001101</a> <font color="#993399">13</font>
+<b><font color="#000080">#define</font></b> <a name="358">B00001101</a> <font color="#993399">13</font>
+<b><font color="#000080">#define</font></b> <a name="359">B1110</a> <font color="#993399">14</font>
+<b><font color="#000080">#define</font></b> <a name="360">B01110</a> <font color="#993399">14</font>
+<b><font color="#000080">#define</font></b> <a name="361">B001110</a> <font color="#993399">14</font>
+<b><font color="#000080">#define</font></b> <a name="362">B0001110</a> <font color="#993399">14</font>
+<b><font color="#000080">#define</font></b> <a name="363">B00001110</a> <font color="#993399">14</font>
+<b><font color="#000080">#define</font></b> <a name="364">B1111</a> <font color="#993399">15</font>
+<b><font color="#000080">#define</font></b> <a name="365">B01111</a> <font color="#993399">15</font>
+<b><font color="#000080">#define</font></b> <a name="366">B001111</a> <font color="#993399">15</font>
+<b><font color="#000080">#define</font></b> <a name="367">B0001111</a> <font color="#993399">15</font>
+<b><font color="#000080">#define</font></b> <a name="368">B00001111</a> <font color="#993399">15</font>
+<b><font color="#000080">#define</font></b> <a name="369">B10000</a> <font color="#993399">16</font>
+<b><font color="#000080">#define</font></b> <a name="370">B010000</a> <font color="#993399">16</font>
+<b><font color="#000080">#define</font></b> <a name="371">B0010000</a> <font color="#993399">16</font>
+<b><font color="#000080">#define</font></b> <a name="372">B00010000</a> <font color="#993399">16</font>
+<b><font color="#000080">#define</font></b> <a name="373">B10001</a> <font color="#993399">17</font>
+<b><font color="#000080">#define</font></b> <a name="374">B010001</a> <font color="#993399">17</font>
+<b><font color="#000080">#define</font></b> <a name="375">B0010001</a> <font color="#993399">17</font>
+<b><font color="#000080">#define</font></b> <a name="376">B00010001</a> <font color="#993399">17</font>
+<b><font color="#000080">#define</font></b> <a name="377">B10010</a> <font color="#993399">18</font>
+<b><font color="#000080">#define</font></b> <a name="378">B010010</a> <font color="#993399">18</font>
+<b><font color="#000080">#define</font></b> <a name="379">B0010010</a> <font color="#993399">18</font>
+<b><font color="#000080">#define</font></b> <a name="380">B00010010</a> <font color="#993399">18</font>
+<b><font color="#000080">#define</font></b> <a name="381">B10011</a> <font color="#993399">19</font>
+<b><font color="#000080">#define</font></b> <a name="382">B010011</a> <font color="#993399">19</font>
+<b><font color="#000080">#define</font></b> <a name="383">B0010011</a> <font color="#993399">19</font>
+<b><font color="#000080">#define</font></b> <a name="384">B00010011</a> <font color="#993399">19</font>
+<b><font color="#000080">#define</font></b> <a name="385">B10100</a> <font color="#993399">20</font>
+<b><font color="#000080">#define</font></b> <a name="386">B010100</a> <font color="#993399">20</font>
+<b><font color="#000080">#define</font></b> <a name="387">B0010100</a> <font color="#993399">20</font>
+<b><font color="#000080">#define</font></b> <a name="388">B00010100</a> <font color="#993399">20</font>
+<b><font color="#000080">#define</font></b> <a name="389">B10101</a> <font color="#993399">21</font>
+<b><font color="#000080">#define</font></b> <a name="390">B010101</a> <font color="#993399">21</font>
+<b><font color="#000080">#define</font></b> <a name="391">B0010101</a> <font color="#993399">21</font>
+<b><font color="#000080">#define</font></b> <a name="392">B00010101</a> <font color="#993399">21</font>
+<b><font color="#000080">#define</font></b> <a name="393">B10110</a> <font color="#993399">22</font>
+<b><font color="#000080">#define</font></b> <a name="394">B010110</a> <font color="#993399">22</font>
+<b><font color="#000080">#define</font></b> <a name="395">B0010110</a> <font color="#993399">22</font>
+<b><font color="#000080">#define</font></b> <a name="396">B00010110</a> <font color="#993399">22</font>
+<b><font color="#000080">#define</font></b> <a name="397">B10111</a> <font color="#993399">23</font>
+<b><font color="#000080">#define</font></b> <a name="398">B010111</a> <font color="#993399">23</font>
+<b><font color="#000080">#define</font></b> <a name="399">B0010111</a> <font color="#993399">23</font>
+<b><font color="#000080">#define</font></b> <a name="400">B00010111</a> <font color="#993399">23</font>
+<b><font color="#000080">#define</font></b> <a name="401">B11000</a> <font color="#993399">24</font>
+<b><font color="#000080">#define</font></b> <a name="402">B011000</a> <font color="#993399">24</font>
+<b><font color="#000080">#define</font></b> <a name="403">B0011000</a> <font color="#993399">24</font>
+<b><font color="#000080">#define</font></b> <a name="404">B00011000</a> <font color="#993399">24</font>
+<b><font color="#000080">#define</font></b> <a name="405">B11001</a> <font color="#993399">25</font>
+<b><font color="#000080">#define</font></b> <a name="406">B011001</a> <font color="#993399">25</font>
+<b><font color="#000080">#define</font></b> <a name="407">B0011001</a> <font color="#993399">25</font>
+<b><font color="#000080">#define</font></b> <a name="408">B00011001</a> <font color="#993399">25</font>
+<b><font color="#000080">#define</font></b> <a name="409">B11010</a> <font color="#993399">26</font>
+<b><font color="#000080">#define</font></b> <a name="410">B011010</a> <font color="#993399">26</font>
+<b><font color="#000080">#define</font></b> <a name="411">B0011010</a> <font color="#993399">26</font>
+<b><font color="#000080">#define</font></b> <a name="412">B00011010</a> <font color="#993399">26</font>
+<b><font color="#000080">#define</font></b> <a name="413">B11011</a> <font color="#993399">27</font>
+<b><font color="#000080">#define</font></b> <a name="414">B011011</a> <font color="#993399">27</font>
+<b><font color="#000080">#define</font></b> <a name="415">B0011011</a> <font color="#993399">27</font>
+<b><font color="#000080">#define</font></b> <a name="416">B00011011</a> <font color="#993399">27</font>
+<b><font color="#000080">#define</font></b> <a name="417">B11100</a> <font color="#993399">28</font>
+<b><font color="#000080">#define</font></b> <a name="418">B011100</a> <font color="#993399">28</font>
+<b><font color="#000080">#define</font></b> <a name="419">B0011100</a> <font color="#993399">28</font>
+<b><font color="#000080">#define</font></b> <a name="420">B00011100</a> <font color="#993399">28</font>
+<b><font color="#000080">#define</font></b> <a name="421">B11101</a> <font color="#993399">29</font>
+<b><font color="#000080">#define</font></b> <a name="422">B011101</a> <font color="#993399">29</font>
+<b><font color="#000080">#define</font></b> <a name="423">B0011101</a> <font color="#993399">29</font>
+<b><font color="#000080">#define</font></b> <a name="424">B00011101</a> <font color="#993399">29</font>
+<b><font color="#000080">#define</font></b> <a name="425">B11110</a> <font color="#993399">30</font>
+<b><font color="#000080">#define</font></b> <a name="426">B011110</a> <font color="#993399">30</font>
+<b><font color="#000080">#define</font></b> <a name="427">B0011110</a> <font color="#993399">30</font>
+<b><font color="#000080">#define</font></b> <a name="428">B00011110</a> <font color="#993399">30</font>
+<b><font color="#000080">#define</font></b> <a name="429">B11111</a> <font color="#993399">31</font>
+<b><font color="#000080">#define</font></b> <a name="430">B011111</a> <font color="#993399">31</font>
+<b><font color="#000080">#define</font></b> <a name="431">B0011111</a> <font color="#993399">31</font>
+<b><font color="#000080">#define</font></b> <a name="432">B00011111</a> <font color="#993399">31</font>
+<b><font color="#000080">#define</font></b> <a name="433">B100000</a> <font color="#993399">32</font>
+<b><font color="#000080">#define</font></b> <a name="434">B0100000</a> <font color="#993399">32</font>
+<b><font color="#000080">#define</font></b> <a name="435">B00100000</a> <font color="#993399">32</font>
+<b><font color="#000080">#define</font></b> <a name="436">B100001</a> <font color="#993399">33</font>
+<b><font color="#000080">#define</font></b> <a name="437">B0100001</a> <font color="#993399">33</font>
+<b><font color="#000080">#define</font></b> <a name="438">B00100001</a> <font color="#993399">33</font>
+<b><font color="#000080">#define</font></b> <a name="439">B100010</a> <font color="#993399">34</font>
+<b><font color="#000080">#define</font></b> <a name="440">B0100010</a> <font color="#993399">34</font>
+<b><font color="#000080">#define</font></b> <a name="441">B00100010</a> <font color="#993399">34</font>
+<b><font color="#000080">#define</font></b> <a name="442">B100011</a> <font color="#993399">35</font>
+<b><font color="#000080">#define</font></b> <a name="443">B0100011</a> <font color="#993399">35</font>
+<b><font color="#000080">#define</font></b> <a name="444">B00100011</a> <font color="#993399">35</font>
+<b><font color="#000080">#define</font></b> <a name="445">B100100</a> <font color="#993399">36</font>
+<b><font color="#000080">#define</font></b> <a name="446">B0100100</a> <font color="#993399">36</font>
+<b><font color="#000080">#define</font></b> <a name="447">B00100100</a> <font color="#993399">36</font>
+<b><font color="#000080">#define</font></b> <a name="448">B100101</a> <font color="#993399">37</font>
+<b><font color="#000080">#define</font></b> <a name="449">B0100101</a> <font color="#993399">37</font>
+<b><font color="#000080">#define</font></b> <a name="450">B00100101</a> <font color="#993399">37</font>
+<b><font color="#000080">#define</font></b> <a name="451">B100110</a> <font color="#993399">38</font>
+<b><font color="#000080">#define</font></b> <a name="452">B0100110</a> <font color="#993399">38</font>
+<b><font color="#000080">#define</font></b> <a name="453">B00100110</a> <font color="#993399">38</font>
+<b><font color="#000080">#define</font></b> <a name="454">B100111</a> <font color="#993399">39</font>
+<b><font color="#000080">#define</font></b> <a name="455">B0100111</a> <font color="#993399">39</font>
+<b><font color="#000080">#define</font></b> <a name="456">B00100111</a> <font color="#993399">39</font>
+<b><font color="#000080">#define</font></b> <a name="457">B101000</a> <font color="#993399">40</font>
+<b><font color="#000080">#define</font></b> <a name="458">B0101000</a> <font color="#993399">40</font>
+<b><font color="#000080">#define</font></b> <a name="459">B00101000</a> <font color="#993399">40</font>
+<b><font color="#000080">#define</font></b> <a name="460">B101001</a> <font color="#993399">41</font>
+<b><font color="#000080">#define</font></b> <a name="461">B0101001</a> <font color="#993399">41</font>
+<b><font color="#000080">#define</font></b> <a name="462">B00101001</a> <font color="#993399">41</font>
+<b><font color="#000080">#define</font></b> <a name="463">B101010</a> <font color="#993399">42</font>
+<b><font color="#000080">#define</font></b> <a name="464">B0101010</a> <font color="#993399">42</font>
+<b><font color="#000080">#define</font></b> <a name="465">B00101010</a> <font color="#993399">42</font>
+<b><font color="#000080">#define</font></b> <a name="466">B101011</a> <font color="#993399">43</font>
+<b><font color="#000080">#define</font></b> <a name="467">B0101011</a> <font color="#993399">43</font>
+<b><font color="#000080">#define</font></b> <a name="468">B00101011</a> <font color="#993399">43</font>
+<b><font color="#000080">#define</font></b> <a name="469">B101100</a> <font color="#993399">44</font>
+<b><font color="#000080">#define</font></b> <a name="470">B0101100</a> <font color="#993399">44</font>
+<b><font color="#000080">#define</font></b> <a name="471">B00101100</a> <font color="#993399">44</font>
+<b><font color="#000080">#define</font></b> <a name="472">B101101</a> <font color="#993399">45</font>
+<b><font color="#000080">#define</font></b> <a name="473">B0101101</a> <font color="#993399">45</font>
+<b><font color="#000080">#define</font></b> <a name="474">B00101101</a> <font color="#993399">45</font>
+<b><font color="#000080">#define</font></b> <a name="475">B101110</a> <font color="#993399">46</font>
+<b><font color="#000080">#define</font></b> <a name="476">B0101110</a> <font color="#993399">46</font>
+<b><font color="#000080">#define</font></b> <a name="477">B00101110</a> <font color="#993399">46</font>
+<b><font color="#000080">#define</font></b> <a name="478">B101111</a> <font color="#993399">47</font>
+<b><font color="#000080">#define</font></b> <a name="479">B0101111</a> <font color="#993399">47</font>
+<b><font color="#000080">#define</font></b> <a name="480">B00101111</a> <font color="#993399">47</font>
+<b><font color="#000080">#define</font></b> <a name="481">B110000</a> <font color="#993399">48</font>
+<b><font color="#000080">#define</font></b> <a name="482">B0110000</a> <font color="#993399">48</font>
+<b><font color="#000080">#define</font></b> <a name="483">B00110000</a> <font color="#993399">48</font>
+<b><font color="#000080">#define</font></b> <a name="484">B110001</a> <font color="#993399">49</font>
+<b><font color="#000080">#define</font></b> <a name="485">B0110001</a> <font color="#993399">49</font>
+<b><font color="#000080">#define</font></b> <a name="486">B00110001</a> <font color="#993399">49</font>
+<b><font color="#000080">#define</font></b> <a name="487">B110010</a> <font color="#993399">50</font>
+<b><font color="#000080">#define</font></b> <a name="488">B0110010</a> <font color="#993399">50</font>
+<b><font color="#000080">#define</font></b> <a name="489">B00110010</a> <font color="#993399">50</font>
+<b><font color="#000080">#define</font></b> <a name="490">B110011</a> <font color="#993399">51</font>
+<b><font color="#000080">#define</font></b> <a name="491">B0110011</a> <font color="#993399">51</font>
+<b><font color="#000080">#define</font></b> <a name="492">B00110011</a> <font color="#993399">51</font>
+<b><font color="#000080">#define</font></b> <a name="493">B110100</a> <font color="#993399">52</font>
+<b><font color="#000080">#define</font></b> <a name="494">B0110100</a> <font color="#993399">52</font>
+<b><font color="#000080">#define</font></b> <a name="495">B00110100</a> <font color="#993399">52</font>
+<b><font color="#000080">#define</font></b> <a name="496">B110101</a> <font color="#993399">53</font>
+<b><font color="#000080">#define</font></b> <a name="497">B0110101</a> <font color="#993399">53</font>
+<b><font color="#000080">#define</font></b> <a name="498">B00110101</a> <font color="#993399">53</font>
+<b><font color="#000080">#define</font></b> <a name="499">B110110</a> <font color="#993399">54</font>
+<b><font color="#000080">#define</font></b> <a name="500">B0110110</a> <font color="#993399">54</font>
+<b><font color="#000080">#define</font></b> <a name="501">B00110110</a> <font color="#993399">54</font>
+<b><font color="#000080">#define</font></b> <a name="502">B110111</a> <font color="#993399">55</font>
+<b><font color="#000080">#define</font></b> <a name="503">B0110111</a> <font color="#993399">55</font>
+<b><font color="#000080">#define</font></b> <a name="504">B00110111</a> <font color="#993399">55</font>
+<b><font color="#000080">#define</font></b> <a name="505">B111000</a> <font color="#993399">56</font>
+<b><font color="#000080">#define</font></b> <a name="506">B0111000</a> <font color="#993399">56</font>
+<b><font color="#000080">#define</font></b> <a name="507">B00111000</a> <font color="#993399">56</font>
+<b><font color="#000080">#define</font></b> <a name="508">B111001</a> <font color="#993399">57</font>
+<b><font color="#000080">#define</font></b> <a name="509">B0111001</a> <font color="#993399">57</font>
+<b><font color="#000080">#define</font></b> <a name="510">B00111001</a> <font color="#993399">57</font>
+<b><font color="#000080">#define</font></b> <a name="511">B111010</a> <font color="#993399">58</font>
+<b><font color="#000080">#define</font></b> <a name="512">B0111010</a> <font color="#993399">58</font>
+<b><font color="#000080">#define</font></b> <a name="513">B00111010</a> <font color="#993399">58</font>
+<b><font color="#000080">#define</font></b> <a name="514">B111011</a> <font color="#993399">59</font>
+<b><font color="#000080">#define</font></b> <a name="515">B0111011</a> <font color="#993399">59</font>
+<b><font color="#000080">#define</font></b> <a name="516">B00111011</a> <font color="#993399">59</font>
+<b><font color="#000080">#define</font></b> <a name="517">B111100</a> <font color="#993399">60</font>
+<b><font color="#000080">#define</font></b> <a name="518">B0111100</a> <font color="#993399">60</font>
+<b><font color="#000080">#define</font></b> <a name="519">B00111100</a> <font color="#993399">60</font>
+<b><font color="#000080">#define</font></b> <a name="520">B111101</a> <font color="#993399">61</font>
+<b><font color="#000080">#define</font></b> <a name="521">B0111101</a> <font color="#993399">61</font>
+<b><font color="#000080">#define</font></b> <a name="522">B00111101</a> <font color="#993399">61</font>
+<b><font color="#000080">#define</font></b> <a name="523">B111110</a> <font color="#993399">62</font>
+<b><font color="#000080">#define</font></b> <a name="524">B0111110</a> <font color="#993399">62</font>
+<b><font color="#000080">#define</font></b> <a name="525">B00111110</a> <font color="#993399">62</font>
+<b><font color="#000080">#define</font></b> <a name="526">B111111</a> <font color="#993399">63</font>
+<b><font color="#000080">#define</font></b> <a name="527">B0111111</a> <font color="#993399">63</font>
+<b><font color="#000080">#define</font></b> <a name="528">B00111111</a> <font color="#993399">63</font>
+<b><font color="#000080">#define</font></b> <a name="529">B1000000</a> <font color="#993399">64</font>
+<b><font color="#000080">#define</font></b> <a name="530">B01000000</a> <font color="#993399">64</font>
+<b><font color="#000080">#define</font></b> <a name="531">B1000001</a> <font color="#993399">65</font>
+<b><font color="#000080">#define</font></b> <a name="532">B01000001</a> <font color="#993399">65</font>
+<b><font color="#000080">#define</font></b> <a name="533">B1000010</a> <font color="#993399">66</font>
+<b><font color="#000080">#define</font></b> <a name="534">B01000010</a> <font color="#993399">66</font>
+<b><font color="#000080">#define</font></b> <a name="535">B1000011</a> <font color="#993399">67</font>
+<b><font color="#000080">#define</font></b> <a name="536">B01000011</a> <font color="#993399">67</font>
+<b><font color="#000080">#define</font></b> <a name="537">B1000100</a> <font color="#993399">68</font>
+<b><font color="#000080">#define</font></b> <a name="538">B01000100</a> <font color="#993399">68</font>
+<b><font color="#000080">#define</font></b> <a name="539">B1000101</a> <font color="#993399">69</font>
+<b><font color="#000080">#define</font></b> <a name="540">B01000101</a> <font color="#993399">69</font>
+<b><font color="#000080">#define</font></b> <a name="541">B1000110</a> <font color="#993399">70</font>
+<b><font color="#000080">#define</font></b> <a name="542">B01000110</a> <font color="#993399">70</font>
+<b><font color="#000080">#define</font></b> <a name="543">B1000111</a> <font color="#993399">71</font>
+<b><font color="#000080">#define</font></b> <a name="544">B01000111</a> <font color="#993399">71</font>
+<b><font color="#000080">#define</font></b> <a name="545">B1001000</a> <font color="#993399">72</font>
+<b><font color="#000080">#define</font></b> <a name="546">B01001000</a> <font color="#993399">72</font>
+<b><font color="#000080">#define</font></b> <a name="547">B1001001</a> <font color="#993399">73</font>
+<b><font color="#000080">#define</font></b> <a name="548">B01001001</a> <font color="#993399">73</font>
+<b><font color="#000080">#define</font></b> <a name="549">B1001010</a> <font color="#993399">74</font>
+<b><font color="#000080">#define</font></b> <a name="550">B01001010</a> <font color="#993399">74</font>
+<b><font color="#000080">#define</font></b> <a name="551">B1001011</a> <font color="#993399">75</font>
+<b><font color="#000080">#define</font></b> <a name="552">B01001011</a> <font color="#993399">75</font>
+<b><font color="#000080">#define</font></b> <a name="553">B1001100</a> <font color="#993399">76</font>
+<b><font color="#000080">#define</font></b> <a name="554">B01001100</a> <font color="#993399">76</font>
+<b><font color="#000080">#define</font></b> <a name="555">B1001101</a> <font color="#993399">77</font>
+<b><font color="#000080">#define</font></b> <a name="556">B01001101</a> <font color="#993399">77</font>
+<b><font color="#000080">#define</font></b> <a name="557">B1001110</a> <font color="#993399">78</font>
+<b><font color="#000080">#define</font></b> <a name="558">B01001110</a> <font color="#993399">78</font>
+<b><font color="#000080">#define</font></b> <a name="559">B1001111</a> <font color="#993399">79</font>
+<b><font color="#000080">#define</font></b> <a name="560">B01001111</a> <font color="#993399">79</font>
+<b><font color="#000080">#define</font></b> <a name="561">B1010000</a> <font color="#993399">80</font>
+<b><font color="#000080">#define</font></b> <a name="562">B01010000</a> <font color="#993399">80</font>
+<b><font color="#000080">#define</font></b> <a name="563">B1010001</a> <font color="#993399">81</font>
+<b><font color="#000080">#define</font></b> <a name="564">B01010001</a> <font color="#993399">81</font>
+<b><font color="#000080">#define</font></b> <a name="565">B1010010</a> <font color="#993399">82</font>
+<b><font color="#000080">#define</font></b> <a name="566">B01010010</a> <font color="#993399">82</font>
+<b><font color="#000080">#define</font></b> <a name="567">B1010011</a> <font color="#993399">83</font>
+<b><font color="#000080">#define</font></b> <a name="568">B01010011</a> <font color="#993399">83</font>
+<b><font color="#000080">#define</font></b> <a name="569">B1010100</a> <font color="#993399">84</font>
+<b><font color="#000080">#define</font></b> <a name="570">B01010100</a> <font color="#993399">84</font>
+<b><font color="#000080">#define</font></b> <a name="571">B1010101</a> <font color="#993399">85</font>
+<b><font color="#000080">#define</font></b> <a name="572">B01010101</a> <font color="#993399">85</font>
+<b><font color="#000080">#define</font></b> <a name="573">B1010110</a> <font color="#993399">86</font>
+<b><font color="#000080">#define</font></b> <a name="574">B01010110</a> <font color="#993399">86</font>
+<b><font color="#000080">#define</font></b> <a name="575">B1010111</a> <font color="#993399">87</font>
+<b><font color="#000080">#define</font></b> <a name="576">B01010111</a> <font color="#993399">87</font>
+<b><font color="#000080">#define</font></b> <a name="577">B1011000</a> <font color="#993399">88</font>
+<b><font color="#000080">#define</font></b> <a name="578">B01011000</a> <font color="#993399">88</font>
+<b><font color="#000080">#define</font></b> <a name="579">B1011001</a> <font color="#993399">89</font>
+<b><font color="#000080">#define</font></b> <a name="580">B01011001</a> <font color="#993399">89</font>
+<b><font color="#000080">#define</font></b> <a name="581">B1011010</a> <font color="#993399">90</font>
+<b><font color="#000080">#define</font></b> <a name="582">B01011010</a> <font color="#993399">90</font>
+<b><font color="#000080">#define</font></b> <a name="583">B1011011</a> <font color="#993399">91</font>
+<b><font color="#000080">#define</font></b> <a name="584">B01011011</a> <font color="#993399">91</font>
+<b><font color="#000080">#define</font></b> <a name="585">B1011100</a> <font color="#993399">92</font>
+<b><font color="#000080">#define</font></b> <a name="586">B01011100</a> <font color="#993399">92</font>
+<b><font color="#000080">#define</font></b> <a name="587">B1011101</a> <font color="#993399">93</font>
+<b><font color="#000080">#define</font></b> <a name="588">B01011101</a> <font color="#993399">93</font>
+<b><font color="#000080">#define</font></b> <a name="589">B1011110</a> <font color="#993399">94</font>
+<b><font color="#000080">#define</font></b> <a name="590">B01011110</a> <font color="#993399">94</font>
+<b><font color="#000080">#define</font></b> <a name="591">B1011111</a> <font color="#993399">95</font>
+<b><font color="#000080">#define</font></b> <a name="592">B01011111</a> <font color="#993399">95</font>
+<b><font color="#000080">#define</font></b> <a name="593">B1100000</a> <font color="#993399">96</font>
+<b><font color="#000080">#define</font></b> <a name="594">B01100000</a> <font color="#993399">96</font>
+<b><font color="#000080">#define</font></b> <a name="595">B1100001</a> <font color="#993399">97</font>
+<b><font color="#000080">#define</font></b> <a name="596">B01100001</a> <font color="#993399">97</font>
+<b><font color="#000080">#define</font></b> <a name="597">B1100010</a> <font color="#993399">98</font>
+<b><font color="#000080">#define</font></b> <a name="598">B01100010</a> <font color="#993399">98</font>
+<b><font color="#000080">#define</font></b> <a name="599">B1100011</a> <font color="#993399">99</font>
+<b><font color="#000080">#define</font></b> <a name="600">B01100011</a> <font color="#993399">99</font>
+<b><font color="#000080">#define</font></b> <a name="601">B1100100</a> <font color="#993399">100</font>
+<b><font color="#000080">#define</font></b> <a name="602">B01100100</a> <font color="#993399">100</font>
+<b><font color="#000080">#define</font></b> <a name="603">B1100101</a> <font color="#993399">101</font>
+<b><font color="#000080">#define</font></b> <a name="604">B01100101</a> <font color="#993399">101</font>
+<b><font color="#000080">#define</font></b> <a name="605">B1100110</a> <font color="#993399">102</font>
+<b><font color="#000080">#define</font></b> <a name="606">B01100110</a> <font color="#993399">102</font>
+<b><font color="#000080">#define</font></b> <a name="607">B1100111</a> <font color="#993399">103</font>
+<b><font color="#000080">#define</font></b> <a name="608">B01100111</a> <font color="#993399">103</font>
+<b><font color="#000080">#define</font></b> <a name="609">B1101000</a> <font color="#993399">104</font>
+<b><font color="#000080">#define</font></b> <a name="610">B01101000</a> <font color="#993399">104</font>
+<b><font color="#000080">#define</font></b> <a name="611">B1101001</a> <font color="#993399">105</font>
+<b><font color="#000080">#define</font></b> <a name="612">B01101001</a> <font color="#993399">105</font>
+<b><font color="#000080">#define</font></b> <a name="613">B1101010</a> <font color="#993399">106</font>
+<b><font color="#000080">#define</font></b> <a name="614">B01101010</a> <font color="#993399">106</font>
+<b><font color="#000080">#define</font></b> <a name="615">B1101011</a> <font color="#993399">107</font>
+<b><font color="#000080">#define</font></b> <a name="616">B01101011</a> <font color="#993399">107</font>
+<b><font color="#000080">#define</font></b> <a name="617">B1101100</a> <font color="#993399">108</font>
+<b><font color="#000080">#define</font></b> <a name="618">B01101100</a> <font color="#993399">108</font>
+<b><font color="#000080">#define</font></b> <a name="619">B1101101</a> <font color="#993399">109</font>
+<b><font color="#000080">#define</font></b> <a name="620">B01101101</a> <font color="#993399">109</font>
+<b><font color="#000080">#define</font></b> <a name="621">B1101110</a> <font color="#993399">110</font>
+<b><font color="#000080">#define</font></b> <a name="622">B01101110</a> <font color="#993399">110</font>
+<b><font color="#000080">#define</font></b> <a name="623">B1101111</a> <font color="#993399">111</font>
+<b><font color="#000080">#define</font></b> <a name="624">B01101111</a> <font color="#993399">111</font>
+<b><font color="#000080">#define</font></b> <a name="625">B1110000</a> <font color="#993399">112</font>
+<b><font color="#000080">#define</font></b> <a name="626">B01110000</a> <font color="#993399">112</font>
+<b><font color="#000080">#define</font></b> <a name="627">B1110001</a> <font color="#993399">113</font>
+<b><font color="#000080">#define</font></b> <a name="628">B01110001</a> <font color="#993399">113</font>
+<b><font color="#000080">#define</font></b> <a name="629">B1110010</a> <font color="#993399">114</font>
+<b><font color="#000080">#define</font></b> <a name="630">B01110010</a> <font color="#993399">114</font>
+<b><font color="#000080">#define</font></b> <a name="631">B1110011</a> <font color="#993399">115</font>
+<b><font color="#000080">#define</font></b> <a name="632">B01110011</a> <font color="#993399">115</font>
+<b><font color="#000080">#define</font></b> <a name="633">B1110100</a> <font color="#993399">116</font>
+<b><font color="#000080">#define</font></b> <a name="634">B01110100</a> <font color="#993399">116</font>
+<b><font color="#000080">#define</font></b> <a name="635">B1110101</a> <font color="#993399">117</font>
+<b><font color="#000080">#define</font></b> <a name="636">B01110101</a> <font color="#993399">117</font>
+<b><font color="#000080">#define</font></b> <a name="637">B1110110</a> <font color="#993399">118</font>
+<b><font color="#000080">#define</font></b> <a name="638">B01110110</a> <font color="#993399">118</font>
+<b><font color="#000080">#define</font></b> <a name="639">B1110111</a> <font color="#993399">119</font>
+<b><font color="#000080">#define</font></b> <a name="640">B01110111</a> <font color="#993399">119</font>
+<b><font color="#000080">#define</font></b> <a name="641">B1111000</a> <font color="#993399">120</font>
+<b><font color="#000080">#define</font></b> <a name="642">B01111000</a> <font color="#993399">120</font>
+<b><font color="#000080">#define</font></b> <a name="643">B1111001</a> <font color="#993399">121</font>
+<b><font color="#000080">#define</font></b> <a name="644">B01111001</a> <font color="#993399">121</font>
+<b><font color="#000080">#define</font></b> <a name="645">B1111010</a> <font color="#993399">122</font>
+<b><font color="#000080">#define</font></b> <a name="646">B01111010</a> <font color="#993399">122</font>
+<b><font color="#000080">#define</font></b> <a name="647">B1111011</a> <font color="#993399">123</font>
+<b><font color="#000080">#define</font></b> <a name="648">B01111011</a> <font color="#993399">123</font>
+<b><font color="#000080">#define</font></b> <a name="649">B1111100</a> <font color="#993399">124</font>
+<b><font color="#000080">#define</font></b> <a name="650">B01111100</a> <font color="#993399">124</font>
+<b><font color="#000080">#define</font></b> <a name="651">B1111101</a> <font color="#993399">125</font>
+<b><font color="#000080">#define</font></b> <a name="652">B01111101</a> <font color="#993399">125</font>
+<b><font color="#000080">#define</font></b> <a name="653">B1111110</a> <font color="#993399">126</font>
+<b><font color="#000080">#define</font></b> <a name="654">B01111110</a> <font color="#993399">126</font>
+<b><font color="#000080">#define</font></b> <a name="655">B1111111</a> <font color="#993399">127</font>
+<b><font color="#000080">#define</font></b> <a name="656">B01111111</a> <font color="#993399">127</font>
+<b><font color="#000080">#define</font></b> <a name="657">B10000000</a> <font color="#993399">128</font>
+<b><font color="#000080">#define</font></b> <a name="658">B10000001</a> <font color="#993399">129</font>
+<b><font color="#000080">#define</font></b> <a name="659">B10000010</a> <font color="#993399">130</font>
+<b><font color="#000080">#define</font></b> <a name="660">B10000011</a> <font color="#993399">131</font>
+<b><font color="#000080">#define</font></b> <a name="661">B10000100</a> <font color="#993399">132</font>
+<b><font color="#000080">#define</font></b> <a name="662">B10000101</a> <font color="#993399">133</font>
+<b><font color="#000080">#define</font></b> <a name="663">B10000110</a> <font color="#993399">134</font>
+<b><font color="#000080">#define</font></b> <a name="664">B10000111</a> <font color="#993399">135</font>
+<b><font color="#000080">#define</font></b> <a name="665">B10001000</a> <font color="#993399">136</font>
+<b><font color="#000080">#define</font></b> <a name="666">B10001001</a> <font color="#993399">137</font>
+<b><font color="#000080">#define</font></b> <a name="667">B10001010</a> <font color="#993399">138</font>
+<b><font color="#000080">#define</font></b> <a name="668">B10001011</a> <font color="#993399">139</font>
+<b><font color="#000080">#define</font></b> <a name="669">B10001100</a> <font color="#993399">140</font>
+<b><font color="#000080">#define</font></b> <a name="670">B10001101</a> <font color="#993399">141</font>
+<b><font color="#000080">#define</font></b> <a name="671">B10001110</a> <font color="#993399">142</font>
+<b><font color="#000080">#define</font></b> <a name="672">B10001111</a> <font color="#993399">143</font>
+<b><font color="#000080">#define</font></b> <a name="673">B10010000</a> <font color="#993399">144</font>
+<b><font color="#000080">#define</font></b> <a name="674">B10010001</a> <font color="#993399">145</font>
+<b><font color="#000080">#define</font></b> <a name="675">B10010010</a> <font color="#993399">146</font>
+<b><font color="#000080">#define</font></b> <a name="676">B10010011</a> <font color="#993399">147</font>
+<b><font color="#000080">#define</font></b> <a name="677">B10010100</a> <font color="#993399">148</font>
+<b><font color="#000080">#define</font></b> <a name="678">B10010101</a> <font color="#993399">149</font>
+<b><font color="#000080">#define</font></b> <a name="679">B10010110</a> <font color="#993399">150</font>
+<b><font color="#000080">#define</font></b> <a name="680">B10010111</a> <font color="#993399">151</font>
+<b><font color="#000080">#define</font></b> <a name="681">B10011000</a> <font color="#993399">152</font>
+<b><font color="#000080">#define</font></b> <a name="682">B10011001</a> <font color="#993399">153</font>
+<b><font color="#000080">#define</font></b> <a name="683">B10011010</a> <font color="#993399">154</font>
+<b><font color="#000080">#define</font></b> <a name="684">B10011011</a> <font color="#993399">155</font>
+<b><font color="#000080">#define</font></b> <a name="685">B10011100</a> <font color="#993399">156</font>
+<b><font color="#000080">#define</font></b> <a name="686">B10011101</a> <font color="#993399">157</font>
+<b><font color="#000080">#define</font></b> <a name="687">B10011110</a> <font color="#993399">158</font>
+<b><font color="#000080">#define</font></b> <a name="688">B10011111</a> <font color="#993399">159</font>
+<b><font color="#000080">#define</font></b> <a name="689">B10100000</a> <font color="#993399">160</font>
+<b><font color="#000080">#define</font></b> <a name="690">B10100001</a> <font color="#993399">161</font>
+<b><font color="#000080">#define</font></b> <a name="691">B10100010</a> <font color="#993399">162</font>
+<b><font color="#000080">#define</font></b> <a name="692">B10100011</a> <font color="#993399">163</font>
+<b><font color="#000080">#define</font></b> <a name="693">B10100100</a> <font color="#993399">164</font>
+<b><font color="#000080">#define</font></b> <a name="694">B10100101</a> <font color="#993399">165</font>
+<b><font color="#000080">#define</font></b> <a name="695">B10100110</a> <font color="#993399">166</font>
+<b><font color="#000080">#define</font></b> <a name="696">B10100111</a> <font color="#993399">167</font>
+<b><font color="#000080">#define</font></b> <a name="697">B10101000</a> <font color="#993399">168</font>
+<b><font color="#000080">#define</font></b> <a name="698">B10101001</a> <font color="#993399">169</font>
+<b><font color="#000080">#define</font></b> <a name="699">B10101010</a> <font color="#993399">170</font>
+<b><font color="#000080">#define</font></b> <a name="700">B10101011</a> <font color="#993399">171</font>
+<b><font color="#000080">#define</font></b> <a name="701">B10101100</a> <font color="#993399">172</font>
+<b><font color="#000080">#define</font></b> <a name="702">B10101101</a> <font color="#993399">173</font>
+<b><font color="#000080">#define</font></b> <a name="703">B10101110</a> <font color="#993399">174</font>
+<b><font color="#000080">#define</font></b> <a name="704">B10101111</a> <font color="#993399">175</font>
+<b><font color="#000080">#define</font></b> <a name="705">B10110000</a> <font color="#993399">176</font>
+<b><font color="#000080">#define</font></b> <a name="706">B10110001</a> <font color="#993399">177</font>
+<b><font color="#000080">#define</font></b> <a name="707">B10110010</a> <font color="#993399">178</font>
+<b><font color="#000080">#define</font></b> <a name="708">B10110011</a> <font color="#993399">179</font>
+<b><font color="#000080">#define</font></b> <a name="709">B10110100</a> <font color="#993399">180</font>
+<b><font color="#000080">#define</font></b> <a name="710">B10110101</a> <font color="#993399">181</font>
+<b><font color="#000080">#define</font></b> <a name="711">B10110110</a> <font color="#993399">182</font>
+<b><font color="#000080">#define</font></b> <a name="712">B10110111</a> <font color="#993399">183</font>
+<b><font color="#000080">#define</font></b> <a name="713">B10111000</a> <font color="#993399">184</font>
+<b><font color="#000080">#define</font></b> <a name="714">B10111001</a> <font color="#993399">185</font>
+<b><font color="#000080">#define</font></b> <a name="715">B10111010</a> <font color="#993399">186</font>
+<b><font color="#000080">#define</font></b> <a name="716">B10111011</a> <font color="#993399">187</font>
+<b><font color="#000080">#define</font></b> <a name="717">B10111100</a> <font color="#993399">188</font>
+<b><font color="#000080">#define</font></b> <a name="718">B10111101</a> <font color="#993399">189</font>
+<b><font color="#000080">#define</font></b> <a name="719">B10111110</a> <font color="#993399">190</font>
+<b><font color="#000080">#define</font></b> <a name="720">B10111111</a> <font color="#993399">191</font>
+<b><font color="#000080">#define</font></b> <a name="721">B11000000</a> <font color="#993399">192</font>
+<b><font color="#000080">#define</font></b> <a name="722">B11000001</a> <font color="#993399">193</font>
+<b><font color="#000080">#define</font></b> <a name="723">B11000010</a> <font color="#993399">194</font>
+<b><font color="#000080">#define</font></b> <a name="724">B11000011</a> <font color="#993399">195</font>
+<b><font color="#000080">#define</font></b> <a name="725">B11000100</a> <font color="#993399">196</font>
+<b><font color="#000080">#define</font></b> <a name="726">B11000101</a> <font color="#993399">197</font>
+<b><font color="#000080">#define</font></b> <a name="727">B11000110</a> <font color="#993399">198</font>
+<b><font color="#000080">#define</font></b> <a name="728">B11000111</a> <font color="#993399">199</font>
+<b><font color="#000080">#define</font></b> <a name="729">B11001000</a> <font color="#993399">200</font>
+<b><font color="#000080">#define</font></b> <a name="730">B11001001</a> <font color="#993399">201</font>
+<b><font color="#000080">#define</font></b> <a name="731">B11001010</a> <font color="#993399">202</font>
+<b><font color="#000080">#define</font></b> <a name="732">B11001011</a> <font color="#993399">203</font>
+<b><font color="#000080">#define</font></b> <a name="733">B11001100</a> <font color="#993399">204</font>
+<b><font color="#000080">#define</font></b> <a name="734">B11001101</a> <font color="#993399">205</font>
+<b><font color="#000080">#define</font></b> <a name="735">B11001110</a> <font color="#993399">206</font>
+<b><font color="#000080">#define</font></b> <a name="736">B11001111</a> <font color="#993399">207</font>
+<b><font color="#000080">#define</font></b> <a name="737">B11010000</a> <font color="#993399">208</font>
+<b><font color="#000080">#define</font></b> <a name="738">B11010001</a> <font color="#993399">209</font>
+<b><font color="#000080">#define</font></b> <a name="739">B11010010</a> <font color="#993399">210</font>
+<b><font color="#000080">#define</font></b> <a name="740">B11010011</a> <font color="#993399">211</font>
+<b><font color="#000080">#define</font></b> <a name="741">B11010100</a> <font color="#993399">212</font>
+<b><font color="#000080">#define</font></b> <a name="742">B11010101</a> <font color="#993399">213</font>
+<b><font color="#000080">#define</font></b> <a name="743">B11010110</a> <font color="#993399">214</font>
+<b><font color="#000080">#define</font></b> <a name="744">B11010111</a> <font color="#993399">215</font>
+<b><font color="#000080">#define</font></b> <a name="745">B11011000</a> <font color="#993399">216</font>
+<b><font color="#000080">#define</font></b> <a name="746">B11011001</a> <font color="#993399">217</font>
+<b><font color="#000080">#define</font></b> <a name="747">B11011010</a> <font color="#993399">218</font>
+<b><font color="#000080">#define</font></b> <a name="748">B11011011</a> <font color="#993399">219</font>
+<b><font color="#000080">#define</font></b> <a name="749">B11011100</a> <font color="#993399">220</font>
+<b><font color="#000080">#define</font></b> <a name="750">B11011101</a> <font color="#993399">221</font>
+<b><font color="#000080">#define</font></b> <a name="751">B11011110</a> <font color="#993399">222</font>
+<b><font color="#000080">#define</font></b> <a name="752">B11011111</a> <font color="#993399">223</font>
+<b><font color="#000080">#define</font></b> <a name="753">B11100000</a> <font color="#993399">224</font>
+<b><font color="#000080">#define</font></b> <a name="754">B11100001</a> <font color="#993399">225</font>
+<b><font color="#000080">#define</font></b> <a name="755">B11100010</a> <font color="#993399">226</font>
+<b><font color="#000080">#define</font></b> <a name="756">B11100011</a> <font color="#993399">227</font>
+<b><font color="#000080">#define</font></b> <a name="757">B11100100</a> <font color="#993399">228</font>
+<b><font color="#000080">#define</font></b> <a name="758">B11100101</a> <font color="#993399">229</font>
+<b><font color="#000080">#define</font></b> <a name="759">B11100110</a> <font color="#993399">230</font>
+<b><font color="#000080">#define</font></b> <a name="760">B11100111</a> <font color="#993399">231</font>
+<b><font color="#000080">#define</font></b> <a name="761">B11101000</a> <font color="#993399">232</font>
+<b><font color="#000080">#define</font></b> <a name="762">B11101001</a> <font color="#993399">233</font>
+<b><font color="#000080">#define</font></b> <a name="763">B11101010</a> <font color="#993399">234</font>
+<b><font color="#000080">#define</font></b> <a name="764">B11101011</a> <font color="#993399">235</font>
+<b><font color="#000080">#define</font></b> <a name="765">B11101100</a> <font color="#993399">236</font>
+<b><font color="#000080">#define</font></b> <a name="766">B11101101</a> <font color="#993399">237</font>
+<b><font color="#000080">#define</font></b> <a name="767">B11101110</a> <font color="#993399">238</font>
+<b><font color="#000080">#define</font></b> <a name="768">B11101111</a> <font color="#993399">239</font>
+<b><font color="#000080">#define</font></b> <a name="769">B11110000</a> <font color="#993399">240</font>
+<b><font color="#000080">#define</font></b> <a name="770">B11110001</a> <font color="#993399">241</font>
+<b><font color="#000080">#define</font></b> <a name="771">B11110010</a> <font color="#993399">242</font>
+<b><font color="#000080">#define</font></b> <a name="772">B11110011</a> <font color="#993399">243</font>
+<b><font color="#000080">#define</font></b> <a name="773">B11110100</a> <font color="#993399">244</font>
+<b><font color="#000080">#define</font></b> <a name="774">B11110101</a> <font color="#993399">245</font>
+<b><font color="#000080">#define</font></b> <a name="775">B11110110</a> <font color="#993399">246</font>
+<b><font color="#000080">#define</font></b> <a name="776">B11110111</a> <font color="#993399">247</font>
+<b><font color="#000080">#define</font></b> <a name="777">B11111000</a> <font color="#993399">248</font>
+<b><font color="#000080">#define</font></b> <a name="778">B11111001</a> <font color="#993399">249</font>
+<b><font color="#000080">#define</font></b> <a name="779">B11111010</a> <font color="#993399">250</font>
+<b><font color="#000080">#define</font></b> <a name="780">B11111011</a> <font color="#993399">251</font>
+<b><font color="#000080">#define</font></b> <a name="781">B11111100</a> <font color="#993399">252</font>
+<b><font color="#000080">#define</font></b> <a name="782">B11111101</a> <font color="#993399">253</font>
+<b><font color="#000080">#define</font></b> <a name="783">B11111110</a> <font color="#993399">254</font>
+<b><font color="#000080">#define</font></b> <a name="784">B11111111</a> <font color="#993399">255</font>
+<i><font color="#9A1900">// }}}1</font></i>
+
+<b><font color="#000080">#endif</font></b> <i><font color="#9A1900">// UTIL_H</font></i>
+</tt></pre>

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+  <title>Cduino Prerequisites</title>
+  <meta name="keywords" content="arduino, Cduino, prerequisites, hardware" />
+  <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+
+  <script type="text/javascript">
+
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-23228808-1']);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+
+  </script>
+
+</head>
+
+<body>
+
+<h1>Cduino Prerequisites</h1>
+
+The following hardware must be available:
+
+<ul>
+
+  <li><a href="http://www.arduino.cc/en/Main/ArduinoBoardDuemilanove">Arduino
+    Duemilanove</a> or <a
+    href="http://arduino.cc/en/Main/ArduinoBoardUno">Arduino Uno</a> with USB
+  programming cable.  If you use an older duemilanove, some variable settings
+  may need to be tweaked away from the defaults (which assume a Mega328P
+  chip).</li>
+
+  <li>If you want to use in-system programming (ISP), an
+  <a href="http://www.atmel.com/dyn/products/tools_card.asp?tool_id=3808">
+    AVRISPmkII
+  </a>
+  or clone is needed.  Probably any programmer supported by avrdude could be
+  made to work with a trivial tweak or two to <code>generic.mk</code>, but I
+  don't own any other so I can't test them.
+
+</ul>
+
+The following programs must be installed:
+
+<ul>
+
+  <li>GNU AVR GCC compiler (debian package: <a
+    href="http://packages.debian.org/squeeze/gcc-avr">gcc-avr</a>)</li>
+
+  <li>GNU AVR binutils (debian package:  <a
+    href="http://packages.debian.org/squeeze/binutils-avr">binutils-avr</a>)
+  </li>
+
+  <li><a href="http://www.nongnu.org/avr-libc/">GNU AVR libc</a> (debian
+  package: <a
+    href="http://packages.debian.org/squeeze/avr-libc">avr-libc</a>)</li>
+
+  <li><a href="http://savannah.nongnu.org/projects/avrdude/">avrdude</a>
+  (debian package: <a
+    href="http://packages.debian.org/squeeze/avrdude">avrdude</a>)</li>
+
+  <li><a href="http://www.gnu.org/software/screen/">screen</a> for
+  terminal-style communication with the arduino (debian package: <a
+    href="http://packages.debian.org/squeeze/screen">screen</a>)</li>
+
+  <li>
+    If you don't want to have to press the reset button on the arduino every
+    time you program using the arduino bootloader method, you'll need the
+    <a
+      href="http://search.cpan.org/~cook/Device-SerialPort-1.04/SerialPort.pm">
+      Device::SerialPort
+    </a>
+    perl module (debian package:
+    <a href="http://packages.debian.org/search?keywords=device-serialport&searchon=names&suite=stable&section=all">
+      libdevice-serialport-perl
+    </a>
+    ).
+  </li>
+
+</ul>
+
+The AVR GCC compiler, toolchain and libc are a bit tricky to compile.  It's
+probably best to use the versions provided by your linux distribution.  If you
+do otherwise, you'll probably have to tweak some flags in the
+<code>generic.mk</code> file to tell it where things are, I haven't done this
+myself.
+<p />
+
+The avrdude program is easy to build.
+<p />
+
+The screen program is available as a package for all distributions.
+<p />
+
+The avrdude program has its own dependencies: it requries at least access to a
+USB serial device.  If in-system programming (ISP) with an AVRISP MkII device
+is going to be done, the libusb library is also required.  Most modern linux
+distrubutions probably provide these prerequisites by default.
+<p />
+
+The Make program provided by this package attempts to detect and report on
+missing software dependencies and untested dependency versions.
+<p />
+
+</body>
+
+</html>

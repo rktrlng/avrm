@@ -1,0 +1,168 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">// Implementation of the interface described in <a href="timer0_stopwatch.h.html">timer0_stopwatch.h</a>.</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/interrupt.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/atomic.h&gt;</font>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="timer0_stopwatch.h.html">timer0_stopwatch.h</a>"</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">"<a href="util.h.html">util.h</a>"</font>
+
+<b><font color="#000080">#define</font></b> <a name="9">TIMER0_VALUE_COUNT</a> <font color="#993399">256</font>   <i><font color="#9A1900">// Values representable with eight bits</font></i>
+
+<b><font color="#000080">#ifndef</font></b> __AVR_ATmega328P__
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> <font color="#008080">Processor</font> <font color="#008080">macro</font> __AVR_ATmega328P__ is <font color="#008080">not</font> defined<font color="#990000">.</font> This <font color="#008080">code</font> has <font color="#990000">\</font>
+         only been tested with the ATMega328p at <font color="#993399">16</font> MHz on an <font color="#008080">Arduino</font> Uno <font color="#990000">\</font>
+         board<font color="#990000">,</font> though it should work with other ATMega or <font color="#008080">ATTiny</font> chips <font color="#990000">\</font>
+         Use the source and relax this <font color="#008080"><a href="sd_card.c.html#114">error</a></font> trap <font color="#990000">:)</font>
+<b><font color="#000080">#endif</font></b>
+
+<b><font color="#000080">#if</font></b> F_CPU <font color="#990000">!=</font> <font color="#993399">16000000</font>
+<b><font color="#000080">#  </font></b><b><font color="#000080"><a href="sd_card.c.html#114">error</a></font></b> F_CPU is not defined to be <font color="#993399">16000000</font><font color="#990000">.</font> This code has only <font color="#008080">been</font> tested <font color="#990000">\</font>
+         with the ATMega328p at <font color="#993399">16</font> MHz on an Arduino <font color="#008080">Uno</font> board<font color="#990000">,</font> <font color="#008080">though</font> it <font color="#990000">\</font>
+         should work with other ATMega or <font color="#008080">ATTiny</font> chips<font color="#990000">.</font>  It should <font color="#008080">also</font> work <font color="#990000">\</font>
+         at other <font color="#008080">clock</font> frequencies<font color="#990000">,</font> though some of the <font color="#008080">performance</font> macros <font color="#990000">\</font>
+         <font color="#990000">(</font>overhead guarantees and <font color="#008080">the</font> like<font color="#990000">)</font> and tests might need <font color="#008080">to</font> be <font color="#990000">\</font>
+         changed<font color="#990000">.</font>  Use the source and relax this <font color="#008080"><a href="sd_card.c.html#114">error</a></font> trap <font color="#990000">:)</font>
+<b><font color="#000080">#endif</font></b>
+
+<b><font color="#0000FF">volatile</font></b> <font color="#008080">uint32_t</font> <a name="27">timer0_stopwatch_oc</a><font color="#990000">;</font>
+
+<i><font color="#9A1900">// Explicit support for ATTiny chip interrupt name thingies from AVR libc,</font></i>
+<i><font color="#9A1900">// to make migration to smaller/cheaper chips easier.</font></i>
+<b><font color="#000080">#if</font></b> <b><font color="#000000">defined</font></b> <font color="#990000">(</font>__AVR_ATtiny24__<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b> <font color="#990000">(</font>__AVR_ATtiny44__<font color="#990000">)</font> <font color="#990000">||</font> <font color="#990000">\</font>
+    <b><font color="#000000">defined</font></b> <font color="#990000">(</font>__AVR_ATtiny84__<font color="#990000">)</font>
+<b><font color="#000000"><a name="34">ISR</a></font></b> <font color="#990000">(</font>TIM0_OVF_vect<font color="#990000">)</font>
+<b><font color="#000080">#else</font></b>
+<b><font color="#000000">ISR</font></b> <font color="#990000">(</font>TIMER0_OVF_vect<font color="#990000">)</font>
+<a href="lesson10.c.html#29">ISR -> lesson10.c:29</a>
+<a href="timer0_stopwatch.c.html#34">ISR -> timer0_stopwatch.c:34</a>
+<b><font color="#000080">#endif</font></b>
+<font color="#FF0000">{</font>
+  <i><font color="#9A1900">// Note that we don't need to use an atomic block here, as we're inside</font></i>
+  <i><font color="#9A1900">// an ordinary ISR block, so interrupts are globally deferred anyway.</font></i>
+  <a href="timer0_stopwatch.c.html#27">timer0_stopwatch_oc</a><font color="#990000">++;</font>
+<font color="#FF0000">}</font>
+
+<i><font color="#9A1900">// Default values of the timer/counter0 control registers (for the ATmega328P</font></i>
+<i><font color="#9A1900">// at least), according to the datasheet.</font></i>
+<b><font color="#000080">#define</font></b> <a name="46">TCCR0A_DEFAULT_VALUE</a> <font color="#993399">0x00</font>
+<b><font color="#000080">#define</font></b> <a name="47">TCCR0B_DEFAULT_VALUE</a> <font color="#993399">0x00</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="50">timer0_stopwatch_init</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  PRR <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PRTIM0<font color="#990000">));</font>   <i><font color="#9A1900">// Ensure timer0 not shut down to save power.</font></i>
+
+  TCCR0A <font color="#990000">=</font> <a href="timer0_stopwatch.c.html#46">TCCR0A_DEFAULT_VALUE</a><font color="#990000">;</font>
+  TCCR0B <font color="#990000">=</font> <a href="timer0_stopwatch.c.html#47">TCCR0B_DEFAULT_VALUE</a><font color="#990000">;</font>
+
+  <i><font color="#9A1900">// Reset the timer, in case it currently has some strange value that might</font></i>
+  <i><font color="#9A1900">// cause it to overflow (possibly triggering a deferred overflow interrupt)</font></i>
+  <i><font color="#9A1900">// as soon as we start it running.</font></i>
+  TCNT0 <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+
+  <i><font color="#9A1900">// Ensure that timer/counter0 is in normal mode (timer counts upwards and</font></i>
+  <i><font color="#9A1900">// simply overruns when it passes its maximum 8-bit value).</font></i>
+  TCCR0B <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>WGM02<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>WGM01<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>WGM00<font color="#990000">));</font>
+
+  <i><font color="#9A1900">// Ensure that the clock source for timer/counter is set to the</font></i>
+  <i><font color="#9A1900">// TIMER0_STOPWATCH_PRESCALER_DIVIDER prescaler tap.  Note that connecting</font></i>
+  <i><font color="#9A1900">// the clock source here probably allows the timer to run for a few</font></i>
+  <i><font color="#9A1900">// cycles before we reset everything and start handling interrupts, but</font></i>
+  <i><font color="#9A1900">// it shouldn't matter.</font></i>
+  TCCR0B <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>CS02<font color="#990000">));</font>
+  TCCR0B <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>CS01<font color="#990000">)</font> <font color="#990000">|</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>CS00<font color="#990000">);</font>
+
+  TIMSK0 <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>TOIE0<font color="#990000">);</font>   <i><font color="#9A1900">// Enable overflow interrupts for timer/counter0.</font></i>
+
+  <a href="timer0_stopwatch.c.html#27">timer0_stopwatch_oc</a> <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+
+  <i><font color="#9A1900">// FIXME: It's possible that we should be using the TSM bit of GTCCR here</font></i>
+  <i><font color="#9A1900">// to truly sync up the counter and the prescaler, I dunno if it's worth</font></i>
+  <i><font color="#9A1900">// dealing with though.</font></i>
+
+  TIFR0 <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>TOV0<font color="#990000">);</font>   <i><font color="#9A1900">// Overflow flag is "cleared" by writing one to it</font></i>
+  GTCCR <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PSRSYNC<font color="#990000">);</font>   <i><font color="#9A1900">// Reset the prescaler (affects timer1 also)</font></i>
+  TCNT0 <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+
+  <b><font color="#000000">sei</font></b> <font color="#990000">();</font>   <i><font color="#9A1900">// Enable interrupts.</font></i>
+<font color="#FF0000">}</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="90">timer0_stopwatch_reset</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <b><font color="#000000">ATOMIC_BLOCK</font></b> <font color="#990000">(</font>ATOMIC_RESTORESTATE<font color="#990000">)</font>
+  <font color="#FF0000">{</font>
+    <a href="timer0_stopwatch.c.html#27">timer0_stopwatch_oc</a> <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+    <i><font color="#9A1900">// Clear the overflow flag.  NOTE: it is my understanding that clearing</font></i>
+    <i><font color="#9A1900">// this will prevent any deferred overflow interrupt that may have</font></i>
+    <i><font color="#9A1900">// gone pending during this atomic block from executing: see document</font></i>
+    <i><font color="#9A1900">// "AVR130: Setup and Use the AVR Timers", section "Example -- Timer0</font></i>
+    <i><font color="#9A1900">// Overflow Interrupt".</font></i>
+    TIFR0 <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>TOV0<font color="#990000">);</font>   <i><font color="#9A1900">// Overflow flag is "cleared" by writing one to it</font></i>
+    GTCCR <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PSRSYNC<font color="#990000">);</font>   <i><font color="#9A1900">// Reset the prescaler  (affects timer1 also)</font></i>
+    TCNT0 <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+uint32_t
+<b><font color="#000000"><a name="107">timer0_stopwatch_ticks</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#008080">uint32_t</font> result<font color="#990000">;</font>
+
+  <b><font color="#000000">ATOMIC_BLOCK</font></b> <font color="#990000">(</font>ATOMIC_RESTORESTATE<font color="#990000">)</font>
+  <font color="#FF0000">{</font>
+    <i><font color="#9A1900">// Save timer/counter value in case it overflows while we're checking</font></i>
+    <i><font color="#9A1900">// for overflow (note that timers run parallel to everything, including</font></i>
+    <i><font color="#9A1900">// interrupt handlers).</font></i>
+    <b><font color="#0000FF">register</font></b> <font color="#008080">uint8_t</font> tcv <font color="#990000">=</font> TCNT0<font color="#990000">;</font>
+
+    <i><font color="#9A1900">// If we have an uncleared overflow flag...</font></i>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(</font> TIFR0 <font color="#990000">&amp;</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>TOV0<font color="#990000">)</font> <font color="#990000">)</font> <font color="#FF0000">{</font>
+      <i><font color="#9A1900">// ...then we have one extra overflow that the interrup handler hasn't</font></i>
+      <i><font color="#9A1900">// had a chance to count yet, and it might even have happend since we</font></i>
+      <i><font color="#9A1900">// saved the value of TCNT0 a few instructions ago, so we don't add</font></i>
+      <i><font color="#9A1900">// tcv in.</font></i>
+      result <font color="#990000">=</font> <font color="#990000">(</font><a href="timer0_stopwatch.c.html#27">timer0_stopwatch_oc</a> <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">)</font> <font color="#990000">*</font> <a href="timer0_stopwatch.c.html#9">TIMER0_VALUE_COUNT</a><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">else</font></b> <font color="#FF0000">{</font>
+      <i><font color="#9A1900">// Otherwise, the computation is as expected.</font></i>
+      result <font color="#990000">=</font> <a href="timer0_stopwatch.c.html#27">timer0_stopwatch_oc</a> <font color="#990000">*</font> <a href="timer0_stopwatch.c.html#9">TIMER0_VALUE_COUNT</a> <font color="#990000">+</font> tcv<font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+
+  <b><font color="#0000FF">return</font></b> result<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+uint32_t
+<b><font color="#000000"><a name="136">timer0_stopwatch_microseconds</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  <font color="#008080">uint32_t</font> tmp<font color="#990000">;</font>
+  <b><font color="#000000"><a href="timer0_stopwatch.h.html#109">TIMER0_STOPWATCH_TICKS</a></font></b> <font color="#990000">(</font>tmp<font color="#990000">);</font>
+
+  <b><font color="#0000FF">return</font></b> <a href="timer0_stopwatch.h.html#47">TIMER0_STOPWATCH_MICROSECONDS_PER_TIMER_TICK</a> <font color="#990000">*</font> tmp<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<font color="#009900">void</font>
+<b><font color="#000000"><a name="145">timer0_stopwatch_shutdown</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+  TIMSK0 <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>TOIE0<font color="#990000">));</font>   <i><font color="#9A1900">// Disable overflow interrups for timer/counter0.</font></i>
+
+  <i><font color="#9A1900">// Restore defaults for timer/counter0 control register B.  Note that this</font></i>
+  <i><font color="#9A1900">// will stop the timer.</font></i>
+  TCCR0B <font color="#990000">=</font> <a href="timer0_stopwatch.c.html#47">TCCR0B_DEFAULT_VALUE</a><font color="#990000">;</font>
+
+  <i><font color="#9A1900">// Leave timer reading 0 as per interface promise.</font></i>
+  <a href="timer0_stopwatch.c.html#27">timer0_stopwatch_oc</a> <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  TCNT0 <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+  TIFR0 <font color="#990000">|=</font> <b><font color="#000000">_BV</font></b> <font color="#990000">(</font>TOV0<font color="#990000">);</font>   <i><font color="#9A1900">// Overflow flag is "cleared" by writing one to it</font></i>
+
+  TCCR0A <font color="#990000">=</font> <a href="timer0_stopwatch.c.html#46">TCCR0A_DEFAULT_VALUE</a><font color="#990000">;</font>
+
+  PRR <font color="#990000">&amp;=</font> <font color="#990000">~(</font><b><font color="#000000">_BV</font></b> <font color="#990000">(</font>PRTIM0<font color="#990000">));</font>   <i><font color="#9A1900">// Shutdown timer/counter0 to save power.</font></i>
+<font color="#FF0000">}</font>
+</tt></pre>

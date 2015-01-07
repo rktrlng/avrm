@@ -1,0 +1,106 @@
+<!-- Generator: GNU source-highlight 3.1.7
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">/* $CSK: <a href="lesson6.c.html">lesson6.c</a>,v 1.2 2009/05/17 06:22:44 ckuethe Exp $ */</font></i>
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900"> * Copyright (c) 2008 Chris Kuethe </font></i><u><font color="#0000FF">&lt;chris.kuethe@gmail.com&gt;</font></u>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * Permission to use, copy, modify, and distribute this software for any</font></i>
+<i><font color="#9A1900"> * purpose with or without fee is hereby granted, provided that the above</font></i>
+<i><font color="#9A1900"> * copyright notice and this permission notice appear in all copies.</font></i>
+<i><font color="#9A1900"> *</font></i>
+<i><font color="#9A1900"> * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES</font></i>
+<i><font color="#9A1900"> * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF</font></i>
+<i><font color="#9A1900"> * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR</font></i>
+<i><font color="#9A1900"> * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES</font></i>
+<i><font color="#9A1900"> * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN</font></i>
+<i><font color="#9A1900"> * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF</font></i>
+<i><font color="#9A1900"> * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;avr/io.h&gt;</font>
+<b><font color="#000080">#include</font></b> <font color="#FF0000">&lt;util/delay.h&gt;</font>
+
+<i><font color="#9A1900">/*</font></i>
+<i><font color="#9A1900"> * Assumptions:</font></i>
+<i><font color="#9A1900"> * 	- LED connected to PORTB.5</font></i>
+<i><font color="#9A1900"> * 	- Switch connected to PORTD.2</font></i>
+<i><font color="#9A1900"> */</font></i>
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">void</font>
+<b><font color="#000000"><a name="28">serial_init</a></font></b><font color="#990000">(</font><font color="#009900">unsigned</font> <font color="#009900">int</font> bittimer<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+	<i><font color="#9A1900">/* Set the baud rate */</font></i>
+	UBRR0H <font color="#990000">=</font> <font color="#990000">(</font><font color="#009900">unsigned</font> <font color="#009900">char</font><font color="#990000">)</font> <font color="#990000">(</font>bittimer <font color="#990000">&gt;&gt;</font> <font color="#993399">8</font><font color="#990000">);</font>
+	UBRR0L <font color="#990000">=</font> <font color="#990000">(</font><font color="#009900">unsigned</font> <font color="#009900">char</font><font color="#990000">)</font> bittimer<font color="#990000">;</font>
+	<i><font color="#9A1900">/* set the framing to 8N1 */</font></i>
+	UCSR0C <font color="#990000">=</font> <font color="#990000">(</font><font color="#993399">3</font> <font color="#990000">&lt;&lt;</font> UCSZ00<font color="#990000">);</font>
+	<i><font color="#9A1900">/* Engage! */</font></i>
+	UCSR0B <font color="#990000">=</font> <font color="#990000">(</font><font color="#993399">1</font> <font color="#990000">&lt;&lt;</font> RXEN0<font color="#990000">)</font> <font color="#990000">|</font> <font color="#990000">(</font><font color="#993399">1</font> <font color="#990000">&lt;&lt;</font> TXEN0<font color="#990000">);</font>
+	<b><font color="#0000FF">return</font></b><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">unsigned</font> <font color="#009900">char</font>
+<b><font color="#000000"><a name="41">serial_read</a></font></b><font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+	<b><font color="#0000FF">while</font></b><font color="#990000">(</font> <font color="#990000">!(</font>UCSR0A <font color="#990000">&amp;</font> <font color="#990000">(</font><font color="#993399">1</font> <font color="#990000">&lt;&lt;</font> RXC0<font color="#990000">))</font> <font color="#990000">)</font>
+		<font color="#990000">;</font>
+	<b><font color="#0000FF">return</font></b> UDR0<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">static</font></b> <font color="#009900">void</font>
+<b><font color="#000000"><a name="49">serial_write</a></font></b><font color="#990000">(</font><font color="#009900">unsigned</font> <font color="#009900">char</font> c<font color="#990000">)</font>
+<font color="#FF0000">{</font>
+	<b><font color="#0000FF">while</font></b> <font color="#990000">(</font> <font color="#990000">!(</font>UCSR0A <font color="#990000">&amp;</font> <font color="#990000">(</font><font color="#993399">1</font> <font color="#990000">&lt;&lt;</font> UDRE0<font color="#990000">))</font> <font color="#990000">)</font>
+		<font color="#990000">;</font>
+	UDR0 <font color="#990000">=</font> c<font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#000080">#define</font></b> <a name="56">SPEED</a> <font color="#993399">9600</font>
+
+<font color="#009900">int</font>
+<b><font color="#000000"><a name="59">main</a></font></b> <font color="#990000">(</font><font color="#009900">void</font><font color="#990000">)</font>
+<font color="#FF0000">{</font>
+	<font color="#009900">int</font> ledstate <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+	<i><font color="#9A1900">/* set PORTB for output*/</font></i>
+	DDRB <font color="#990000">=</font> <font color="#993399">0xFF</font><font color="#990000">;</font>
+	<i><font color="#9A1900">/* set PORTD for input*/</font></i>
+	DDRD <font color="#990000">&amp;=</font> <font color="#993399">0xFB</font><font color="#990000">;</font>
+	PORTD <font color="#990000">|=</font> <font color="#993399">0x04</font><font color="#990000">;</font>
+
+	<i><font color="#9A1900">/* let the preprocessor calculate this */</font></i>
+	<b><font color="#000000">serial_init</font></b><font color="#990000">(</font> <font color="#990000">(</font> F_CPU <font color="#990000">/</font> SPEED <font color="#990000">/</font> <font color="#993399">16</font> <font color="#990000">)</font> <font color="#990000">-</font> <font color="#993399">1</font><font color="#990000">);</font>
+<a href="lesson4.c.html#22">serial_init -> lesson4.c:22</a>
+<a href="lesson4.c.html#42">SPEED -> lesson4.c:42</a>
+<a href="lesson5.c.html#22">serial_init -> lesson5.c:22</a>
+<a href="lesson5.c.html#50">SPEED -> lesson5.c:50</a>
+<a href="lesson6.c.html#28">serial_init -> lesson6.c:28</a>
+<a href="lesson6.c.html#56">SPEED -> lesson6.c:56</a>
+
+	<b><font color="#0000FF">while</font></b> <font color="#990000">(</font><font color="#993399">1</font><font color="#990000">)</font> <font color="#FF0000">{</font>
+
+		<i><font color="#9A1900">/* read a character and echo back the next one */</font></i>
+		<b><font color="#000000">serial_write</font></b><font color="#990000">(</font> <b><font color="#000000">serial_read</font></b><font color="#990000">()</font> <font color="#990000">+</font> <font color="#993399">1</font><font color="#990000">);</font>
+<a href="lesson4.c.html#35">serial_write -> lesson4.c:35</a>
+<a href="lesson5.c.html#35">serial_read -> lesson5.c:35</a>
+<a href="lesson5.c.html#43">serial_write -> lesson5.c:43</a>
+<a href="lesson6.c.html#41">serial_read -> lesson6.c:41</a>
+<a href="lesson6.c.html#49">serial_write -> lesson6.c:49</a>
+
+		<i><font color="#9A1900">/* test button */</font></i>
+		<b><font color="#0000FF">if</font></b> <font color="#990000">(</font>PIND <font color="#990000">&amp;</font> <font color="#993399">0x04</font><font color="#990000">)</font><font color="#FF0000">{</font>
+			<b><font color="#000000">_delay_ms</font></b><font color="#990000">(</font><font color="#993399">2</font><font color="#990000">);</font>
+			ledstate <font color="#990000">=</font> <font color="#990000">!</font>ledstate<font color="#990000">;</font>
+		<font color="#FF0000">}</font>
+
+		<b><font color="#0000FF">if</font></b> <font color="#990000">(</font>ledstate<font color="#990000">)</font>
+			PORTB <font color="#990000">&amp;=</font> <font color="#990000">~</font><font color="#993399">0x20</font><font color="#990000">;</font>
+		<b><font color="#0000FF">else</font></b>
+			PORTB <font color="#990000">|=</font>  <font color="#993399">0x20</font><font color="#990000">;</font>
+
+	<font color="#FF0000">}</font>
+	<b><font color="#0000FF">return</font></b> <font color="#993399">0</font><font color="#990000">;</font>
+<font color="#FF0000">}</font>
+
+</tt></pre>
