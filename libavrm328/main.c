@@ -1,9 +1,8 @@
-#include <avr/io.h>
-#include <inttypes.h>
-#include <avr/interrupt.h>
-#include <util/delay.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include <avr/io.h>			// register names
+#include <inttypes.h>		// uint8_t etc.
+#include <avr/interrupt.h>	// ISR(...)
+#include <util/delay.h>		// not used here
+#include <stdlib.h>			// itoa
 
 #include "adc.h"
 #include "spi.h"
@@ -12,7 +11,6 @@
 #include "timers.h"
 #include "leds.h"
 #include "buttons.h"
-
 
 int main(void)
 {
@@ -35,7 +33,7 @@ int main(void)
 	timer0_init(); // CTC
 	timer2_init(); // PWM
 	
-	// init the UART
+	// init the USART
 	usart_init(9600);
 	
 	// enable interrupts

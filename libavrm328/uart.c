@@ -1,7 +1,6 @@
 #include <avr/io.h>
 #include <inttypes.h>
 #include <avr/interrupt.h>
-#include <stdlib.h>
 
 #include "uart.h"
 
@@ -19,11 +18,14 @@ void usart_init(int baud_rate)
 	UCSR0C |= (3<<UCSZ00); // 8 data bits
 	UCSR0C &= ~(1<<USBS0); // 1 stop bit
 	
-	// enable USART recieve interrupt
+	// enable USART receive interrupt
 	UCSR0B |= (1 << RXCIE0 );
 }
 
-
+uint8_t usart_data_available(void)
+{
+	return (UCSR0A & (1<<RXC0));
+}
 
 char usart_read_char(void)
 {
