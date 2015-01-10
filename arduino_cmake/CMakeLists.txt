@@ -123,21 +123,24 @@ MACRO(POST_PROCESS prog chip port baud)
 		avr-size -A --mcu=${MCU} ${HEX_PATH} &&
 		echo ${MESSAGE}
 	)
-	ADD_CUSTOM_TARGET(flash_${PRJ_NAME} 
-		make ${PRJ_NAME}.hex && 
-		avrdude -p ${chip} -c ${prog} -P ${port} -b ${baud} -D -U flash:w:${HEX_PATH}:i -v
-	)
-	ADD_CUSTOM_TARGET(gpio_${PRJ_NAME} 
-		make ${PRJ_NAME}.hex && 
-		avrdude -p ${chip} -c ${prog} -U flash:w:${HEX_PATH}:i -v &&
-		cd ${UNEXPORT_SCR_PATH} &&
-		./reset_gpio.sh
-	)
-	ADD_CUSTOM_TARGET(dfu_${PRJ_NAME} 
-		make ${PRJ_NAME}.hex && 
-		dfu-programmer ${chip} erase &&
-		dfu-programmer ${chip} flash ${HEX_PATH}
-	)
+	if(PROGRAMMER MATCHES linuxgpio)
+		ADD_CUSTOM_TARGET(gpio_${PRJ_NAME} 
+			make ${PRJ_NAME}.hex && 
+			avrdude -p ${chip} -c ${prog} -U flash:w:${HEX_PATH}:i -v &&
+			cd ${UNEXPORT_SCR_PATH} &&
+			./reset_gpio.sh
+		)
+	else()
+		ADD_CUSTOM_TARGET(flash_${PRJ_NAME} 
+			make ${PRJ_NAME}.hex && 
+			avrdude -p ${chip} -c ${prog} -P ${port} -b ${baud} -D -U flash:w:${HEX_PATH}:i -v
+		)
+		ADD_CUSTOM_TARGET(dfu_${PRJ_NAME} 
+			make ${PRJ_NAME}.hex && 
+			dfu-programmer ${chip} erase &&
+			dfu-programmer ${chip} flash ${HEX_PATH}
+		)
+	endif()
 	ADD_CUSTOM_TARGET(clean_${PRJ_NAME} 
 		make clean &&
 		rm ${HEX_PATH}
