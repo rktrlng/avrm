@@ -8,7 +8,8 @@ usage()
   -h         help          show this info
   -a         apt-get       apt-get all prerequisites
   -p         patch         patch arduino
-  -c         compile       compile + install from source
+  -w         wiringPi      install wiringPi
+  -c         compile       compile + install avrdude from source
   -b         binary        install pre-compiled avrdude binary
   -f         fuses         set m328p fuses (with crystal)
   -t         test          make + upload test/blinky.hex
@@ -91,6 +92,27 @@ test_blinky()
 	cd ..
 }
 
+install_wiringpi()
+{
+	cd install/
+
+	if [ -d wiringPi ]; then
+		echo "wiringPi found. updating..."
+		cd wiringPi
+		git pull origin
+		./build
+		cd ..
+	else
+		echo "First time git clone: installing"
+		git clone git://git.drogon.net/wiringPi
+		cd wiringPi
+		./build
+		cd ..
+	fi
+	
+	cd ..
+}
+
 remove()
 {
 	# sudo apt-get remove avrdude would be better, but also removes arduino
@@ -124,7 +146,7 @@ install_ino()
 }
 
 
-while getopts ":hacbptfr" opt; do
+while getopts ":hacbpwtfr" opt; do
   case $opt in
     h)
       usage
@@ -144,6 +166,10 @@ while getopts ":hacbptfr" opt; do
       ;;
     p)
       patch_arduino
+      exit 0
+      ;;
+    w)
+      install_wiringpi
       exit 0
       ;;
     t)
