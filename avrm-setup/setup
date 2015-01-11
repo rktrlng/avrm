@@ -13,6 +13,7 @@ usage()
   -b         binary        install pre-compiled avrdude binary
   -f         fuses         set m328p fuses (with crystal)
   -t         test          make + upload test/blinky.hex
+  -v         avrm          install avrm tool
   -r         remove        remove avrdude from system"
 }
 
@@ -113,6 +114,24 @@ install_wiringpi()
 	cd ..
 }
 
+install_avrm()
+{
+	cd install/
+
+	if [ -f /etc/avrm.cfg ]; then
+		echo "Old /etc/avrm.cfg found. Backing up..." >&2
+		sudo mv /etc/avrm.cfg /etc/avrm.cfg.bak
+	else
+		echo "No config file found. Installing avrm default config..." >&2
+	fi
+
+	echo "Please 'sudo nano /etc/avrm.cfg' and edit for your board." >&2
+	sudo cp avrm/avrm.cfg /etc/avrm.cfg
+	sudo cp avrm/avrm /usr/local/bin/avrm
+
+	cd ..
+}
+
 remove()
 {
 	# sudo apt-get remove avrdude would be better, but also removes arduino
@@ -146,7 +165,7 @@ install_ino()
 }
 
 
-while getopts ":hacbpwtfr" opt; do
+while getopts ":hacbpwtfvr" opt; do
   case $opt in
     h)
       usage
@@ -178,6 +197,10 @@ while getopts ":hacbpwtfr" opt; do
       ;;
     f)
       m328_fuses
+      exit 0
+      ;;
+    v)
+      install_avrm
       exit 0
       ;;
     r)
