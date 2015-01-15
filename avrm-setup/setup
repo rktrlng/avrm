@@ -5,16 +5,17 @@ usage()
 	echo "Usage: setup [options]
 
 [options] is any of the following:
-  -h         help          show this info
-  -a         apt-get       apt-get all prerequisites
-  -p         patch         patch arduino
-  -w         wiringPi      install wiringPi
-  -c         compile       compile + install avrdude from source
-  -b         binary        install pre-compiled avrdude binary
-  -f         fuses         set m328p fuses (with crystal)
-  -t         test          make + upload test/blinky.hex
-  -v         avrm          install avrm tool
-  -r         remove        remove avrdude from system"
+  -h         help           show this info
+  -a         apt-get        apt-get all prerequisites
+  -p         patch          patch arduino
+  -w         wiringPi       install wiringPi
+  -d         dfu-programmer install dfu-programmer
+  -c         compile        compile + install avrdude from source
+  -b         binary         install pre-compiled avrdude binary
+  -f         fuses          set m328p fuses (with crystal)
+  -t         test           make + upload test/blinky.hex
+  -v         avrm           install avrm tool
+  -r         remove         remove avrdude from system"
 }
 
 apt_get_everything()
@@ -114,6 +115,29 @@ install_wiringpi()
 	cd ..
 }
 
+install_dfu_programmer()
+{
+	cd install/
+
+	if [ -d dfu-programmer ]; then
+		echo "dfu-programmer found. updating..."
+		cd dfu-programmer
+		git pull origin
+	else
+		echo "First time git clone: installing"
+		git clone https://github.com/dfu-programmer/dfu-programmer
+		cd dfu-programmer
+	fi
+	
+	./bootstrap.sh
+	./configure
+	make
+	sudo make install
+	cd .. #dfu-programmer
+
+	cd .. #install
+}
+
 install_avrm()
 {
 	cd install/
@@ -165,7 +189,7 @@ install_ino()
 }
 
 
-while getopts ":hacbpwtfvr" opt; do
+while getopts ":hacbpwdtfvr" opt; do
   case $opt in
     h)
       usage
@@ -189,6 +213,10 @@ while getopts ":hacbpwtfvr" opt; do
       ;;
     w)
       install_wiringpi
+      exit 0
+      ;;
+    d)
+      install_dfu_programmer
       exit 0
       ;;
     t)
