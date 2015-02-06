@@ -83,6 +83,7 @@ patch_arduino()
 
 m328_fuses()
 {
+	#factory: (E:07, H:D9, L:62)
 	avrdude -v -c linuxgpio -p m328p -U lfuse:w:0xE7:m -U hfuse:w:0xD9:m -U efuse:w:0x07:m
 }
 
