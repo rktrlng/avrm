@@ -12,7 +12,7 @@ usage()
   -d         dfu-programmer install dfu-programmer
   -c         compile        compile + install avrdude from source
   -b         binary         install pre-compiled avrdude binary
-  -f         fuses          set m328p fuses (with crystal)
+  -f         fuses          set m32u4 fuses (with crystal)
   -t         test           make + upload test/blinky.hex
   -v         avrm           install avrm tool
   -r         remove         remove avrdude from system"
@@ -83,7 +83,13 @@ patch_arduino()
 
 m328_fuses()
 {
-	avrdude -v -c linuxgpio -p m328p -U lfuse:w:0xE7:m -U hfuse:w:0xD9:m -U efuse:w:0x07:m
+	avrdude -v -c linuxgpio -p m328p -v -U lfuse:w:0xE7:m -U hfuse:w:0xD9:m -U efuse:w:0x07:m
+}
+
+m32u4_fuses()
+{
+	#from factory:  (E:F3, H:99, L:5E)
+	avrdude -v -c linuxgpio -p m32u4 -v -U lfuse:w:0xde:m -U hfuse:w:0xd8:m -U efuse:w:0xcb:m
 }
 
 test_blinky()
@@ -224,7 +230,8 @@ while getopts ":hacbpwdtfvr" opt; do
       exit 0
       ;;
     f)
-      m328_fuses
+#      m328_fuses
+      m32u4_fuses
       exit 0
       ;;
     v)
