@@ -12,7 +12,7 @@ usage()
   -d         dfu-programmer install dfu-programmer
   -c         compile        compile + install avrdude from source
   -b         binary         install pre-compiled avrdude binary
-  -f         fuses          set m32u4 fuses (with crystal)
+  -f         fuses          set m328p fuses (with crystal)
   -t         test           make + upload test/blinky.hex
   -v         avrm           install avrm tool
   -r         remove         remove avrdude from system"
