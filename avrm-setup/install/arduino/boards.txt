@@ -46,7 +46,7 @@ avrm12.build.variant=standard
 
 ##############################################################
 
-avrm32u4.name=AVRM32U4 ATmega32U4 @ 16MHz
+avrm32u4.name=AVRM32U4 ATmega32U4 @ 8MHz
 
 avrm32u4.upload.using=linuxgpio
 avrm32u4.upload.protocol=linuxgpio
@@ -63,7 +63,7 @@ avrm32u4.bootloader.unlock_bits=0x3F
 avrm32u4.bootloader.lock_bits=0x2F
 
 avrm32u4.build.mcu=atmega32u4
-avrm32u4.build.f_cpu=16000000L
+avrm32u4.build.f_cpu=8000000L
 avrm32u4.build.vid=0x2341
 avrm32u4.build.pid=0x8036
 avrm32u4.build.core=arduino
